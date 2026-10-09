@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyLodge Travel</title>
+    <style>
+        /* ── Reset & Base ─────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; line-height: 1.5; }
+
+        /* ── Top Bar ──────────────────────────────────────────────── */
+        .top-bar { background: #1a365d; padding: .45rem 2rem; display: flex; justify-content: space-between; align-items: center; font-size: .78rem; color: #bee3f8; }
+        .top-bar a { color: #bee3f8; text-decoration: none; }
+        .top-bar a:hover { color: #fff; }
+        .top-bar-links { display: flex; gap: 1.2rem; }
+
+        /* ── Header ───────────────────────────────────────────────── */
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #4299e1, #63b3ed); border-radius: .4rem; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; font-weight: 700; }
+        .logo-text { color: #fff; font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
+        .logo-text em { font-style: normal; color: #63b3ed; }
+
+        /* ── Nav ───────────────────────────────────────────────────── */
+        .main-nav { background: #fff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 100; }
+        .main-nav-inner { max-width: 1120px; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; gap: 0; }
+        .main-nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .85rem 1rem; border-bottom: 3px solid transparent; transition: color .15s, border-color .15s, background .15s; }
+        .main-nav a:hover { background: #ebf4ff; border-bottom-color: #bee3f8; }
+        .main-nav a.active { color: #1a365d; font-weight: 700; background: #bee3f8; border-bottom-color: #2b6cb0; }
+        .nav-right { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+        .btn-signin { background: #1a365d; color: #fff !important; padding: .5rem 1.2rem; border-radius: .3rem; font-weight: 600; font-size: .85rem; border-bottom: none !important; transition: background .15s; }
+        .btn-signin:hover { background: #2b6cb0; border-bottom-color: transparent !important; }
+        .btn-signout { color: #e53e3e !important; font-size: .85rem; }
+        .btn-signout:hover { color: #c53030 !important; background: transparent !important; }
+
+        /* ── Hero ──────────────────────────────────────────────────── */
+        .hero {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 35%, #2b6cb0 70%, #4299e1 100%);
+            color: #fff;
+            text-align: center;
+            padding: 3.5rem 2rem 5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(66,153,225,.25) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(99,179,237,.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(190,227,248,.15) 0%, transparent 40%);
+            pointer-events: none;
+        }
+        .hero-content { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; }
+        .hero-badge { display: inline-block; background: rgba(255,255,255,.15); backdrop-filter: blur(4px); padding: .3rem 1rem; border-radius: 2rem; font-size: .8rem; font-weight: 500; letter-spacing: .03em; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,.15); }
+        .hero h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: .6rem; letter-spacing: -.02em; line-height: 1.2; }
+        .hero p { font-size: 1.1rem; opacity: .85; max-width: 520px; margin: 0 auto; line-height: 1.6; }
+        .hero-stats { display: flex; justify-content: center; gap: 2.5rem; margin-top: 1.5rem; }
+        .hero-stat { text-align: center; }
+        .hero-stat .stat-num { font-size: 1.5rem; font-weight: 800; display: block; }
+        .hero-stat .stat-label { font-size: .78rem; opacity: .7; text-transform: uppercase; letter-spacing: .05em; }
+
+        /* ── Search Box ───────────────────────────────────────────── */
+        .search-wrapper { max-width: 900px; margin: -3rem auto 0; padding: 0 1.5rem; position: relative; z-index: 10; }
+
+        .search-tabs { display: flex; gap: 2px; }
+        .search-tabs button {
+            padding: .7rem 1.5rem;
+            font-size: .92rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            background: rgba(255,255,255,.65);
+            color: #4a5568;
+            border-radius: .5rem .5rem 0 0;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            transition: background .15s, color .15s;
+        }
+        .search-tabs button .tab-icon { font-size: 1.1rem; }
+        .search-tabs button:hover { background: rgba(255,255,255,.85); }
+        .search-tabs button.active { background: #fff; color: #2b6cb0; box-shadow: 0 -2px 8px rgba(0,0,0,.04); }
+
+        .search-panel {
+            background: #fff;
+            border-radius: 0 .6rem .6rem .6rem;
+            box-shadow: 0 8px 30px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.04);
+            padding: 1.8rem 2rem;
+        }
+        .search-panel .form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .search-panel .form-group { flex: 1; min-width: 170px; position: relative; }
+        .search-panel .form-group.narrow { max-width: 150px; }
+        .form-label { display: block; font-size: .75rem; font-weight: 600; color: #4a5568; margin-bottom: .35rem; text-transform: uppercase; letter-spacing: .04em; }
+        .form-input {
+            width: 100%;
+            padding: .65rem .85rem;
+            border: 1px solid #cbd5e0;
+            border-radius: .3rem;
+            font-size: .92rem;
+            color: #2d3748;
+            background: #fff;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+            -webkit-appearance: none;
+        }
+        .form-input:focus { outline: none; border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,.15); background: #fff; }
+        .form-input::placeholder { color: #a0aec0; }
+
+        .form-row-split { display: flex; gap: .5rem; }
+        .passengers-group { position: relative; }
+        .passengers-group .pax-display {
+            cursor: pointer;
+            display: flex; align-items: center; gap: .4rem;
+        }
+        .passengers-group .pax-display .pax-icon { font-size: 1rem; color: #718096; }
+
+        .search-btn {
+            background: #2b6cb0;
+            color: #fff;
+            border: none;
+            padding: .8rem 2.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: .3rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: .5rem;
+            transition: background .2s, transform .1s, box-shadow .2s;
+            box-shadow: 0 2px 8px rgba(43,108,176,.25);
+            letter-spacing: .01em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .5rem;
+        }
+        .search-btn:hover { background: #1a365d; box-shadow: 0 4px 14px rgba(26,54,93,.35); }
+        .search-btn:active { transform: scale(.99); }
+        .search-btn .btn-arrow { font-size: 1.1rem; }
+
+        .hidden { display: none !important; }
+
+        /* ── Promo Banner ─────────────────────────────────────────── */
+        .promo-banner {
+            max-width: 900px;
+            margin: 1.5rem auto 0;
+            padding: 0 1.5rem;
+        }
+        .promo-inner {
+            background: #fefcbf;
+            border: 1px solid #d69e2e;
+            border-radius: .5rem;
+            padding: .8rem 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: .8rem;
+            font-size: .88rem;
+            color: #744210;
+        }
+        .promo-inner .promo-icon { font-size: 1.3rem; }
+        .promo-inner strong { color: #744210; }
+        .promo-inner code { background: rgba(116,66,16,.1); padding: .1rem .4rem; border-radius: .2rem; font-family: 'SF Mono', monospace; font-size: .82rem; }
+
+        /* ── Quick Links / Popular ────────────────────────────────── */
+        .section { max-width: 1120px; margin: 0 auto; padding: 2.5rem 2rem 0; }
+        .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.2rem; }
+        .section-title { font-size: 1.35rem; font-weight: 700; color: #1a365d; }
+        .section-subtitle { font-size: .88rem; color: #718096; }
+        .section-link { font-size: .85rem; color: #2b6cb0; text-decoration: none; font-weight: 600; }
+        .section-link:hover { text-decoration: underline; }
+
+        /* ── Destination Cards ─────────────────────────────────────── */
+        .dest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        .dest-card {
+            background: #fff;
+            border-radius: .6rem;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+            transition: transform .2s, box-shadow .2s;
+            text-decoration: none;
+            color: inherit;
+            border: 1px solid #e2e8f0;
+        }
+        .dest-card:hover { transform: translateY(-3px); border-color: #4299e1; box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+        .dest-card-img {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            position: relative;
+        }
+        .dest-card-img.seattle { background: linear-gradient(135deg, #234e52, #2c7a7b); }
+        .dest-card-img.portland { background: linear-gradient(135deg, #1a365d, #2b6cb0); }
+        .dest-card-img.sanfran { background: linear-gradient(135deg, #744210, #d69e2e); }
+        .dest-card-img.losangeles { background: linear-gradient(135deg, #c53030, #e53e3e); }
+        .dest-card-img.newyork { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+        .dest-card-img.chicago { background: linear-gradient(135deg, #2d3748, #4a5568); }
+        .dest-card-body { padding: .8rem 1rem; }
+        .dest-card-city { font-weight: 700; font-size: .95rem; color: #1a365d; }
+        .dest-card-info { font-size: .78rem; color: #718096; margin-top: .15rem; }
+        .dest-card-price { font-size: .82rem; color: #2f855a; font-weight: 600; margin-top: .3rem; }
+
+        /* ── Feature Strip ────────────────────────────────────────── */
+        .features-strip {
+            max-width: 1120px;
+            margin: 2.5rem auto 0;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.2rem;
+        }
+        .feature-item {
+            background: #fff;
+            border-radius: .6rem;
+            padding: 1.4rem;
+            text-align: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,.05);
+            border: 1px solid #e2e8f0;
+            transition: border-color .2s;
+        }
+        .feature-item:hover { border-color: #63b3ed; }
+        .feature-icon {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto .8rem;
+            font-size: 1.4rem;
+        }
+        .feature-icon.blue { background: #ebf4ff; color: #2b6cb0; }
+        .feature-icon.green { background: #e6fffa; color: #2c7a7b; }
+        .feature-icon.amber { background: #fefcbf; color: #d69e2e; }
+        .feature-icon.purple { background: #e9d8fd; color: #6b46c1; }
+        .feature-item h3 { font-size: .92rem; font-weight: 700; color: #1a365d; margin-bottom: .3rem; }
+        .feature-item p { font-size: .8rem; color: #718096; line-height: 1.5; }
+
+        /* ── Deal Cards ───────────────────────────────────────────── */
+        .deals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.2rem; }
+        .deal-card {
+            background: #fff;
+            border-radius: .6rem;
+            padding: 1.3rem 1.5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            transition: border-color .2s, box-shadow .2s;
+            text-decoration: none;
+            color: inherit;
+        }
+        .deal-card:hover { border-color: #4299e1; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+        .deal-badge {
+            flex-shrink: 0;
+            width: 52px; height: 52px;
+            border-radius: .5rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+        }
+        .deal-badge.flight-deal { background: linear-gradient(135deg, #ebf4ff, #bee3f8); }
+        .deal-badge.hotel-deal { background: linear-gradient(135deg, #e6fffa, #b2f5ea); }
+        .deal-body { flex: 1; min-width: 0; }
+        .deal-route { font-weight: 700; font-size: .95rem; color: #1a365d; }
+        .deal-detail { font-size: .82rem; color: #718096; margin-top: .15rem; }
+        .deal-footer { display: flex; justify-content: space-between; align-items: baseline; margin-top: .5rem; }
+        .deal-price { font-size: 1.2rem; font-weight: 800; color: #2b6cb0; }
+        .deal-price .deal-unit { font-size: .72rem; font-weight: 500; color: #a0aec0; }
+        .deal-tag {
+            font-size: .7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            padding: .2rem .5rem;
+            border-radius: .2rem;
+            background: #e6fffa;
+            color: #234e52;
+        }
+
+        /* ── Newsletter ───────────────────────────────────────────── */
+        .newsletter {
+            max-width: 1120px;
+            margin: 2.5rem auto 0;
+            padding: 0 2rem;
+        }
+        .newsletter-inner {
+            background: linear-gradient(135deg, #1a365d, #2b6cb0);
+            border-radius: .8rem;
+            padding: 2rem 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            color: #fff;
+        }
+        .newsletter-text h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: .3rem; }
+        .newsletter-text p { font-size: .88rem; opacity: .8; }
+        .newsletter-form { display: flex; gap: .5rem; flex-shrink: 0; }
+        .newsletter-form input {
+            padding: .6rem 1rem;
+            border: 1.5px solid rgba(255,255,255,.3);
+            border-radius: .4rem;
+            background: rgba(255,255,255,.12);
+            color: #fff;
+            font-size: .9rem;
+            width: 250px;
+        }
+        .newsletter-form input::placeholder { color: rgba(255,255,255,.5); }
+        .newsletter-form input:focus { outline: none; border-color: #63b3ed; background: rgba(255,255,255,.18); }
+        .newsletter-form button {
+            background: #63b3ed;
+            color: #1a365d;
+            border: none;
+            padding: .6rem 1.2rem;
+            border-radius: .4rem;
+            font-weight: 700;
+            font-size: .88rem;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        .newsletter-form button:hover { background: #90cdf4; }
+
+        /* ── Footer ───────────────────────────────────────────────── */
+        .footer {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 2rem 2rem 1.5rem;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 2.5rem;
+        }
+        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; }
+        .footer-brand .logo-text { color: #1a365d; font-size: 1.1rem; }
+        .footer-brand .logo-text em { color: #2b6cb0; }
+        .footer-brand p { font-size: .82rem; color: #718096; margin-top: .4rem; line-height: 1.5; }
+        .footer-col h4 { font-size: .78rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .6rem; }
+        .footer-col a { display: block; font-size: .82rem; color: #718096; text-decoration: none; padding: .15rem 0; }
+        .footer-col a:hover { color: #2b6cb0; }
+        .footer-bottom { text-align: center; padding-top: 1rem; border-top: 1px solid #edf2f7; color: #a0aec0; font-size: .78rem; }
+
+        /* ── Responsive ───────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .hero h2 { font-size: 1.6rem; }
+            .hero-stats { gap: 1.5rem; }
+            .features-strip { grid-template-columns: repeat(2, 1fr); }
+            .deals-grid { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr 1fr; }
+            .newsletter-inner { flex-direction: column; text-align: center; }
+            .newsletter-form { width: 100%; }
+            .newsletter-form input { flex: 1; width: auto; }
+            .search-panel .form-group.narrow { max-width: none; }
+            .top-bar { display: none; }
+        }
+        @media (max-width: 480px) {
+            .features-strip { grid-template-columns: 1fr; }
+            .dest-grid { grid-template-columns: repeat(2, 1fr); }
+            .footer-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top utility bar -->
+    <div class="top-bar">
+        <div class="top-bar-links">
+            <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+            <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+            <a href="{{ url_for('flights-hotels.bookings_page') }}">My Trips</a>
+        </div>
+        <div>
+            {% if logged_in %}
+            Welcome, {{ user.name }}
+            {% else %}
+            <a href="{{ url_for('flights-hotels.login_page') }}">Sign In</a> | <a href="{{ url_for('flights-hotels.login_page') }}">Create Account</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Header with logo -->
+    <div class="header">
+        <a href="{{ url_for('flights-hotels.index') }}" class="logo">
+            <div class="logo-icon">S</div>
+            <div class="logo-text">Sky<em>Lodge</em></div>
+        </a>
+    </div>
+
+    <!-- Main navigation -->
+    <nav class="main-nav">
+        <div class="main-nav-inner">
+            <a href="{{ url_for('flights-hotels.index') }}" class="active">Home</a>
+            <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+            <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+            <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+            <div class="nav-right">
+                {% if logged_in %}
+                <a href="{{ url_for('flights-hotels.logout') }}" class="btn-signout">Sign Out ({{ user.name }})</a>
+                {% else %}
+                <a href="{{ url_for('flights-hotels.login_page') }}" class="btn-signin">Sign In</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero section -->
+    <div class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">Your next adventure starts here</div>
+            <h2>Where do you want to go?</h2>
+            <p>Compare flights and hotels across top US cities. Book with confidence, cancel with ease.</p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <span class="stat-num">{{ airports|length }}</span>
+                    <span class="stat-label">Airports</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="stat-num">{{ cities|length }}</span>
+                    <span class="stat-label">Cities</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="stat-num">{{ airlines|length }}</span>
+                    <span class="stat-label">Airlines</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search box -->
+    <div class="search-wrapper">
+        <div class="search-tabs">
+            <button id="tab-flights" class="active" onclick="switchTab('flights')">
+                <span class="tab-icon">&#9992;</span> Flights
+            </button>
+            <button id="tab-hotels" onclick="switchTab('hotels')">
+                <span class="tab-icon">&#127976;</span> Hotels
+            </button>
+        </div>
+
+        <div class="search-panel">
+            <!-- Flights search form -->
+            <form id="form-flights" action="{{ url_for('flights-hotels.flights_page') }}" method="get">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="f-origin">From</label>
+                        <select name="origin" id="f-origin" class="form-input">
+                            <option value="">Any Origin</option>
+                            {% for ap in airports %}
+                            <option value="{{ ap }}">{{ ap }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:flex-end;max-width:40px;justify-content:center;padding-bottom:.6rem;">
+                        <span style="color:#a0aec0;font-size:1.2rem;cursor:pointer;" onclick="swapAirports()" title="Swap origin and destination">&#8644;</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="f-dest">To</label>
+                        <select name="destination" id="f-dest" class="form-input">
+                            <option value="">Any Destination</option>
+                            {% for ap in airports %}
+                            <option value="{{ ap }}">{{ ap }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="f-date">Departure Date</label>
+                        <input type="date" name="date" id="f-date" class="form-input">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="f-airline">Airline</label>
+                        <select name="airline" id="f-airline" class="form-input">
+                            <option value="">Any Airline</option>
+                            {% for a in airlines %}
+                            <option value="{{ a }}">{{ a }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="f-class">Cabin Class</label>
+                        <select name="class" id="f-class" class="form-input">
+                            <option value="">Any Class</option>
+                            <option value="economy">Economy</option>
+                            <option value="business">Business</option>
+                            <option value="first">First</option>
+                        </select>
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="f-passengers">Travelers</label>
+                        <select id="f-passengers" class="form-input">
+                            <option value="1">1 Adult</option>
+                            <option value="2">2 Adults</option>
+                            <option value="3">3 Adults</option>
+                            <option value="4">4 Adults</option>
+                        </select>
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="f-maxprice">Max Price: <span id="f-maxprice-val">Any</span></label>
+                        <input type="range" name="max_price" id="f-maxprice" class="form-input" min="0" max="2000" step="50" value="2000" oninput="document.getElementById('f-maxprice-val').textContent=this.value=='2000'?'Any':'$'+this.value" style="padding:0;">
+                    </div>
+                </div>
+                <div class="form-row" style="gap:.8rem;">
+                    <div class="form-group">
+                        <label class="form-label">Stops</label>
+                        <div style="display:flex;gap:.8rem;padding-top:.3rem;">
+                            <label style="font-size:.85rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+                                <input type="checkbox" name="max_stops" value="0" style="accent-color:#4299e1;"> Nonstop
+                            </label>
+                            <label style="font-size:.85rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+                                <input type="checkbox" name="max_stops" value="1" style="accent-color:#4299e1;"> 1 Stop
+                            </label>
+                            <label style="font-size:.85rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
+                                <input type="checkbox" name="max_stops" value="2" style="accent-color:#4299e1;"> 2+ Stops
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="search-btn">
+                    Search Flights <span class="btn-arrow">&#8594;</span>
+                </button>
+            </form>
+
+            <!-- Hotels search form -->
+            <form id="form-hotels" class="hidden" action="{{ url_for('flights-hotels.hotels_page') }}" method="get">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="h-city">City</label>
+                        <select name="city" id="h-city" class="form-input">
+                            <option value="">Any City</option>
+                            {% for c in cities %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="h-checkin">Check-in</label>
+                        <input type="date" id="h-checkin" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="h-checkout">Check-out</label>
+                        <input type="date" id="h-checkout" class="form-input">
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="h-guests">Guests</label>
+                        <select id="h-guests" class="form-input">
+                            <option value="1">1 Guest</option>
+                            <option value="2">2 Guests</option>
+                            <option value="3">3 Guests</option>
+                            <option value="4">4 Guests</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group narrow">
+                        <label class="form-label" for="h-stars">Min Stars</label>
+                        <select name="min_stars" id="h-stars" class="form-input">
+                            <option value="">Any</option>
+                            <option value="2">2+</option>
+                            <option value="3">3+</option>
+                            <option value="4">4+</option>
+                            <option value="5">5 Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="h-maxprice">Max / Night: <span id="h-maxprice-val">Any</span></label>
+                        <input type="range" name="max_price" id="h-maxprice" class="form-input" min="0" max="1000" step="25" value="1000" oninput="document.getElementById('h-maxprice-val').textContent=this.value=='1000'?'Any':'$'+this.value" style="padding:0;">
+                    </div>
+                    <div class="form-group narrow">
+                        <label class="form-label" for="h-rating">Min Rating</label>
+                        <select name="min_rating" id="h-rating" class="form-input">
+                            <option value="">Any</option>
+                            <option value="3.5">3.5+</option>
+                            <option value="4.0">4.0+</option>
+                            <option value="4.5">4.5+</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="h-sort">Sort By</label>
+                        <select name="sort" id="h-sort" class="form-input">
+                            <option value="price">Price: Low to High</option>
+                            <option value="rating">Guest Rating</option>
+                            <option value="stars">Star Rating</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="search-btn">
+                    Search Hotels <span class="btn-arrow">&#8594;</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Promo banner -->
+    <div class="promo-banner">
+        <div class="promo-inner">
+            <span class="promo-icon">&#127881;</span>
+            <span><strong>Limited offer:</strong> Use promo code <code>SAVE10</code> for 10% off your next booking, or <code>SUMMER25</code> for $25 off!</span>
+        </div>
+    </div>
+
+    <!-- Sponsored products -->
+    <div class="section" style="padding-bottom:0;">
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='flights-hotels-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <!-- Popular Destinations -->
+    <div class="section">
+        <div class="section-header">
+            <div>
+                <h3 class="section-title">Popular Destinations</h3>
+                <p class="section-subtitle">Explore top cities with the best deals on flights and hotels</p>
+            </div>
+            <a href="{{ url_for('flights-hotels.flights_page') }}" class="section-link">View all flights &#8594;</a>
+        </div>
+        <div class="dest-grid">
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='Seattle') }}">
+                <div class="dest-card-img seattle">&#127747;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">Seattle</div>
+                    <div class="dest-card-info">Emerald City, WA</div>
+                    <div class="dest-card-price">Hotels from $89/night</div>
+                </div>
+            </a>
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='Portland') }}">
+                <div class="dest-card-img portland">&#127795;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">Portland</div>
+                    <div class="dest-card-info">Rose City, OR</div>
+                    <div class="dest-card-price">Hotels from $79/night</div>
+                </div>
+            </a>
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='San Francisco') }}">
+                <div class="dest-card-img sanfran">&#127309;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">San Francisco</div>
+                    <div class="dest-card-info">City by the Bay, CA</div>
+                    <div class="dest-card-price">Hotels from $129/night</div>
+                </div>
+            </a>
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='Los Angeles') }}">
+                <div class="dest-card-img losangeles">&#127796;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">Los Angeles</div>
+                    <div class="dest-card-info">City of Angels, CA</div>
+                    <div class="dest-card-price">Hotels from $109/night</div>
+                </div>
+            </a>
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='New York') }}">
+                <div class="dest-card-img newyork">&#127751;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">New York</div>
+                    <div class="dest-card-info">The Big Apple, NY</div>
+                    <div class="dest-card-price">Hotels from $149/night</div>
+                </div>
+            </a>
+            <a class="dest-card" href="{{ url_for('flights-hotels.hotels_page', city='Chicago') }}">
+                <div class="dest-card-img chicago">&#127961;</div>
+                <div class="dest-card-body">
+                    <div class="dest-card-city">Chicago</div>
+                    <div class="dest-card-info">Windy City, IL</div>
+                    <div class="dest-card-price">Hotels from $99/night</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Featured Deals -->
+    <div class="section">
+        <div class="section-header">
+            <div>
+                <h3 class="section-title">Today's Top Deals</h3>
+                <p class="section-subtitle">Hand-picked flights and hotels at great prices</p>
+            </div>
+        </div>
+        <div class="deals-grid">
+            <a class="deal-card" href="{{ url_for('flights-hotels.flights_page', sort='price') }}">
+                <div class="deal-badge flight-deal">&#9992;</div>
+                <div class="deal-body">
+                    <div class="deal-route">SEA &#8594; LAX</div>
+                    <div class="deal-detail">Nonstop, Economy &middot; Multiple airlines</div>
+                    <div class="deal-footer">
+                        <div class="deal-price">$89 <span class="deal-unit">one-way</span></div>
+                        <div class="deal-tag">Best Price</div>
+                    </div>
+                </div>
+            </a>
+            <a class="deal-card" href="{{ url_for('flights-hotels.flights_page', sort='price') }}">
+                <div class="deal-badge flight-deal">&#9992;</div>
+                <div class="deal-body">
+                    <div class="deal-route">SFO &#8594; JFK</div>
+                    <div class="deal-detail">1 stop, Economy &middot; Coast to coast</div>
+                    <div class="deal-footer">
+                        <div class="deal-price">$199 <span class="deal-unit">one-way</span></div>
+                        <div class="deal-tag">Popular</div>
+                    </div>
+                </div>
+            </a>
+            <a class="deal-card" href="{{ url_for('flights-hotels.hotels_page', min_stars='4', sort='price') }}">
+                <div class="deal-badge hotel-deal">&#127976;</div>
+                <div class="deal-body">
+                    <div class="deal-route">4-Star Hotels in NYC</div>
+                    <div class="deal-detail">Luxury stays in Manhattan &middot; Free cancellation</div>
+                    <div class="deal-footer">
+                        <div class="deal-price">$179 <span class="deal-unit">per night</span></div>
+                        <div class="deal-tag">Top Rated</div>
+                    </div>
+                </div>
+            </a>
+            <a class="deal-card" href="{{ url_for('flights-hotels.hotels_page', city='San Francisco', sort='rating') }}">
+                <div class="deal-badge hotel-deal">&#127976;</div>
+                <div class="deal-body">
+                    <div class="deal-route">San Francisco Hotels</div>
+                    <div class="deal-detail">Downtown &amp; waterfront &middot; Highest rated</div>
+                    <div class="deal-footer">
+                        <div class="deal-price">$129 <span class="deal-unit">per night</span></div>
+                        <div class="deal-tag">Guest Favorite</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Why SkyLodge -->
+    <div class="features-strip">
+        <div class="feature-item">
+            <div class="feature-icon blue">&#9992;</div>
+            <h3>Best Flight Deals</h3>
+            <p>Compare prices from multiple airlines across all cabin classes.</p>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon green">&#127976;</div>
+            <h3>Verified Hotels</h3>
+            <p>From budget to 5-star luxury, all with real guest ratings.</p>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon amber">&#128179;</div>
+            <h3>No Hidden Fees</h3>
+            <p>The price you see is the price you pay. Transparent pricing always.</p>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon purple">&#128274;</div>
+            <h3>Free Cancellation</h3>
+            <p>Plans change. Cancel your bookings anytime with one click.</p>
+        </div>
+    </div>
+
+    <!-- Sponsored products -->
+    <div class="section" style="padding-top:0;">
+        {% set ad_format = 'grid' %}
+        {% set ads = product_ads(4, seed='flights-hotels-ad2') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <!-- Newsletter -->
+    <div class="newsletter">
+        <div class="newsletter-inner">
+            <div class="newsletter-text">
+                <h3>Get exclusive travel deals</h3>
+                <p>Join our newsletter for personalized flight and hotel offers.</p>
+            </div>
+            <div class="newsletter-form">
+                <input type="email" placeholder="Enter your email" aria-label="Email for newsletter">
+                <button type="button" onclick=".then(()=>{this.textContent='Subscribed!';this.style.background='#059669';this.disabled=true})">Subscribe</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <div class="logo-text">Sky<em>Lodge</em></div>
+                <p>Your trusted travel companion. Compare flights and hotels across major US cities with the best rates, guaranteed.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Explore</h4>
+                <a href="{{ url_for('flights-hotels.flights_page') }}">Flights</a>
+                <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+                <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+            </div>
+            <div class="footer-col">
+                <h4>Top Cities</h4>
+                <a href="{{ url_for('flights-hotels.hotels_page', city='New York') }}">New York</a>
+                <a href="{{ url_for('flights-hotels.hotels_page', city='San Francisco') }}">San Francisco</a>
+                <a href="{{ url_for('flights-hotels.hotels_page', city='Los Angeles') }}">Los Angeles</a>
+            </div>
+            <div class="footer-col">
+                <h4>Support</h4>
+                <a href="#">Help Center</a>
+                <a href="#">Contact Us</a>
+                <a href="#">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            SkyLodge Travel &mdash; Your journey starts here. &copy; 2026 SkyLodge, Inc. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+    function switchTab(tab) {
+        document.getElementById('form-flights').classList.toggle('hidden', tab !== 'flights');
+        document.getElementById('form-hotels').classList.toggle('hidden', tab !== 'hotels');
+        document.getElementById('tab-flights').classList.toggle('active', tab === 'flights');
+        document.getElementById('tab-hotels').classList.toggle('active', tab === 'hotels');
+    }
+
+    function swapAirports() {
+        var o = document.getElementById('f-origin');
+        var d = document.getElementById('f-dest');
+        var tmp = o.value;
+        o.value = d.value;
+        d.value = tmp;
+    }
+
+    // Auto-set check-in to today and check-out to tomorrow
+    (function() {
+        var today = new Date();
+        var tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        function fmt(d) {
+            var m = ('0'+(d.getMonth()+1)).slice(-2);
+            var day = ('0'+d.getDate()).slice(-2);
+            return d.getFullYear()+'-'+m+'-'+day;
+        }
+        var ci = document.getElementById('h-checkin');
+        var co = document.getElementById('h-checkout');
+        if (ci && !ci.value) ci.value = fmt(today);
+        if (co && !co.value) co.value = fmt(tomorrow);
+    })();
+    </script>
+</body>
+</html>

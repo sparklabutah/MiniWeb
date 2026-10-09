@@ -1,0 +1,175 @@
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active = 'backlog' %}
+{% block title %}Backlog - Meridian Tracker{% endblock %}
+{% block heading %}Backlog{% endblock %}
+{% block content %}
+
+<form class="filters" method="GET" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+    <input type="text" name="q" placeholder="Search backlog..." value="{{ q }}" autocomplete="off" style="width:auto;min-width:200px;">
+    <select name="project" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Projects</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="type" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Types</option>
+        <option value="bug" {% if type_filter == 'bug' %}selected{% endif %}>Bug</option>
+        <option value="feature" {% if type_filter == 'feature' %}selected{% endif %}>Feature</option>
+        <option value="task" {% if type_filter == 'task' %}selected{% endif %}>Task</option>
+        <option value="story" {% if type_filter == 'story' %}selected{% endif %}>Story</option>
+    </select>
+    <select name="priority" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All Priorities</option>
+        <option value="critical" {% if priority == 'critical' %}selected{% endif %}>Critical</option>
+        <option value="high" {% if priority == 'high' %}selected{% endif %}>High</option>
+        <option value="medium" {% if priority == 'medium' %}selected{% endif %}>Medium</option>
+        <option value="low" {% if priority == 'low' %}selected{% endif %}>Low</option>
+    </select>
+    <button type="submit" class="btn">Filter</button>
+</form>
+
+<div class="sec-h" style="margin-top:0;">Backlog <span class="count">{{ issues|length }}</span></div>
+
+<style>
+.grid-wrap{overflow-x:auto;}
+table.bl-grid{width:100%;border-collapse:collapse;font-size:.82rem;background:var(--panel,#fff);}
+table.bl-grid th{text-align:left;padding:8px 10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#64748b);border-bottom:1px solid var(--border,#e2e8f0);white-space:nowrap;}
+table.bl-grid td{padding:4px 6px;border-bottom:1px solid var(--border,#eef1f5);vertical-align:middle;}
+table.bl-grid td .cell-key{font-weight:600;white-space:nowrap;}
+table.bl-grid input.cell-input,table.bl-grid select.cell-input{width:100%;box-sizing:border-box;padding:5px 6px;border:1px solid transparent;border-radius:5px;background:transparent;font:inherit;color:inherit;}
+table.bl-grid input.cell-input:focus,table.bl-grid select.cell-input:focus{border-color:var(--accent,#4f46e5);background:var(--panel,#fff);outline:none;}
+table.bl-grid input.cell-input:hover,table.bl-grid select.cell-input:hover{border-color:var(--border,#d5dae2);}
+.bl-num{width:70px;}
+.bl-actions{display:flex;gap:10px;margin-top:12px;align-items:center;}
+tr.new-row{display:none;background:var(--soft,#f8fafc);}
+tr.new-row.on{display:table-row;}
+</style>
+
+<form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_backlog_save') }}" id="backlog-form">
+<div class="grid-wrap panel">
+<table class="bl-grid" id="bl-grid">
+    <thead>
+        <tr>
+            <th>Key</th>
+            <th style="width:32%;">Title</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Assignee</th>
+            <th>Points</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for issue in issues %}
+        <tr data-issue-id="{{ issue.id }}">
+            <td><a class="cell-key" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=issue.id) }}">{{ issue.key }}</a></td>
+            <td><input class="cell-input" name="cell_{{ issue.id }}_title" value="{{ issue.title }}"></td>
+            <td>
+                <select class="cell-input" name="cell_{{ issue.id }}_type">
+                    {% for t in ['bug','feature','task','story'] %}
+                    <option value="{{ t }}" {% if issue.type == t %}selected{% endif %}>{{ t|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="cell_{{ issue.id }}_status">
+                    {% for s in ['open','in_progress','review','done','closed'] %}
+                    <option value="{{ s }}" {% if issue.status == s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="cell_{{ issue.id }}_priority">
+                    {% for pr in ['critical','high','medium','low'] %}
+                    <option value="{{ pr }}" {% if issue.priority == pr %}selected{% endif %}>{{ pr|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="cell_{{ issue.id }}_assignee_id">
+                    <option value="">Unassigned</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {% if issue.assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td><input class="cell-input bl-num" type="number" min="0" name="cell_{{ issue.id }}_story_points" value="{{ issue.story_points or '' }}"></td>
+        </tr>
+    {% endfor %}
+        <!-- New issue row (revealed by "+ Add row") -->
+        <tr class="new-row" id="new-row">
+            <td><span class="cell-key">New</span></td>
+            <td><input class="cell-input" name="new_title" placeholder="Issue title..."></td>
+            <td>
+                <select class="cell-input" name="new_type">
+                    {% for t in ['bug','feature','task','story'] %}
+                    <option value="{{ t }}" {% if t == 'task' %}selected{% endif %}>{{ t|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="new_status">
+                    {% for s in ['open','in_progress','review','done','closed'] %}
+                    <option value="{{ s }}">{{ s|replace('_',' ')|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="new_priority">
+                    {% for pr in ['critical','high','medium','low'] %}
+                    <option value="{{ pr }}" {% if pr == 'medium' %}selected{% endif %}>{{ pr|title }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select class="cell-input" name="new_assignee_id">
+                    <option value="">Unassigned</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td><input class="cell-input bl-num" type="number" min="0" name="new_story_points" placeholder="0"></td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<!-- Project for a newly added issue -->
+<div class="new-row-project" id="new-row-project" style="display:none;margin-top:10px;">
+    <label style="font-size:.78rem;color:var(--muted,#64748b);margin-right:8px;">New issue project</label>
+    <select name="new_project_id" style="width:auto;">
+        <option value="">Select project...</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="bl-actions">
+    <button type="button" class="btn" id="add-row-btn">+ Add row</button>
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+</div>
+</form>
+
+{% if not issues %}
+<div class="empty" style="margin-top:12px;">No issues in backlog matching your filters.</div>
+{% endif %}
+
+<script>
+(function () {
+    var btn = document.getElementById('add-row-btn');
+    var row = document.getElementById('new-row');
+    var proj = document.getElementById('new-row-project');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        row.classList.add('on');
+        proj.style.display = 'block';
+        var t = row.querySelector('input[name="new_title"]');
+        if (t) t.focus();
+        btn.disabled = true;
+    });
+})();
+</script>
+{% endblock %}

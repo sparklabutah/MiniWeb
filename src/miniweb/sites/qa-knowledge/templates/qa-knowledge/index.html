@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnowledgeHub Q&amp;A</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; } a:hover { color: #0a95ff; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .search-form { flex: 1; display: flex; }
+        .header .search-form input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; }
+        .header .search-form button { padding: 6px 12px; background: #e3701a; color: #fff; border: none; border-radius: 3px; cursor: pointer; margin-left: 4px; }
+        .header .user-area { color: #fff; font-size: 13px; white-space: nowrap; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 1100px; margin: 0 auto; display: flex; gap: 24px; padding: 16px; }
+        .main { flex: 1; }
+        .sidebar { width: 260px; min-width: 200px; }
+        .card { background: #fff; border: 1px solid #d6d9dc; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+        .q-list-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid #e3e6e8; }
+        .q-stats { text-align: center; min-width: 60px; }
+        .q-stats .num { font-size: 17px; font-weight: 600; } .q-stats .lbl { font-size: 11px; color: #6a737c; }
+        .q-stats.has-accepted { color: #2f6f44; } .q-stats.has-accepted .num { background: #2f6f44; color: #fff; padding: 2px 8px; border-radius: 3px; }
+        .q-content h3 { font-size: 15px; margin-bottom: 4px; } .q-content .excerpt { font-size: 13px; color: #3b4045; margin-bottom: 6px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .meta { font-size: 12px; color: #6a737c; margin-top: 4px; }
+        .sort-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .sort-bar a, .sort-bar span { padding: 4px 10px; border: 1px solid #d6d9dc; border-radius: 3px; font-size: 13px; }
+        .sort-bar a.active, .sort-bar span.active { background: #e3e6e8; font-weight: 600; }
+        .filter-section { margin-bottom: 16px; }
+        .filter-section h4 { font-size: 13px; margin-bottom: 6px; }
+        .filter-section label { display: block; font-size: 13px; margin-bottom: 3px; cursor: pointer; }
+        .filter-section select { width: 100%; padding: 4px; font-size: 13px; }
+        .btn { display: inline-block; padding: 8px 16px; background: #0a95ff; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .btn:hover { background: #0074cc; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .stats-box div { font-size: 13px; margin-bottom: 4px; }
+
+        .loading-indicator { display: none; text-align: center; padding: 40px; }
+        .loading-indicator.active { display: block; }
+        .spinner { border: 3px solid #e3e6e8; border-top: 3px solid #f48024; border-radius: 50%; width: 28px; height: 28px; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-indicator span { margin-left: .5rem; color: #6a737c; font-size: 14px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    {% include "qa-knowledge/_header.html" %}
+
+    <div class="container">
+        <div class="main">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2>All Questions</h2>
+                <a href="{{ url_for('qa-knowledge.ask_page') }}" class="btn">Ask Question</a>
+            </div>
+
+            {% set ad_format = 'banner' %}
+            {% set ads = product_ads(4, seed='qa-knowledge-ad2') %}
+            {% include "ads/_product_ads.html" %}
+
+            <div class="sort-bar">
+                <span>Sort by:</span>
+                {% for s in ['newest', 'votes', 'active', 'unanswered'] %}
+                <a href="{{ url_for('qa-knowledge.index', sort=s, tags=checked_tags, filter_tag=filter_tag) }}"
+                   class="{% if sort == s %}active{% endif %}" onclick="showLoading()">{{ s|capitalize }}</a>
+                {% endfor %}
+            </div>
+
+            <div class="loading-indicator" id="loading-indicator">
+                <div class="spinner"></div>
+                <span>Loading questions...</span>
+            </div>
+
+            <div id="results-area">
+            {% for q in questions %}
+            <div class="q-list-item">
+                <div class="q-stats">
+                    <div class="num">{{ q.score }}</div><div class="lbl">votes</div>
+                </div>
+                <div class="q-stats {% if q.has_accepted %}has-accepted{% endif %}">
+                    <div class="num">{{ q.answer_count }}</div><div class="lbl">answers</div>
+                </div>
+                <div class="q-content">
+                    <h3><a href="{{ url_for('qa-knowledge.question_detail', qid=q.id) }}">{{ q.title }}</a></h3>
+                    <div class="excerpt">{{ (q.body_excerpt or q.body or "")[:150] }}...</div>
+                    <div class="tags">
+                        {% for t in q.tags %}
+                        <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="meta">
+                        asked {{ q.creation_date }}
+                        {% if q.author %}by <a href="{{ url_for('qa-knowledge.user_profile', uid=q.author.root_user_id) }}">{{ q.author.se_display_name }}</a>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+
+            {% set ad_format = 'native' %}
+            {% set ads = product_ads(4, seed='qa-knowledge-index') %}
+            {% include "ads/_product_ads.html" %}
+        </div>
+
+        <div class="sidebar">
+            <div class="card stats-box">
+                <h4>Community</h4>
+                <div>{{ stats.total_users }} users</div>
+            </div>
+
+            <!-- filter_by_dropdown -->
+            <div class="card filter-section">
+                <h4>Filter by Tag</h4>
+                <form method="get" action="{{ url_for('qa-knowledge.index') }}">
+                    <input type="hidden" name="sort" value="{{ sort }}">
+                    <select name="filter_tag" onchange="this.form.submit()">
+                        <option value="">All Tags</option>
+                        {% for t, count in top_tags %}
+                        <option value="{{ t }}" {% if filter_tag == t %}selected{% endif %}>{{ t }} ({{ count }})</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+
+            <!-- filter_by_checkbox -->
+            <div class="card filter-section">
+                <h4>Popular Tags</h4>
+                <form method="get" action="{{ url_for('qa-knowledge.index') }}">
+                    <input type="hidden" name="sort" value="{{ sort }}">
+                    {% for t, count in top_tags %}
+                    <label>
+                        <input type="checkbox" name="tags" value="{{ t }}"
+                               {% if t in checked_tags %}checked{% endif %}>
+                        {{ t }} ({{ count }})
+                    </label>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-sm" style="margin-top:6px;">Apply</button>
+                </form>
+            </div>
+
+            <!-- follow_by_dropdown (logged in) -->
+            {% if current_user %}
+            <div class="card filter-section">
+                <h4>Follow a Tag</h4>
+                <form method="post" action="{{ url_for('qa-knowledge.form_follow_tag_dropdown') }}">
+                    <select name="tag">
+                        <option value="">Choose tag...</option>
+                        {% for t, count in top_tags %}
+                        <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm" style="margin-top:6px;">Follow</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function showLoading() {
+        var el = document.getElementById('loading-indicator');
+        var res = document.getElementById('results-area');
+        if (el) el.classList.add('active');
+        if (res) res.style.display = 'none';
+    }
+    document.querySelector('.search-form').addEventListener('submit', function() {
+        if (this.querySelector('input[name="q"]').value.trim()) showLoading();
+    });
+    document.querySelectorAll('.filter-section form').forEach(function(f) {
+        f.addEventListener('submit', showLoading);
+    });
+    </script>
+</body>
+</html>

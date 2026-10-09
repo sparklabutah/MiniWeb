@@ -1,0 +1,57 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}Prompts Library - AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>Prompts Library</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p>Browse and use curated prompts for your AI conversations</p>
+</div>
+
+<form class="search-bar" method="GET" action="{{ url_for('ai-chatbots.prompts_page') }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search prompts...">
+    <select name="category">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Search</button>
+</form>
+
+<div class="card-grid">
+    {% for prompt in prompts %}
+    <div class="card">
+        <span class="category-badge">{{ prompt.category }}</span>
+        <h3>{{ prompt.title }}</h3>
+        <p>{{ prompt.prompt[:150] }}{% if prompt.prompt|length > 150 %}...{% endif %}</p>
+        <div style="margin-top:8px;">
+            {% for tag in prompt.tags %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px; color:#8e8ea0;">Popularity: {{ prompt.popularity }}%</span>
+            <form method="get" action="{{ url_for('ai-chatbots.chat_page') }}" style="display:inline;">
+                <button type="submit" class="btn-small btn-primary">Use</button>
+            </form>
+            {% if user %}
+            <form method="post" action="{{ url_for('ai-chatbots.form_save_prompt') }}" style="display:inline;">
+                <input type="hidden" name="prompt_id" value="{{ prompt.id }}">
+                <button type="submit" class="btn-small">Save</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not prompts %}
+<p style="text-align:center; color:#8e8ea0; margin-top:40px;">No prompts found.</p>
+{% endif %}
+
+{% endblock %}

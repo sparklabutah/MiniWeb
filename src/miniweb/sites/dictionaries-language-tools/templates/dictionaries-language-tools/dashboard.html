@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - WordRef Dictionary</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; background: #f5f5f0; color: #2d2d2d; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #1a3c5e; color: #fff; }
+        .header-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem; }
+        .header h1 { font-size: 1.5rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header h1 span { color: #e74c3c; }
+
+        .nav-bar { background: #15334f; border-bottom: 2px solid #e74c3c; }
+        .nav-bar-inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 0; padding: 0 1.5rem; }
+        .nav-bar a { color: #ccc; font-size: .95rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: .6rem 1rem; display: inline-block; }
+        .nav-bar a:hover { color: #fff; background: rgba(255,255,255,.08); text-decoration: none; }
+
+        .search-strip { background: #1a3c5e; padding: .5rem 1.5rem 1rem; }
+        .search-strip form { max-width: 960px; margin: 0 auto; display: flex; }
+        .search-strip input { flex: 1; padding: .6rem 1rem; font-size: 1rem; border: 2px solid #2c6faa; border-radius: .3rem 0 0 .3rem; border-right: none; font-family: inherit; outline: none; }
+        .search-strip input:focus { border-color: #e74c3c; }
+        .search-strip button { padding: .6rem 1.2rem; background: #e74c3c; color: #fff; border: none; border-radius: 0 .3rem .3rem 0; cursor: pointer; font-size: 1rem; font-weight: 600; font-family: -apple-system, sans-serif; }
+
+        .main { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+        .dash-header { margin-bottom: 2rem; }
+        .dash-header h2 { font-size: 1.6rem; color: #1a3c5e; margin-bottom: .3rem; }
+        .dash-header p { color: #7f8c8d; font-family: -apple-system, sans-serif; font-size: .9rem; }
+
+        .section { margin-bottom: 2rem; }
+        .section-title { font-size: 1rem; font-weight: 700; color: #e74c3c; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, sans-serif; border-bottom: 1px solid #ddd; padding-bottom: .3rem; margin-bottom: .8rem; }
+
+        .saved-list { list-style: none; }
+        .saved-list li { padding: .5rem 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .saved-list li:last-child { border-bottom: none; }
+        .saved-word { font-size: 1.05rem; font-weight: 600; color: #1a3c5e; }
+        .saved-meta { font-family: -apple-system, sans-serif; font-size: .8rem; color: #999; }
+        .saved-meta .pos-tag { background: #eef2f7; padding: .1rem .4rem; border-radius: .15rem; color: #1a5276; font-weight: 600; font-size: .72rem; text-transform: uppercase; }
+
+        .vocab-card { background: #fff; border: 1px solid #ddd; border-radius: .4rem; padding: 1rem 1.3rem; margin-bottom: 1rem; }
+        .vocab-name { font-size: 1.1rem; font-weight: 700; color: #1a3c5e; margin-bottom: .3rem; }
+        .vocab-count { font-family: -apple-system, sans-serif; font-size: .82rem; color: #7f8c8d; margin-bottom: .5rem; }
+        .vocab-words { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .vocab-tag { display: inline-block; background: #eef2f7; color: #1a5276; padding: .2rem .5rem; border-radius: .2rem; font-size: .85rem; font-family: -apple-system, sans-serif; }
+        .vocab-tag:hover { background: #1a5276; color: #fff; text-decoration: none; }
+
+        .empty-msg { color: #999; font-style: italic; padding: 1rem 0; }
+        .footer { text-align: center; padding: 2rem; color: #999; font-size: .8rem; border-top: 1px solid #ddd; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-inner">
+            <h1><a href="{{ url_for('dictionaries-language-tools.index') }}">Word<span>Ref</span> Dictionary</a></h1>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-bar-inner">
+            <a href="{{ url_for('dictionaries-language-tools.index') }}">Home</a>
+            <a href="{{ url_for('dictionaries-language-tools.index') }}">Search</a>
+            <a href="{{ url_for('dictionaries-language-tools.browse', letter='A') }}">Browse A-Z</a>
+            <a href="{{ url_for('dictionaries-language-tools.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('dictionaries-language-tools.logout') }}">Logout</a>
+        </div>
+    </div>
+
+    <div class="search-strip">
+        <form method="get" action="{{ url_for('dictionaries-language-tools.index') }}">
+            <input type="text" name="q" placeholder="Search for a word..." autocomplete="off">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="main">
+        <div class="dash-header">
+            <h2>Welcome, {{ user.name }}</h2>
+            <p>{{ user.email }} &middot; {{ user.saved_words|length }} saved word{{ 's' if user.saved_words|length != 1 }}</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Saved Words</div>
+            {% if saved_entries %}
+            <ul class="saved-list">
+                {% for e in saved_entries %}
+                <li>
+                    <div>
+                        <a class="saved-word" href="{{ url_for('dictionaries-language-tools.word_detail', word_text=e.word) }}">{{ e.word }}</a>
+                        <div class="saved-meta">
+                            <span class="pos-tag">{{ e.pos }}</span>
+                            {% if e.definitions %}{{ e.definitions[0].gloss[:80] }}{% if e.definitions[0].gloss|length > 80 %}...{% endif %}{% endif %}
+                        </div>
+                    </div>
+                    <form method="post" action="{{ url_for('dictionaries-language-tools.form_save_word', word_text=e.word) }}">
+                        <button type="submit" style="background:none;border:1px solid #ccc;padding:.2rem .5rem;border-radius:.2rem;cursor:pointer;font-size:.75rem;color:#999;font-family:-apple-system,sans-serif;">Remove</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-msg">No saved words yet. Browse the dictionary and save words you want to remember.</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">Vocabulary Lists</div>
+            {% if vocab_lists %}
+            {% for vl in vocab_lists %}
+            <div class="vocab-card">
+                <div class="vocab-name">{{ vl.name }}</div>
+                <div class="vocab-count">{{ vl.count }} word{{ 's' if vl.count != 1 }}</div>
+                <div class="vocab-words">
+                    {% for w in vl.words %}
+                    <a class="vocab-tag" href="{{ url_for('dictionaries-language-tools.word_detail', word_text=w.word) }}">{{ w.word }}</a>
+                    {% endfor %}
+                    {% if not vl.words %}
+                    <span class="empty-msg">No words in this list yet.</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-msg">No vocabulary lists yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="footer">
+        <a href="{{ url_for('dictionaries-language-tools.index') }}">Back to Dictionary</a> &middot;
+        <a href="/">MiniWeb</a>
+    </div>
+</body>
+</html>

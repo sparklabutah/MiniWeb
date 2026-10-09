@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeridianFlow Docs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f9fc; color: #3c4257; line-height: 1.6; }
+
+        /* Top nav */
+        .topnav { background: #0a2540; color: #fff; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topnav-brand { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; display: flex; align-items: center; gap: .5rem; }
+        .topnav-brand span { color: #80e9ff; }
+        .topnav-links { display: flex; align-items: center; gap: 1.2rem; }
+        .topnav-links a { color: #adbdcc; text-decoration: none; font-size: .875rem; transition: color .15s; }
+        .topnav-links a:hover { color: #fff; }
+        .topnav-links a.active { color: #80e9ff; }
+
+        /* Layout */
+        .layout { display: flex; min-height: calc(100vh - 56px); }
+
+        /* Sidebar */
+        .sidebar { width: 260px; background: #1a1f36; color: #a3acb9; padding: 1.5rem 0; overflow-y: auto; position: sticky; top: 56px; height: calc(100vh - 56px); flex-shrink: 0; }
+        .sidebar-section { margin-bottom: 1.2rem; }
+        .sidebar-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #697386; padding: .4rem 1.5rem; }
+        .sidebar-link { display: block; padding: .35rem 1.5rem; font-size: .85rem; color: #a3acb9; text-decoration: none; transition: all .15s; border-left: 3px solid transparent; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+        .sidebar-link.active { color: #80e9ff; border-left-color: #80e9ff; background: rgba(128,233,255,.06); }
+
+        /* Content */
+        .content { flex: 1; max-width: 900px; padding: 2.5rem 3rem; }
+        .content h1 { font-size: 2rem; color: #0a2540; margin-bottom: .5rem; }
+        .content .subtitle { font-size: 1.1rem; color: #697386; margin-bottom: 2rem; }
+
+        /* Search bar on home */
+        .home-search { max-width: 560px; margin: 0 auto 2.5rem; position: relative; }
+        .home-search input { width: 100%; padding: .9rem 1.2rem .9rem 2.8rem; border: 2px solid #e3e8ee; border-radius: 8px; font-size: 1rem; background: #fff; transition: border-color .15s; }
+        .home-search input:focus { outline: none; border-color: #635bff; }
+        .home-search .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #8898aa; font-size: 1rem; }
+
+        /* Section cards */
+        .section-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.2rem; margin-bottom: 2rem; }
+        .section-card { background: #fff; border: 1px solid #e3e8ee; border-radius: 8px; padding: 1.5rem; transition: box-shadow .15s, border-color .15s; }
+        .section-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); border-color: #c4cdd5; }
+        .section-card h3 { font-size: 1rem; color: #0a2540; margin-bottom: .5rem; }
+        .section-card p { font-size: .85rem; color: #697386; margin-bottom: .75rem; }
+        .section-card a { font-size: .85rem; color: #635bff; text-decoration: none; font-weight: 500; }
+        .section-card a:hover { text-decoration: underline; }
+
+        /* Doc list on home */
+        .doc-list { list-style: none; }
+        .doc-list li { border-bottom: 1px solid #e3e8ee; }
+        .doc-list li:last-child { border-bottom: none; }
+        .doc-list a { display: flex; justify-content: space-between; align-items: center; padding: .65rem 0; color: #3c4257; text-decoration: none; font-size: .9rem; }
+        .doc-list a:hover { color: #635bff; }
+        .doc-list .section-badge { font-size: .7rem; background: #f0f0ff; color: #635bff; padding: .15rem .5rem; border-radius: 4px; white-space: nowrap; }
+
+        /* Footer */
+        .footer { text-align: center; padding: 2rem; font-size: .8rem; color: #8898aa; border-top: 1px solid #e3e8ee; }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="{{ url_for('documentation-api-docs.index') }}" class="topnav-brand">MeridianFlow <span>Docs</span></a>
+        <div class="topnav-links">
+            <a href="{{ url_for('documentation-api-docs.index') }}" class="active">Home</a>
+            <a href="{{ url_for('documentation-api-docs.api_reference') }}">API Reference</a>
+            <a href="{{ url_for('documentation-api-docs.changelog') }}">Changelog</a>
+            <a href="{{ url_for('documentation-api-docs.search_page') }}">Search</a>
+            {% if user %}
+            <a href="{{ url_for('documentation-api-docs.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('documentation-api-docs.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('documentation-api-docs.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside class="sidebar">
+            {% for section_name, section_docs in ordered_sections %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">{{ section_name }}</div>
+                {% for doc in section_docs %}
+                <a href="{{ url_for('documentation-api-docs.page', slug=doc.slug) }}" class="sidebar-link">{{ doc.title }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </aside>
+
+        <main class="content">
+            <h1>MeridianFlow Documentation</h1>
+            <p class="subtitle">Everything you need to build and manage workflows with MeridianFlow</p>
+
+            <div class="home-search">
+                <span class="search-icon">&#128269;</span>
+                <form action="{{ url_for('documentation-api-docs.search_page') }}" method="get">
+                    <input type="text" name="q" placeholder="Search documentation..." autocomplete="off">
+                </form>
+            </div>
+
+            <div class="section-grid">
+                {% for section_name, section_docs in ordered_sections %}
+                <div class="section-card">
+                    <h3>{{ section_name }}</h3>
+                    <p>{{ section_docs|length }} page{{ 's' if section_docs|length != 1 else '' }}</p>
+                    <a href="{{ url_for('documentation-api-docs.page', slug=section_docs[0].slug) }}">Get started &rarr;</a>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h2 style="font-size:1.1rem; color:#0a2540; margin-bottom:.75rem;">All Pages</h2>
+            <ul class="doc-list">
+                {% for doc in docs %}
+                <li>
+                    <a href="{{ url_for('documentation-api-docs.page', slug=doc.slug) }}">
+                        <span>{{ doc.title }}</span>
+                        <span class="section-badge">{{ doc.section }}</span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <div class="footer">
+                <a href="/" style="color:#635bff;text-decoration:none">&larr; Back to MiniWeb</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

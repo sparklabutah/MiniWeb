@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout - {{ campaign.title }} - FundSpark</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fafafa; color: #282828; line-height: 1.5; }
+    a { text-decoration: none; color: inherit; }
+    .navbar { background: #fff; border-bottom: 1px solid #e6e6e6; padding: 0 2rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .navbar-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #282828; }
+    .navbar-brand em { font-style: normal; color: #2bde73; }
+    .navbar-links a { font-size: .875rem; font-weight: 500; color: #656969; }
+    .navbar-links a:hover { color: #282828; }
+
+    .wrap { max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; }
+    .crumb { font-size: .85rem; color: #656969; margin-bottom: 1rem; }
+    .crumb a { color: #2bde73; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+    .cols { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
+    @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+
+    .panel { background: #fff; border: 1px solid #e6e6e6; border-radius: .6rem; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+    .panel h2 { font-size: 1rem; margin-bottom: 1rem; }
+    label { display: block; font-size: .8rem; font-weight: 600; color: #656969; margin: .8rem 0 .25rem; }
+    input[type=text], input[type=email], input[type=number] { width: 100%; padding: .55rem .75rem; border: 1px solid #d6d6d6; border-radius: .4rem; font-size: .9rem; }
+    input:focus { outline: 2px solid #a5ecc5; border-color: #2bde73; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .err { color: #d32f2f; font-size: .78rem; margin-top: .2rem; }
+    .field-err input { border-color: #d32f2f; }
+
+    .radio-row { display: flex; gap: 1rem; margin-top: .3rem; }
+    .radio-card { flex: 1; border: 1px solid #d6d6d6; border-radius: .5rem; padding: .7rem .9rem; cursor: pointer; display: flex; gap: .5rem; align-items: center; font-size: .9rem; }
+    .radio-card:has(input:checked) { border-color: #2bde73; background: #f0fdf6; }
+
+    .disclosure { background: #f6f9f7; border: 1px solid #d8ecdf; border-radius: .5rem; padding: .8rem 1rem; font-size: .85rem; color: #3c4b42; }
+    .checkline { display: flex; gap: .55rem; align-items: flex-start; font-size: .87rem; margin-top: .8rem; cursor: pointer; }
+    .checkline input { margin-top: .2rem; }
+
+    .summary { position: sticky; top: 72px; }
+    .summary .panel { margin-bottom: 0; }
+    .sum-row { display: flex; justify-content: space-between; font-size: .9rem; padding: .35rem 0; }
+    .sum-row.total { border-top: 1px solid #e6e6e6; margin-top: .5rem; padding-top: .7rem; font-weight: 700; font-size: 1rem; }
+    .tier-name { font-weight: 600; }
+    .tier-desc { font-size: .8rem; color: #656969; margin: .2rem 0 .6rem; }
+    .badge { display: inline-block; font-size: .68rem; font-weight: 600; padding: .1rem .5rem; border-radius: 1rem; background: #eef2ff; color: #4338ca; }
+    .badge.physical { background: #fff7ed; color: #b45309; }
+
+    .submit-btn { width: 100%; margin-top: 1rem; padding: .8rem; background: #2bde73; color: #0b3d22; font-weight: 700; font-size: .95rem; border: none; border-radius: .5rem; cursor: pointer; }
+    .submit-btn:hover { background: #22c563; }
+    .secure-note { font-size: .75rem; color: #656969; text-align: center; margin-top: .6rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('crowdfunding-donations.index') }}" class="navbar-brand"><em>Fund</em>Spark</a>
+    <div class="navbar-links">
+        <a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=campaign.id) }}">&larr; Back to campaign</a>
+    </div>
+</nav>
+
+<div class="wrap">
+    <div class="crumb"><a href="{{ url_for('crowdfunding-donations.campaign_detail', campaign_id=campaign.id) }}">{{ campaign.title }}</a> / Checkout</div>
+    <h1>Complete your pledge</h1>
+
+    <form method="post" action="{{ url_for('crowdfunding-donations.checkout', campaign_id=campaign.id) }}">
+    {% if tier %}<input type="hidden" name="tier_id" value="{{ tier.id }}">{% endif %}
+    <div class="cols">
+        <div>
+            <div class="panel">
+                <h2>Backer information</h2>
+                <div class="row2">
+                    <div class="{{ 'field-err' if errors.backer_name }}">
+                        <label for="backer_name">Full name</label>
+                        <input type="text" id="backer_name" name="backer_name" value="{{ form.backer_name or '' }}">
+                        {% if errors.backer_name %}<div class="err">{{ errors.backer_name }}</div>{% endif %}
+                    </div>
+                    <div class="{{ 'field-err' if errors.email }}">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ form.email or '' }}">
+                        {% if errors.email %}<div class="err">{{ errors.email }}</div>{% endif %}
+                    </div>
+                </div>
+                <label class="checkline"><input type="checkbox" name="anonymous" value="1" {{ 'checked' if form.anonymous }}> Don't show my name publicly on the backer list</label>
+            </div>
+
+            {% if not tier %}
+            <div class="panel {{ 'field-err' if errors.amount }}">
+                <h2>Pledge amount</h2>
+                <label for="amount">Amount (USD)</label>
+                <input type="number" id="amount" name="amount" min="1" step="1" value="{{ form.amount or '' }}" style="max-width:180px">
+                {% if errors.amount %}<div class="err">{{ errors.amount }}</div>{% endif %}
+            </div>
+            {% else %}
+            <input type="hidden" name="amount" value="{{ tier.amount }}">
+            {% endif %}
+
+            {% if needs_shipping %}
+            <div class="panel">
+                <h2>Shipping address <span class="badge physical">physical reward</span></h2>
+                <div class="{{ 'field-err' if errors.street }}">
+                    <label for="street">Street address</label>
+                    <input type="text" id="street" name="street" value="{{ form.street or '' }}">
+                    {% if errors.street %}<div class="err">{{ errors.street }}</div>{% endif %}
+                </div>
+                <div class="row2">
+                    <div class="{{ 'field-err' if errors.city }}">
+                        <label for="city">City</label>
+                        <input type="text" id="city" name="city" value="{{ form.city or '' }}">
+                        {% if errors.city %}<div class="err">{{ errors.city }}</div>{% endif %}
+                    </div>
+                    <div class="{{ 'field-err' if errors.state }}">
+                        <label for="state">State</label>
+                        <input type="text" id="state" name="state" value="{{ form.state or '' }}">
+                        {% if errors.state %}<div class="err">{{ errors.state }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="{{ 'field-err' if errors.zip_code }}" style="max-width:200px">
+                    <label for="zip_code">ZIP code</label>
+                    <input type="text" id="zip_code" name="zip_code" value="{{ form.zip_code or '' }}">
+                    {% if errors.zip_code %}<div class="err">{{ errors.zip_code }}</div>{% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="panel">
+                <h2>Payment method</h2>
+                <div class="radio-row {{ 'field-err' if errors.account_type }}">
+                    <label class="radio-card"><input type="radio" name="account_type" value="checking" {{ 'checked' if form.account_type != 'credit' }}> Checking account</label>
+                    <label class="radio-card"><input type="radio" name="account_type" value="credit" {{ 'checked' if form.account_type == 'credit' }}> Credit card</label>
+                </div>
+                {% if errors.account_type %}<div class="err">{{ errors.account_type }}</div>{% endif %}
+                <p class="secure-note" style="text-align:left;margin-top:.6rem">Payment is processed via your <a href="/sites/banking/" style="color:#2bde73">linked bank account</a> after verification.</p>
+            </div>
+
+            <div class="panel {{ 'field-err' if errors.consent }}">
+                <h2>How you'll be charged</h2>
+                <div class="disclosure">
+                    {% if campaign.funding_model == 'all_or_nothing' %}
+                    This is an <b>all-or-nothing</b> campaign: your payment method is only charged if the campaign reaches its ${{ '%.0f'|format(campaign.goal_amount) }} goal by {{ campaign.end_date }}.
+                    {% else %}
+                    This is a <b>flexible funding</b> campaign: your pledge is charged immediately and the creator keeps all funds raised, even if the goal isn't met.
+                    {% endif %}
+                </div>
+                <label class="checkline"><input type="checkbox" name="consent" value="1" {{ 'checked' if form.consent }}> I understand how and when I will be charged</label>
+                {% if errors.consent %}<div class="err">{{ errors.consent }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="summary">
+            <div class="panel">
+                <h2>Order summary</h2>
+                {% if tier %}
+                <div class="tier-name">{{ tier.name }} <span class="badge {{ tier.fulfillment or 'digital' }}">{{ tier.fulfillment or 'digital' }}</span></div>
+                <div class="tier-desc">{{ tier.description }}</div>
+                <div class="sum-row"><span>Pledge</span><span>${{ '%.2f'|format(tier.amount) }}</span></div>
+                <div class="sum-row total"><span>Total</span><span>${{ '%.2f'|format(tier.amount) }}</span></div>
+                {% else %}
+                <div class="tier-name">Pledge without a reward</div>
+                <div class="tier-desc">Support "{{ campaign.title }}" directly.</div>
+                <div class="sum-row total"><span>Total</span><span id="sum-total">{% if form.amount %}${{ '%.2f'|format(form.amount|float) }}{% else %}&mdash;{% endif %}</span></div>
+                {% endif %}
+                <button type="submit" class="submit-btn">Complete pledge</button>
+                <div class="secure-note">Secured with 2-step payment verification</div>
+            </div>
+        </div>
+    </div>
+    </form>
+</div>
+{% if not tier %}
+<script>
+    var amt = document.getElementById('amount');
+    if (amt) amt.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        document.getElementById('sum-total').textContent = v > 0 ? '$' + v.toFixed(2) : '—';
+    });
+</script>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filing {{ filing.filing_id }} - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'filings' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <a class="back" href="{{ url_for('tax-filing-dmv-permits.tax_filings_page') }}">&larr; Back to Tax Filings</a>
+        <div class="detail-card">
+            <h2>{{ filing.filing_id }}</h2>
+            <div class="detail-grid">
+                <div><div class="field-label">Taxpayer</div><div class="field-value">{{ filing.taxpayer_name }}</div></div>
+                <div><div class="field-label">Type</div><div class="field-value">{{ filing.type|replace("_"," ")|title }}</div></div>
+                <div><div class="field-label">Tax Year</div><div class="field-value">{{ filing.tax_year }}</div></div>
+                <div><div class="field-label">Status</div><div class="field-value"><span class="badge badge-{{ filing.status }}">{{ filing.status|title }}</span></div></div>
+                <div><div class="field-label">Filing Date</div><div class="field-value">{{ filing.filing_date or 'Not filed' }}</div></div>
+                <div><div class="field-label">Due Date</div><div class="field-value">{{ filing.due_date }}</div></div>
+                <div><div class="field-label">Tax Owed</div><div class="field-value">${{ "%.2f"|format(filing.tax_owed) }}</div></div>
+                <div><div class="field-label">Tax Paid / Withheld</div><div class="field-value">${{ "%.2f"|format(filing.tax_paid) }}</div></div>
+                {% if filing.refund_amount and filing.refund_amount > 0 %}
+                <div><div class="field-label">Refund</div><div class="field-value" style="color:#166534;font-weight:700">${{ "%.2f"|format(filing.refund_amount) }}</div></div>
+                {% elif filing.amount_due and filing.amount_due > 0 %}
+                <div><div class="field-label">Amount Due</div><div class="field-value" style="color:#b91c1c;font-weight:700">${{ "%.2f"|format(filing.amount_due) }}</div></div>
+                {% endif %}
+                {% if filing.gross_income %}<div><div class="field-label">Gross Income</div><div class="field-value">${{ "%.2f"|format(filing.gross_income) }}</div></div>{% endif %}
+                {% if filing.taxable_income %}<div><div class="field-label">Taxable Income</div><div class="field-value">${{ "%.2f"|format(filing.taxable_income) }}</div></div>{% endif %}
+                {% if filing.assessed_value %}<div><div class="field-label">Assessed Value</div><div class="field-value">${{ "%.2f"|format(filing.assessed_value) }}</div></div>{% endif %}
+                {% if filing.property_address %}<div><div class="field-label">Property</div><div class="field-value">{{ filing.property_address }}</div></div>{% endif %}
+                {% if filing.notes %}<div style="grid-column:span 2"><div class="field-label">Notes</div><div class="field-value">{{ filing.notes }}</div></div>{% endif %}
+            </div>
+            {% if filing.form_1040 %}
+            {% set f = filing.form_1040 %}
+            <h3 style="margin-top:18px">Form 1040 &mdash; Income</h3>
+            <table class="income-table" style="width:100%;border-collapse:collapse">
+                <tbody>
+                {% for ln, desc in [('line_1','1  Wages, salaries, tips'),
+                                    ('line_2b','2b  Taxable interest'),
+                                    ('line_3b','3b  Ordinary dividends'),
+                                    ('line_4b','4b  IRA distributions (taxable)'),
+                                    ('line_5b','5b  Pensions and annuities (taxable)'),
+                                    ('line_6','6  Social security benefits (taxable)'),
+                                    ('line_7','7  Capital gain or (loss)'),
+                                    ('line_8','8  Additional income (Schedule 1)')] %}
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">{{ desc }}</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get(ln, 0.0)) }}</td></tr>
+                {% endfor %}
+                    <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111">9  Total income</td>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111">${{ "%.2f"|format(f.get('line_9', 0.0) or filing.gross_income) }}</td></tr>
+                    {% if f.get('standard_deduction') %}
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">12  Standard deduction</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">&minus;${{ "%.2f"|format(f.get('standard_deduction', 0.0)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">15  Taxable income</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('taxable_income', filing.taxable_income)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">22  Tax owed</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('tax_owed', filing.tax_owed)) }}</td></tr>
+                    <tr><td style="padding:4px 6px;border-bottom:1px solid #eee">25  Federal income tax withheld</td>
+                        <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #eee">${{ "%.2f"|format(f.get('line_25', filing.tax_paid)) }}</td></tr>
+                    {% if f.get('refund_amount', filing.refund_amount) > 0 %}
+                    <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111;color:#166534">34  Refund</td>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111;color:#166534">${{ "%.2f"|format(f.get('refund_amount', filing.refund_amount)) }}</td></tr>
+                    {% else %}
+                    <tr><td style="padding:6px;font-weight:700;border-top:2px solid #111;color:#b91c1c">37  Amount you owe</td>
+                        <td style="padding:6px;text-align:right;font-weight:700;border-top:2px solid #111;color:#b91c1c">${{ "%.2f"|format(f.get('amount_due', filing.get('amount_due', 0.0))) }}</td></tr>
+                    {% endif %}
+                    {% endif %}
+                </tbody>
+            </table>
+            {% if f.get('filing_status') %}<p style="color:#374151;font-size:.85rem">Filing status: {{ f.filing_status|replace("_"," ")|title }}</p>{% endif %}
+            {% endif %}
+            {% if filing.requires_signature and not filing.signed %}
+            <div style="margin-top:1rem;padding:.6rem .9rem;background:#fef3c7;border:1px solid #f59e0b;border-radius:.4rem;color:#92400e;font-weight:600">
+                ✍️ Signature required — this filing is not complete until you sign it.
+            </div>
+            <a class="action-btn green" href="{{ url_for('tax-filing-dmv-permits.sign_document_page', filing_id=filing.id) }}">Sign now</a>
+            {% elif filing.signed %}
+            <div style="margin-top:1rem;color:#166534;font-weight:600">✓ Signed on {{ filing.signed_date }}</div>
+            {% endif %}
+            {% if filing.tax_paid < filing.tax_owed %}
+            <a class="action-btn" href="{{ url_for('tax-filing-dmv-permits.make_payment_page') }}">Make Payment</a>
+            {% endif %}
+            {% if not filing.requires_signature %}
+            <a class="action-btn green" href="{{ url_for('tax-filing-dmv-permits.sign_document_page', filing_id=filing.id) }}">Sign Document</a>
+            {% endif %}
+        </div>
+        {% if payments %}
+        <div class="payments-section">
+            <h3>Related Payments</h3>
+            <table>
+                <thead><tr><th>Payment ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td>{{ p.payment_id }}</td>
+                        <td>${{ "%.2f"|format(p.amount) }}</td>
+                        <td>{{ p.method|replace("_"," ")|title }}</td>
+                        <td>{{ p.payment_date }}</td>
+                        <td>{{ p.status|title }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

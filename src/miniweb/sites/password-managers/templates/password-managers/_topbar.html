@@ -1,0 +1,20 @@
+{# Shared VaultGuard top bar. Set {% set active_page = 'vault'|'generator'|'security'|'audit'|'settings' %} before include. #}
+<div class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" href="{{ url_for('password-managers.index') }}">
+            <svg viewBox="0 0 24 28" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M12 0 24 5v9c0 7-5.1 11.5-12 14C5.1 25.5 0 21 0 14V5L12 0zm0 2.6L2.4 6.6V14c0 5.6 3.9 9.3 9.6 11.5V2.6z"/></svg>
+            VaultGuard
+        </a>
+        <nav class="topnav">
+            <a href="{{ url_for('password-managers.index') }}"{% if active_page == 'vault' %} class="active"{% endif %}>My Vault</a>
+            <a href="{{ url_for('password-managers.generator_page') }}"{% if active_page == 'generator' %} class="active"{% endif %}>Generator</a>
+            <a href="{{ url_for('password-managers.security_report_page') }}"{% if active_page == 'security' %} class="active"{% endif %}>Security</a>
+            <a href="{{ url_for('password-managers.audit_log_page') }}"{% if active_page == 'audit' %} class="active"{% endif %}>Audit Log</a>
+            <a href="{{ url_for('password-managers.settings_page') }}"{% if active_page == 'settings' %} class="active"{% endif %}>Settings</a>
+        </nav>
+        <div class="topuser">
+            {% if user %}<span>{{ user.display_name }} &middot; {{ user.plan|title }}</span><span class="avatar">{{ user.display_name[0] }}</span>{% endif %}
+            {% if logged_in %}<a href="{{ url_for('password-managers.logout') }}">Sign Out</a>{% else %}<a href="{{ url_for('password-managers.login_page') }}">Sign In</a>{% endif %}
+        </div>
+    </div>
+</div>

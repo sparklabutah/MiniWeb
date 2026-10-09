@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .login-wrap { max-width: 380px; margin: 3rem auto; padding: 0 1.2rem; }
+        .login-brand { display: flex; align-items: center; justify-content: center; gap: .55rem; color: var(--blue); font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: 1.6rem; }
+        .login-brand svg { width: 26px; height: 30px; }
+        .login-sub { margin-bottom: 1.4rem; }
+        .btn-full { width: 100%; justify-content: center; padding: .6rem; font-size: .95rem; }
+        .login-error { background: #fdecea; color: var(--bad); border: 1px solid #f3c6c0; padding: .6rem .85rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; }
+        .login-help { text-align: center; margin-top: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-brand">
+            <svg viewBox="0 0 24 28" fill="#175ddc" xmlns="http://www.w3.org/2000/svg"><path d="M12 0 24 5v9c0 7-5.1 11.5-12 14C5.1 25.5 0 21 0 14V5L12 0zm0 2.6L2.4 6.6V14c0 5.6 3.9 9.3 9.6 11.5V2.6z"/></svg>
+            VaultGuard
+        </div>
+
+        <form class="card card-pad" method="post" action="{{ url_for('password-managers.login_submit') }}">
+            <div class="card-title">Unlock Your Vault</div>
+            <p class="muted login-sub">Enter your email and master password to continue</p>
+
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <div class="field">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" name="email" id="email" required autocomplete="off" placeholder="you@example.com">
+            </div>
+            <div class="field">
+                <label class="form-label" for="password">Master Password</label>
+                <input type="password" name="password" id="password" required placeholder="Enter your master password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Unlock</button>
+
+            <p class="muted login-help">Your master password is never stored on our servers.</p>
+            <p class="muted login-help" style="margin-top:.4rem;">End-to-end encrypted &middot; Zero-knowledge architecture</p>
+        </form>
+
+        <!-- verify_identity_by_code: 2FA verification step -->
+        <div class="card card-pad" id="twofa-panel" style="display:none;">
+            <div class="card-title">Two-Factor Verification</div>
+            <p class="muted login-sub">Enter the 6-digit code from your authenticator app, or a backup code</p>
+
+            <div class="login-error" id="twofa-error" style="display:none;"></div>
+
+            <div class="field">
+                <label class="form-label" for="twofa-code">Verification Code</label>
+                <input type="text" id="twofa-code" inputmode="numeric" autocomplete="one-time-code"
+                       maxlength="16" placeholder="123456">
+            </div>
+            <button type="button" class="btn btn-primary btn-full" id="twofa-verify-btn">Verify</button>
+
+            <p class="muted login-help">Lost your device? Use one of your backup codes.</p>
+        </div>
+
+        <p class="muted login-help"><a href="/">&larr; Back to MiniWeb</a></p>
+    </div>
+
+    <script>
+    (function() {
+        var loginForm = document.querySelector('form.card');
+        var panel = document.getElementById('twofa-panel');
+        var errBox = document.getElementById('twofa-error');
+        var pendingUserId = null;
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var email = document.getElementById('email').value.trim();
+            var password = document.getElementById('password').value;
+            fetch('{{ url_for("password-managers.api_login") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email, master_password: password})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.requires_2fa) {
+                    pendingUserId = res.data.user_id;
+                    loginForm.style.display = 'none';
+                    panel.style.display = 'block';
+                    document.getElementById('twofa-code').focus();
+                } else {
+                    // No 2FA required (or credentials handled server-side):
+                    // fall through to the normal form login.
+                    loginForm.submit();
+                }
+            })
+            .catch(function() { loginForm.submit(); });
+        });
+
+        document.getElementById('twofa-verify-btn').addEventListener('click', function() {
+            var code = document.getElementById('twofa-code').value.trim();
+            if (!code) { errBox.textContent = 'Please enter your verification code.'; errBox.style.display = 'block'; return; }
+            fetch('{{ url_for("password-managers.api_verify_2fa") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({code: code, user_id: pendingUserId})
+            })
+            .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+            .then(function(res) {
+                if (res.ok && res.data.verified) {
+                    window.location = '{{ url_for("password-managers.index") }}';
+                } else {
+                    errBox.textContent = res.data.error || 'Invalid 2FA code.';
+                    errBox.style.display = 'block';
+                }
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

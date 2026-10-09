@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - HeartLink</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #f093fb 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 0; }
+        .top-nav { position: fixed; top: 0; left: 0; right: 0; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .top-nav a { color: rgba(255,255,255,0.9); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .top-nav a:hover { color: #fff; }
+        .logo { text-align: center; margin-bottom: 1.5rem; }
+        .logo h1 { font-size: 2.2rem; color: #fff; font-weight: 800; letter-spacing: -1px; }
+        .logo p { color: rgba(255,255,255,0.85); font-size: 1rem; margin-top: 0.3rem; }
+        .register-card { background: #fff; border-radius: 1.2rem; padding: 2.5rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+        .register-card h2 { font-size: 1.4rem; color: #1a1a2e; margin-bottom: 1.5rem; text-align: center; }
+        .form-row { display: flex; gap: 0.8rem; }
+        .form-group { margin-bottom: 1rem; flex: 1; }
+        .form-group label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 0.3rem; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.65rem 0.9rem; border: 2px solid #e8e8e8; border-radius: 0.6rem; font-size: 0.95rem; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #667eea; outline: none; }
+        .form-group textarea { min-height: 60px; resize: vertical; }
+        .btn-register { width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff; border: none; border-radius: 0.6rem; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; margin-top: 0.5rem; }
+        .btn-register:hover { opacity: 0.9; }
+        .error { background: #fff0f0; color: #dc3545; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.9rem; margin-bottom: 1rem; text-align: center; }
+        .signin-link { text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #888; }
+        .signin-link a { color: #667eea; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <a href="{{ url_for('dating.profiles_list') }}">Browse Profiles</a>
+    </div>
+    <div class="logo">
+        <h1>HeartLink</h1>
+        <p>Create your profile</p>
+    </div>
+    <form class="register-card" method="post" action="{{ url_for('dating.register_submit') }}">
+        <h2>Create Account</h2>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required autocomplete="off" value="{{ form.username or '' }}">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" name="name" id="name" required value="{{ form.name or '' }}">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" name="age" id="age" min="18" max="99" required value="{{ form.age or '' }}">
+            </div>
+            <div class="form-group">
+                <label for="gender">Gender</label>
+                <select name="gender" id="gender">
+                    <option value="female" {{ 'selected' if form.gender == 'female' }}>Female</option>
+                    <option value="male" {{ 'selected' if form.gender == 'male' }}>Male</option>
+                    <option value="nonbinary" {{ 'selected' if form.gender == 'nonbinary' }}>Non-binary</option>
+                    <option value="other" {{ 'selected' if form.gender == 'other' }}>Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" name="location" id="location" placeholder="e.g. Lakeport, WA" value="{{ form.location or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="bio">Bio</label>
+            <textarea name="bio" id="bio" placeholder="Tell people about yourself&hellip;">{{ form.bio or '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="interests">Interests (comma-separated)</label>
+            <input type="text" name="interests" id="interests" placeholder="hiking, cooking, music" value="{{ form.interests or '' }}">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="looking_for">Looking for</label>
+                <select name="looking_for" id="looking_for">
+                    <option value="relationship" {{ 'selected' if form.looking_for == 'relationship' }}>Relationship</option>
+                    <option value="casual" {{ 'selected' if form.looking_for == 'casual' }}>Casual</option>
+                    <option value="friendship" {{ 'selected' if form.looking_for == 'friendship' }}>Friendship</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="gender_pref">Interested in</label>
+                <select name="gender_pref" id="gender_pref">
+                    <option value="any" {{ 'selected' if form.gender_pref == 'any' }}>Everyone</option>
+                    <option value="female" {{ 'selected' if form.gender_pref == 'female' }}>Women</option>
+                    <option value="male" {{ 'selected' if form.gender_pref == 'male' }}>Men</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-register">Create Account</button>
+        <div class="signin-link">Already have an account? <a href="{{ url_for('dating.login_page') }}">Sign in</a></div>
+    </form>
+</body>
+</html>

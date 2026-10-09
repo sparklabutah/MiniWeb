@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter - Apex Dynamics</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --card-bg: #fff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+        a { color: var(--accent); text-decoration: none; }
+        .navbar { background: var(--primary); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .navbar .logo { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .navbar .logo span { color: #3b82f6; }
+        .navbar nav { display: flex; align-items: center; }
+        .navbar nav a { color: #cbd5e1; margin-left: 1.5rem; font-size: .9rem; text-decoration: none; }
+        .navbar nav a:hover { color: #fff; }
+        .navbar .search-form { display: flex; margin-left: 1.5rem; }
+        .navbar .search-form input { padding: 4px 10px; border: 1px solid #475569; border-radius: 4px 0 0 4px; background: #1e293b; color: #e2e8f0; font-size: .85rem; width: 160px; }
+        .navbar .search-form button { padding: 4px 10px; background: var(--accent); color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: .85rem; }
+        .page-header { background: var(--primary); color: #fff; padding: 3rem 2rem; text-align: center; }
+        .page-header h1 { font-size: 2rem; margin-bottom: .5rem; }
+        .page-header p { color: #94a3b8; }
+        .section { max-width: 600px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .subscribe-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; }
+        .subscribe-card h2 { font-size: 1.3rem; color: var(--primary); margin-bottom: 1rem; }
+        .subscribe-card p { font-size: .9rem; color: var(--text-light); margin-bottom: 1.5rem; line-height: 1.6; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .3rem; color: var(--primary); }
+        .form-group input { width: 100%; padding: .7rem; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; }
+        .topic-list { list-style: none; padding: 0; margin-bottom: 1.5rem; }
+        .topic-list li { padding: .4rem 0; }
+        .topic-list label { font-size: .9rem; cursor: pointer; }
+        .topic-list input[type="checkbox"] { margin-right: .5rem; }
+        .submit-btn { background: var(--accent); color: #fff; padding: .8rem 2rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 600; width: 100%; }
+        .submit-btn:hover { background: #1d4ed8; }
+        .success-msg { background: #dcfce7; color: #166534; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
+        .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 2rem; }
+        .footer a { color: #cbd5e1; margin: 0 .5rem; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('business-company.index') }}" class="logo">Apex<span>Dynamics</span></a>
+        <nav>
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Newsletter</a>
+            <form class="search-form" action="{{ url_for('business-company.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search..." aria-label="Search">
+                <button type="submit">Go</button>
+            </form>
+        </nav>
+    </div>
+
+    <div class="page-header">
+        <h1>Newsletter</h1>
+        <p>Subscribe to stay up to date with Apex Dynamics</p>
+    </div>
+
+    <div class="section">
+        <div class="subscribe-card">
+            <h2>Subscribe to Our Newsletter</h2>
+            <p>Choose the topics you are interested in and receive curated content from Apex Dynamics directly to your inbox.</p>
+
+            {% if subscribe_success %}
+            <div class="success-msg" style="display:block">
+                Successfully {{ subscribe_action }}! ({{ subscribe_email }})<br>
+                <span style="font-size:.88rem;">Confirmation sent to your inbox. <a href="/sites/email/" style="color:#166534; font-weight:600;">Open Email &rarr;</a></span>
+            </div>
+            {% endif %}
+
+            <form id="subscribe-form" method="post" action="{{ url_for('business-company.newsletter_subscribe') }}">
+                <div class="form-group">
+                    <label for="sub-name">Name</label>
+                    <input type="text" id="sub-name" name="name" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label for="sub-email">Email *</label>
+                    <input type="email" id="sub-email" name="email" placeholder="your@email.com" required>
+                </div>
+                <label style="font-size:.9rem; font-weight:600; color:var(--primary); display:block; margin-bottom:.5rem;">Topics</label>
+                <ul class="topic-list">
+                    <li><label><input type="checkbox" name="topics" value="product-updates" checked> Product Updates</label></li>
+                    <li><label><input type="checkbox" name="topics" value="blog" checked> Blog & Insights</label></li>
+                    <li><label><input type="checkbox" name="topics" value="company-news"> Company News</label></li>
+                    <li><label><input type="checkbox" name="topics" value="events"> Events & Webinars</label></li>
+                    <li><label><input type="checkbox" name="topics" value="careers"> Career Opportunities</label></li>
+                </ul>
+                <button type="submit" class="submit-btn">Subscribe</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Apex Dynamics Corp.</p>
+        <p style="margin-top:.5rem">
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+        </p>
+    </div>
+
+    <script>
+    </script>
+</body>
+</html>

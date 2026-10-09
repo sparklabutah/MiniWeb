@@ -1,0 +1,145 @@
+{% extends "music/base.html" %}
+{% set active = 'home' %}
+{% block title %}SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<!-- New-release advertisement banner -->
+{% if new_releases %}
+{% set promo = new_releases[0] %}
+<div class="ad-banner" style="background: linear-gradient(120deg, {{ promo.cover_color }} 0%, #121212 85%);">
+    <span class="ad-tag">Advertisement &middot; New Release</span>
+    <div class="ad-art" style="background: {{ promo.cover_color }};">{{ art_note }}</div>
+    <div class="ad-txt">
+        <h3>{{ promo.title }}</h3>
+        <p>Out now &mdash; the latest release, {{ promo.tracks_count }} new tracks. Stream it first on SoundWave.</p>
+        <a class="ad-cta" href="{{ url_for('music.album_detail', album_id=promo.id) }}">&#9654; Play Now</a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Genre filtering: click a pill (the only way to filter) -->
+<div class="pills">
+    <a href="{{ url_for('music.browse') }}" class="pill">All</a>
+    {% for g in genres %}
+    <a href="{{ url_for('music.browse', genre=g) }}" class="pill">{{ g }}</a>
+    {% endfor %}
+</div>
+
+{% set ad_format = 'banner' %}
+{% set ads = product_ads(4, seed='music-ad2') %}
+{% include "ads/_product_ads.html" %}
+
+{% set grads = ['linear-gradient(135deg,#1db954,#0d5c2e)','linear-gradient(135deg,#8e44ad,#2c1a4d)','linear-gradient(135deg,#e67e22,#5c2d0d)','linear-gradient(135deg,#2980b9,#122c40)','linear-gradient(135deg,#c0392b,#3d1512)','linear-gradient(135deg,#16a085,#0a3b32)'] %}
+
+<!-- Featured Playlists -->
+{% if featured_playlists %}
+<div class="section">
+    <h2 class="section-title">Featured Playlists <a href="{{ url_for('music.playlists_page') }}">Show all</a></h2>
+    <div class="grid">
+        {% for pl in featured_playlists %}
+        <a href="{{ url_for('music.playlist_detail', playlist_id=pl.id) }}" class="card">
+            <div class="art" style="background: {{ grads[loop.index0 % grads|length] }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('playlist', {{ pl.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ pl.name }}</div>
+            <div class="mt">{{ pl.description or (pl.track_ids|length ~ ' tracks') }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Popular Artists -->
+<div class="section">
+    <h2 class="section-title">Popular Artists <a href="{{ url_for('music.browse') }}">Show all</a></h2>
+    <div class="grid">
+        {% for artist in featured_artists %}
+        <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="card artist">
+            <div class="art" style="background: linear-gradient(135deg, {{ artist.avatar_color | default('#1db954') }}, #191414);">{{ art_note }}</div>
+            <div class="nm">{{ artist.name }}</div>
+            <div class="mt">{{ artist.genre }}{% if artist.verified %} &middot; Verified{% endif %}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- New Releases -->
+<div class="section">
+    <h2 class="section-title">New Releases <a href="{{ url_for('music.browse') }}">Show all</a></h2>
+    <div class="grid">
+        {% for album in new_releases %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.release_date }} &middot; {{ album.tracks_count }} tracks</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Popular + Trending Tracks (two columns) -->
+<div class="section">
+    <h2 class="section-title">Charts</h2>
+    <div class="tcols">
+        <div class="tcol">
+            <h3>Popular Right Now</h3>
+            <ul class="tracks">
+                {% for track in popular_tracks %}
+                <li class="trow">
+                    <span class="tnum">{{ loop.index }}</span>
+                    <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+                    <div class="tinfo">
+                        <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                        <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a></div>
+                    </div>
+                    <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+                    <span class="tdur">{{ track.duration_formatted }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="tcol">
+            <h3>Trending</h3>
+            <ul class="tracks">
+                {% for track in trending_tracks %}
+                <li class="trow">
+                    <span class="tnum">{{ loop.index }}</span>
+                    <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+                    <div class="tinfo">
+                        <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                        <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a></div>
+                    </div>
+                    <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+                    <span class="tdur">{{ track.duration_formatted }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Genre shelves -->
+{% for shelf in genre_shelves %}
+<div class="section">
+    <h2 class="section-title">{{ shelf.genre }} <a href="{{ url_for('music.browse', genre=shelf.genre) }}">Show all</a></h2>
+    <div class="grid">
+        {% for album in shelf.albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.artist_name | default(album.release_date) }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% set ad_format = 'native' %}
+{% set ads = product_ads(4, seed='music-index') %}
+{% include "ads/_product_ads.html" %}
+{% endblock %}

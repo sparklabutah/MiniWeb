@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - JobQuest</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
+        .header { background: #1a1a2e; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #6366f1; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .5rem 2rem; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #374151; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f0ff; }
+        nav a.active { font-weight: 700; background: #e0e7ff; color: #4338ca; }
+        .login-container { max-width: 420px; margin: 4rem auto; padding: 2.5rem; background: #fff; border-radius: .6rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .login-container h2 { color: #1e1b4b; margin-bottom: .5rem; font-size: 1.5rem; }
+        .login-container .subtitle { color: #6b7280; font-size: .9rem; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #374151; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input { width: 100%; padding: .7rem .9rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .form-group input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+        .btn-login { width: 100%; padding: .8rem; background: #6366f1; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-login:hover { background: #4f46e5; }
+        .error { background: #fef2f2; color: #dc2626; padding: .7rem 1rem; border-radius: .3rem; font-size: .85rem; margin-bottom: 1rem; border: 1px solid #fee2e2; }
+        .demo-accounts { margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #e5e7eb; }
+        .demo-accounts h4 { font-size: .85rem; color: #6b7280; margin-bottom: .5rem; }
+        .demo-accounts .account { display: flex; justify-content: space-between; align-items: center; padding: .4rem 0; font-size: .85rem; }
+        .demo-accounts .account .username { font-family: monospace; color: #4338ca; font-weight: 600; }
+        .demo-accounts .account .name { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('job-sites.index') }}">Job<span>Quest</span></a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('job-sites.index') }}">Home</a>
+        <a href="{{ url_for('job-sites.jobs_page') }}">Find Jobs</a>
+        <a href="{{ url_for('job-sites.saved_page') }}">Saved Jobs</a>
+        <a href="{{ url_for('job-sites.applications_page') }}">Applications</a>
+        <a href="{{ url_for('job-sites.alerts_page') }}">Job Alerts</a>
+        <a href="{{ url_for('job-sites.login_page') }}" class="active">Sign In</a>
+    </nav>
+
+    <form class="login-container" method="post" action="{{ url_for('job-sites.login_submit') }}">
+        <h2>Sign In</h2>
+        <p class="subtitle">Sign in to manage your job search</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+        </div>
+            <label for="password" style="display:block;margin-top:.6rem;font-size:.85rem;font-weight:500;">Password</label>
+            <input type="password" name="password" id="password" placeholder="Enter password" style="width:100%;padding:.5rem;border:1px solid #ccc;border-radius:.3rem;margin-top:.3rem;" required>
+        <button type="submit" class="btn-login">Sign In</button>
+
+        <div class="demo-accounts">
+            <h4>Demo Accounts</h4>
+            <div class="account">
+                <span class="username">alex.rivera</span>
+                <span class="name">Alex Rivera - Software Engineer</span>
+            </div>
+            <div class="account">
+                <span class="username">sophie.lin</span>
+                <span class="name">Sophie Lin - Graphic Designer</span>
+            </div>
+            <div class="account">
+                <span class="username">natalie.kim</span>
+                <span class="name">Natalie Kim - Junior Developer</span>
+            </div>
+            <div class="account">
+                <span class="username">jake.morrison</span>
+                <span class="name">Jake Morrison - CEO at SyncWave</span>
+            </div>
+        </div>
+    </form>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ link.title }} - SnapLink</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { color: #c4b5fd; }
+        .header-right a { color: #e0e7ff; text-decoration: none; font-size: .85rem; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; }
+        nav a { color: #4f46e5; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #eef2ff; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+        .detail-card { background: #fff; border-radius: .6rem; padding: 1.5rem 2rem; box-shadow: 0 1px 6px rgba(0,0,0,.06); margin-bottom: 1.5rem; }
+        .detail-card h2 { font-size: 1.2rem; margin-bottom: .5rem; }
+        .detail-card .url { color: #4f46e5; word-break: break-all; font-size: .9rem; }
+        .detail-card .meta { color: #64748b; font-size: .85rem; margin-top: .5rem; }
+        .detail-card .code { font-family: monospace; background: #eef2ff; padding: .2rem .6rem; border-radius: .3rem; color: #7c3aed; font-weight: 700; font-size: 1.1rem; }
+        .actions { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .4rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #7c3aed; color: #fff; }
+        .btn-outline { background: transparent; border: 1.5px solid #d1d5db; color: #475569; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-warning { background: #f59e0b; color: #fff; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-box { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; text-align: center; }
+        .stat-box .value { font-size: 1.8rem; font-weight: 700; color: #7c3aed; }
+        .stat-box .label { font-size: .8rem; color: #64748b; margin-top: .2rem; }
+        .stat-section { background: #fff; border-radius: .5rem; border: 1px solid #e2e8f0; padding: 1.2rem; margin-bottom: 1rem; }
+        .stat-section h3 { font-size: .95rem; margin-bottom: .8rem; color: #334155; }
+        .stat-bar { display: flex; align-items: center; margin-bottom: .4rem; }
+        .stat-bar .name { width: 120px; font-size: .82rem; color: #475569; }
+        .stat-bar .bar { flex: 1; height: 18px; background: #f1f5f9; border-radius: .2rem; overflow: hidden; }
+        .stat-bar .bar .fill { height: 100%; background: #7c3aed; border-radius: .2rem; }
+        .stat-bar .count { width: 40px; text-align: right; font-size: .8rem; color: #64748b; }
+        .badge { font-size: .75rem; padding: .2rem .5rem; border-radius: .25rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #16a34a; }
+        .badge-inactive { background: #fee2e2; color: #dc2626; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #f1f5f9; }
+        th { color: #64748b; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('url-shorteners-qr.index') }}">Snap<span>Link</span></a></h1>
+        <div class="header-right">
+            {% if logged_in %}
+            <a href="{{ url_for('url-shorteners-qr.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('url-shorteners-qr.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('url-shorteners-qr.index') }}">Create</a>
+        <a href="{{ url_for('url-shorteners-qr.links_page') }}">My Links</a>
+    </nav>
+
+    <div class="container">
+        <div class="detail-card">
+            <h2>{{ link.title }}</h2>
+            <div><a href="{{ url_for('url-shorteners-qr.redirect_short', short_code=link.short_code) }}" style="color:#4f46e5;font-weight:600;text-decoration:none;">snplnk.io/{{ link.short_code }}</a></div>
+            <div class="url" style="margin-top:.5rem;">{{ link.original_url }}</div>
+            <div class="meta">
+                Created: {{ link.created_at[:10] }}
+                {% if link.expires_at %} &middot; Expires: {{ link.expires_at[:10] }}{% endif %}
+                &middot; <span class="badge {{ 'badge-active' if link.is_active else 'badge-inactive' }}">{{ 'Active' if link.is_active else 'Inactive' }}</span>
+            </div>
+            <div class="actions">
+                <a href="{{ url_for('url-shorteners-qr.qr_page', link_id=link.id) }}" class="btn btn-primary">View QR Code</a>
+                <form method="post" action="{{ url_for('url-shorteners-qr.toggle_link', link_id=link.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-warning">{{ 'Deactivate' if link.is_active else 'Activate' }}</button>
+                </form>
+                <button class="btn btn-danger" id="delete-btn">Delete</button>
+                <button class="btn btn-outline" id="share-toggle-btn" type="button" aria-pressed="false">Sharing: Off</button>
+                <script>
+                document.getElementById('delete-btn').addEventListener('click', function() {
+                    var btn = this;
+                    btn.textContent = 'Deleting...';
+                    btn.disabled = true;
+                    fetch('{{ url_for("url-shorteners-qr.api_link_delete", link_id=link.id) }}', {method: 'DELETE'})
+                        .then(function(r) { return r.json(); })
+                        .then(function() {
+                            btn.textContent = 'Deleted!';
+                            window.location.href = '{{ url_for("url-shorteners-qr.links_page") }}';
+                        })
+                        .catch(function() {
+                            btn.textContent = 'Error';
+                            setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000);
+                        });
+                });
+                </script>
+            </div>
+        </div>
+
+        <!-- Sharing panel (share_by_toggle) -->
+        <div class="detail-card" id="share-panel" style="display:none;">
+            <h2 style="font-size:1rem;">Share this link</h2>
+            <div class="meta" id="share-panel-body" style="margin-top:.4rem;">Loading share options...</div>
+        </div>
+
+        <!-- Edit link settings (edit_by_query) -->
+        <div class="detail-card" id="edit-card">
+            <h2 style="font-size:1rem;">Edit Link</h2>
+            {% if request.args.get('error') %}
+            <div style="margin-top:.6rem;padding:.55rem .8rem;background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:.4rem;font-size:.82rem;">{{ request.args.get('error') }}</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('url-shorteners-qr.edit_link_form', link_id=link.id) }}" id="edit-link-form" style="margin-top:.6rem;">
+                <div style="display:flex; flex-direction:column; gap:.6rem; max-width:560px;">
+                    <label style="font-size:.8rem;color:#64748b;">Title
+                        <input type="text" name="title" value="{{ link.title }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <label style="font-size:.8rem;color:#64748b;">Destination URL
+                        <input type="text" name="original_url" value="{{ link.original_url }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <label style="font-size:.8rem;color:#64748b;">Tags (comma-separated)
+                        <input type="text" name="tags" value="{{ link.tags|join(', ') }}" style="width:100%;padding:.5rem .8rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.85rem;margin-top:.2rem;">
+                    </label>
+                    <div><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                </div>
+            </form>
+        </div>
+
+        <script>
+        (function() {
+            var btn = document.getElementById('share-toggle-btn');
+            var panel = document.getElementById('share-panel');
+            var body = document.getElementById('share-panel-body');
+            var on = false;
+            btn.addEventListener('click', function() {
+                on = !on;
+                btn.textContent = on ? 'Sharing: On' : 'Sharing: Off';
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                panel.style.display = on ? 'block' : 'none';
+                if (on) {
+                    fetch('{{ url_for("url-shorteners-qr.api_link_share", link_id=link.id) }}?method=copy')
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            body.innerHTML = 'Short URL: <span class="code">' + d.short_url + '</span>' +
+                                ' &middot; <a href="{{ url_for("url-shorteners-qr.qr_page", link_id=link.id) }}" style="color:#4f46e5;">Share as QR code</a>';
+                        })
+                        .catch(function() { body.textContent = 'Could not load share options.'; });
+                }
+            });
+        })();
+        </script>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="value">{{ link.clicks }}</div>
+                <div class="label">Total Clicks</div>
+            </div>
+            <div class="stat-box">
+                <div class="value">{{ countries|length }}</div>
+                <div class="label">Countries</div>
+            </div>
+            <div class="stat-box">
+                <div class="value">{{ clicks|length }}</div>
+                <div class="label">Tracked Events</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="stat-section">
+                <h3>Top Countries</h3>
+                {% for country, count in countries.items() %}
+                <div class="stat-bar">
+                    <span class="name">{{ country }}</span>
+                    <div class="bar"><div class="fill" style="width: {{ (count / (countries.values()|max)) * 100 }}%"></div></div>
+                    <span class="count">{{ count }}</span>
+                </div>
+                {% endfor %}
+                {% if not countries %}<div style="color:#94a3b8; font-size:.85rem;">No click data yet.</div>{% endif %}
+            </div>
+
+            <div class="stat-section">
+                <h3>Devices</h3>
+                {% for device, count in devices.items() %}
+                <div class="stat-bar">
+                    <span class="name">{{ device }}</span>
+                    <div class="bar"><div class="fill" style="width: {{ (count / (devices.values()|max)) * 100 }}%"></div></div>
+                    <span class="count">{{ count }}</span>
+                </div>
+                {% endfor %}
+                {% if not devices %}<div style="color:#94a3b8; font-size:.85rem;">No click data yet.</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="stat-section" style="margin-top: 1rem;">
+            <h3>Top Referrers</h3>
+            {% for ref, count in referrers.items() %}
+            <div class="stat-bar">
+                <span class="name" style="width: 220px;">{{ ref[:40] }}</span>
+                <div class="bar"><div class="fill" style="width: {{ (count / (referrers.values()|max)) * 100 }}%"></div></div>
+                <span class="count">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if clicks %}
+        <div class="stat-section" style="margin-top: 1rem;">
+            <h3>Recent Click Events</h3>
+            <table>
+                <thead><tr><th>Timestamp</th><th>Country</th><th>Device</th><th>Referrer</th></tr></thead>
+                <tbody>
+                {% for click in clicks %}
+                <tr>
+                    <td>{{ click.timestamp[:19] }}</td>
+                    <td>{{ click.country }}</td>
+                    <td>{{ click.device }}</td>
+                    <td>{{ click.referrer[:40] }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

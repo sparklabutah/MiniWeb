@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Where's My Refund? - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'filings' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h2>Where's My Refund?</h2>
+            <a href="{{ url_for('tax-filing-dmv-permits.file_1040_page') }}" class="submit-btn" style="text-decoration:none;padding:8px 16px">File a Form 1040</a>
+        </div>
+        <p style="color:#6b7280">Refund and balance-due status for {{ user.display_name }}'s income-tax returns.
+        Amounts are figured from the income and withholding entered on each Form 1040.</p>
+
+        {% if filings %}
+        <table>
+            <thead>
+                <tr><th>Filing ID</th><th>Tax Year</th><th>Tax Owed</th><th>Tax Withheld</th><th>Refund / Amount Due</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for f in filings %}
+                <tr>
+                    <td><a href="{{ url_for('tax-filing-dmv-permits.tax_filing_detail', filing_id=f.id) }}">{{ f.filing_id }}</a></td>
+                    <td>{{ f.tax_year }}</td>
+                    <td>${{ "%.2f"|format(f.tax_owed) }}</td>
+                    <td>${{ "%.2f"|format(f.tax_paid) }}</td>
+                    <td>
+                        {% if f.refund_amount and f.refund_amount > 0 %}
+                        <span style="color:#166534;font-weight:700">Refund ${{ "%.2f"|format(f.refund_amount) }}</span>
+                        {% elif f.get('amount_due') and f.amount_due > 0 %}
+                        <span style="color:#b91c1c;font-weight:700">Owe ${{ "%.2f"|format(f.amount_due) }}</span>
+                        {% else %}
+                        <span style="color:#6b7280">$0.00</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-{{ f.status }}">{{ f.status|replace("_"," ")|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="detail-card"><p>No income-tax returns on file yet.
+            <a href="{{ url_for('tax-filing-dmv-permits.file_1040_page') }}">File a Form 1040</a> to get started.</p></div>
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

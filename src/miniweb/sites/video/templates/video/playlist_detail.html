@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ playlist.title }} - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+
+        /* Layout */
+        .playlist-layout { display: flex; gap: 0; min-height: calc(100vh - 56px); }
+
+        /* Sidebar info panel */
+        .playlist-sidebar { width: 360px; background: linear-gradient(180deg, #1a237e 0%, #0d1b3e 100%); padding: 24px; flex-shrink: 0; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+        .pl-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .pl-creator { font-size: 14px; margin-bottom: 4px; }
+        .pl-creator a { color: #ccc; }
+        .pl-creator a:hover { color: #fff; }
+        .pl-meta { font-size: 13px; color: #aaa; margin-bottom: 16px; }
+        .pl-description { font-size: 14px; color: #ccc; line-height: 1.5; margin-bottom: 16px; }
+        .pl-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pl-btn { background: #fff; color: #0f0f0f; border: none; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .pl-btn.secondary { background: rgba(255,255,255,0.1); color: #fff; }
+
+        /* Video list */
+        .playlist-videos { flex: 1; padding: 16px 24px; }
+        .pv-header { font-size: 14px; color: #aaa; padding: 8px 0 16px; border-bottom: 1px solid #272727; margin-bottom: 8px; }
+        .pv-item { display: flex; gap: 12px; padding: 8px 0; align-items: center; border-radius: 8px; }
+        .pv-item:hover { background: #1a1a1a; }
+        .pv-index { width: 32px; text-align: center; font-size: 14px; color: #aaa; flex-shrink: 0; }
+        .pv-thumb { position: relative; width: 160px; height: 90px; background: #1a1a1a; border-radius: 8px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .pv-dur { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.8); font-size: 11px; padding: 1px 4px; border-radius: 3px; }
+        .pv-info { flex: 1; min-width: 0; }
+        .pv-title { font-size: 14px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+        .pv-channel { font-size: 12px; color: #aaa; }
+        .pv-stats { font-size: 12px; color: #666; }
+
+        .empty-state { text-align: center; padding: 60px 24px; color: #aaa; font-size: 16px; }
+
+        @media (max-width: 900px) {
+            .playlist-layout { flex-direction: column; }
+            .playlist-sidebar { width: 100%; position: static; height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="{{ url_for("video.search") }}" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="playlist-layout">
+        <!-- Sidebar -->
+        <div class="playlist-sidebar">
+            <div class="pl-title">{{ playlist.title }}</div>
+            {% set creator = user_map.get(playlist.user_id) %}
+            {% if creator %}
+            <div class="pl-creator"><a href="{{ url_for('video.channel', user_id=creator.id) }}">{{ creator.channel_name or creator.display_name }}</a></div>
+            {% endif %}
+            <div class="pl-meta">
+                {{ videos|length }} video{{ 's' if videos|length != 1 }}
+                {% if playlist.visibility == 'private' %} &middot; Private{% endif %}
+                {% if playlist.updated_date %} &middot; Updated {{ playlist.updated_date }}{% endif %}
+            </div>
+            {% if playlist.description %}
+            <div class="pl-description">{{ playlist.description }}</div>
+            {% endif %}
+            <div class="pl-actions">
+                {% if videos %}
+                <a href="{{ url_for('video.watch', video_id=videos[0].id) }}" class="pl-btn">&#9654; Play all</a>
+                {% endif %}
+                <a href="{{ url_for('video.playlists') }}" class="pl-btn secondary">All Playlists</a>
+            </div>
+        </div>
+
+        <!-- Video list -->
+        <div class="playlist-videos">
+            {% if videos %}
+            <div class="pv-header">{{ videos|length }} video{{ 's' if videos|length != 1 }} in this playlist</div>
+            {% for video in videos %}
+            <a href="{{ url_for('video.watch', video_id=video.id) }}" class="pv-item">
+                <div class="pv-index">{{ loop.index }}</div>
+                {% set tg = thumb_gradient(video.category) %}
+                <div class="pv-thumb" style="background: {{ tg[0] }};">
+                    <span style="color: {{ tg[1] }}; font-size: 20px; opacity: 0.7;">&#9654;</span>
+                    <span class="pv-dur">{{ format_duration(video.duration_seconds) }}</span>
+                </div>
+                <div class="pv-info">
+                    <div class="pv-title">{{ video.title }}</div>
+                    {% set ch = user_map.get(video.channel_id) %}
+                    {% if ch %}
+                    <div class="pv-channel">{{ ch.channel_name or ch.display_name }}</div>
+                    {% endif %}
+                    <div class="pv-stats">{{ format_views(video.views) }} views</div>
+                </div>
+            </a>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">This playlist is empty.</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

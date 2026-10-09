@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Detail - FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+</head>
+<body>
+    {% set active_page = 'activity' %}
+    {% include 'health-fitness-tracking/_topnav.html' %}
+    <div class="ft-shell">
+        <div class="ft-page-title">
+            <div>
+                <h1>{{ workout.type | replace('_', ' ') | title }}</h1>
+                <div class="sub">{{ workout.date }} &middot; {{ workout.start_time }}{% if workout.location %} &middot; {{ workout.location }}{% endif %}{% if workout_user %} &middot; {{ workout_user.display_name }}{% endif %}</div>
+            </div>
+            <a class="ft-btn ghost" href="{{ url_for('health-fitness-tracking.workouts_page') }}">&larr; Activity</a>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-h">
+                <h3>Session Details</h3>
+                <span class="type-tag tt-{{ workout.type }}">{{ workout.type | replace('_', ' ') }}</span>
+            </div>
+            <div class="panel-b">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="dl">Duration</div>
+                        <div class="dv">{{ workout.duration_minutes }} min</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="dl">Calories</div>
+                        <div class="dv">{{ workout.calories_burned }}</div>
+                    </div>
+                    {% if workout.distance_km and workout.distance_km > 0 %}
+                    <div class="detail-item">
+                        <div class="dl">Distance</div>
+                        <div class="dv">{{ workout.distance_km }} km</div>
+                    </div>
+                    {% endif %}
+                    {% if workout.heart_rate_avg %}
+                    <div class="detail-item">
+                        <div class="dl">Avg HR</div>
+                        <div class="dv">{{ workout.heart_rate_avg }} bpm</div>
+                    </div>
+                    {% endif %}
+                    {% if workout.heart_rate_max %}
+                    <div class="detail-item">
+                        <div class="dl">Max HR</div>
+                        <div class="dv">{{ workout.heart_rate_max }} bpm</div>
+                    </div>
+                    {% endif %}
+                    {% if workout.pace_min_per_km and workout.pace_min_per_km > 0 %}
+                    <div class="detail-item">
+                        <div class="dl">Pace</div>
+                        <div class="dv">{{ workout.pace_min_per_km }} /km</div>
+                    </div>
+                    {% endif %}
+                    {% if workout.elevation_gain_m and workout.elevation_gain_m > 0 %}
+                    <div class="detail-item">
+                        <div class="dl">Elevation</div>
+                        <div class="dv">{{ workout.elevation_gain_m }} m</div>
+                    </div>
+                    {% endif %}
+                    {% if workout.location %}
+                    <div class="detail-item">
+                        <div class="dl">Location</div>
+                        <div class="dv">{{ workout.location }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if workout.exercises and workout.exercises is not string %}
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-h"><h3>Exercises</h3></div>
+            <div class="panel-b">
+                <ul style="list-style:none; display:flex; gap:.5rem; flex-wrap:wrap;">
+                    {% for ex in workout.exercises %}
+                    <li class="type-tag tt-default" style="padding:.3rem .8rem; font-size:.8rem;">{{ ex }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if workout.companions and workout.companions is not string %}
+        <div class="panel" style="margin-bottom:14px;">
+            <div class="panel-b" style="font-size:.85rem; color:var(--muted);">With: {{ workout.companions | join(', ') }}</div>
+        </div>
+        {% endif %}
+
+        {% if workout.notes %}
+        <div class="panel">
+            <div class="panel-h"><h3>Notes</h3></div>
+            <div class="panel-b">
+                <div class="notes-box">{{ workout.notes }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="ft-foot">FitTrack &mdash; Your Nutrition &amp; Fitness Dashboard</div>
+</body>
+</html>

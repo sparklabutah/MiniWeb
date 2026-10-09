@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Generator - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .pw-out { background: #fff; border: 1px solid var(--border-2); border-radius: .35rem; padding: 1.1rem 1.3rem; margin-bottom: 1.3rem; text-align: center; }
+        .pw-text { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 1.15rem; color: var(--ink); word-break: break-all; letter-spacing: .03em; min-height: 1.4em; }
+        .pw-range { width: 100%; accent-color: var(--blue); }
+        .opts { display: flex; flex-direction: column; gap: .3rem; margin: .3rem 0 1.3rem; }
+        .btn-row { display: flex; gap: .6rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+        .meter-track { height: 6px; background: #eef0f3; border-radius: 3px; overflow: hidden; }
+        .meter-fill { height: 100%; width: 0; transition: width .2s; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'generator' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'generator' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="card card-pad">
+                <div class="card-title">Password Generator</div>
+
+                <div class="pw-out"><span class="pw-text" id="generatedPassword">Click &ldquo;Regenerate&rdquo; to create a password</span></div>
+
+                <div class="field">
+                    <label class="form-label" for="pwLength">Length: <span id="lengthValue">20</span></label>
+                    <input type="range" id="pwLength" class="pw-range" min="8" max="64" value="20"
+                           oninput="document.getElementById('lengthValue').textContent = this.value">
+                </div>
+
+                <label class="form-label">Options</label>
+                <div class="opts">
+                    <div class="checkline"><input type="checkbox" id="useUppercase" checked><label for="useUppercase">A-Z</label></div>
+                    <div class="checkline"><input type="checkbox" id="useLowercase" checked><label for="useLowercase">a-z</label></div>
+                    <div class="checkline"><input type="checkbox" id="useDigits" checked><label for="useDigits">0-9</label></div>
+                    <div class="checkline"><input type="checkbox" id="useSymbols" checked><label for="useSymbols">!@#$%^&amp;*</label></div>
+                    <div class="checkline"><input type="checkbox" id="excludeAmbiguous"><label for="excludeAmbiguous">Avoid Ambiguous Characters</label></div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="generatePassword()">Regenerate Password</button>
+                    <button class="btn btn-outline" id="btnCopy" onclick="copyPassword()">Copy Password</button>
+                </div>
+
+                <div class="strength-meter" id="strengthMeter" style="display: none;">
+                    <div class="muted" style="margin-bottom:.35rem;">Estimated Strength</div>
+                    <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+                    <div id="strengthText" style="margin-top:.4rem;font-size:.85rem;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function generatePassword() {
+            var length = document.getElementById('pwLength').value;
+            var uppercase = document.getElementById('useUppercase').checked ? '1' : '0';
+            var lowercase = document.getElementById('useLowercase').checked ? '1' : '0';
+            var digits = document.getElementById('useDigits').checked ? '1' : '0';
+            var symbols = document.getElementById('useSymbols').checked ? '1' : '0';
+            var excludeAmbiguous = document.getElementById('excludeAmbiguous').checked ? '1' : '0';
+            var url = '{{ url_for("password-managers.api_generate_password") }}' +
+                '?length=' + length + '&uppercase=' + uppercase + '&lowercase=' + lowercase +
+                '&digits=' + digits + '&symbols=' + symbols + '&exclude_ambiguous=' + excludeAmbiguous;
+            fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+                document.getElementById('generatedPassword').textContent = data.password;
+                updateStrengthMeter(data.password);
+            });
+        }
+        function copyPassword() {
+            var pw = document.getElementById('generatedPassword').textContent;
+            if (pw && pw.indexOf('Regenerate') === -1) {
+                navigator.clipboard.writeText(pw).then(function() {
+                    var btn = document.getElementById('btnCopy');
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = 'Copy Password'; }, 2000);
+                });
+            }
+        }
+        function updateStrengthMeter(password) {
+            var fill = document.getElementById('meterFill'), text = document.getElementById('strengthText');
+            document.getElementById('strengthMeter').style.display = 'block';
+            var score = 0;
+            if (password.length >= 12) score += 25;
+            if (password.length >= 20) score += 15;
+            if (/[A-Z]/.test(password)) score += 15;
+            if (/[a-z]/.test(password)) score += 15;
+            if (/[0-9]/.test(password)) score += 15;
+            if (/[^A-Za-z0-9]/.test(password)) score += 15;
+            var label, color;
+            if (score >= 85) { label = 'Excellent'; color = '#3f9b52'; }
+            else if (score >= 65) { label = 'Strong'; color = '#175ddc'; }
+            else if (score >= 45) { label = 'Fair'; color = '#c07f16'; }
+            else { label = 'Weak'; color = '#c0392b'; }
+            fill.style.width = score + '%'; fill.style.background = color;
+            text.textContent = label + ' (' + password.length + ' characters)'; text.style.color = color;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalendarTodo - Edit {{ event.title }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, Arial, sans-serif; background: #fff; color: #3c4043; }
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #dadce0; }
+        .header .logo { font-size: 22px; font-weight: 400; color: #5f6368; }
+        .header .logo span { color: #1a73e8; font-weight: 500; }
+        .header-nav a { font-size: 14px; color: #5f6368; text-decoration: none; padding: 6px 12px; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+        .edit-container { max-width: 700px; margin: 32px auto; padding: 0 24px; }
+        .edit-container h1 { font-size: 24px; font-weight: 400; color: #202124; margin-bottom: 24px; }
+        .edit-form label { display: block; font-size: 13px; color: #5f6368; margin: 12px 0 4px; font-weight: 500; }
+        .edit-form input[type="text"],
+        .edit-form input[type="datetime-local"],
+        .edit-form select,
+        .edit-form textarea { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; font-family: inherit; }
+        .edit-form textarea { height: 80px; resize: vertical; }
+        .edit-form select { background: #fff; }
+        .form-actions { margin-top: 24px; display: flex; gap: 12px; }
+        .form-actions button { padding: 10px 24px; border-radius: 4px; font-size: 14px; cursor: pointer; border: 1px solid #dadce0; }
+        .btn-primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+        .btn-cancel { background: #fff; color: #5f6368; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo"><span>Calendar</span>Todo</div>
+        <div class="header-nav">
+            <a href="{{ url_for('calendar-todo.index') }}">Calendar</a>
+            <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}">Back to Event</a>
+            {% if user %}
+            <a href="{{ url_for('calendar-todo.dashboard') }}">{{ user.name }}</a>
+            {% else %}
+            <a href="{{ url_for('calendar-todo.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="edit-container">
+        <h1>Edit Event</h1>
+        <form class="edit-form" method="post" action="{{ url_for('calendar-todo.form_edit_event', event_id=event.id) }}">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" value="{{ event.title }}" required>
+
+            <label for="description">Description</label>
+            <textarea id="description" name="description">{{ event.description }}</textarea>
+
+            <label for="category">Category</label>
+            <select id="category" name="category">
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == event.category %}selected{% endif %}>{{ cat|capitalize }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="calendar">Calendar</label>
+            <select id="calendar" name="calendar">
+                {% for cal in calendars %}
+                <option value="{{ cal }}" {% if cal == event.calendar %}selected{% endif %}>{{ cal }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="start">Start</label>
+            <input type="datetime-local" id="start" name="start" value="{{ event.start[:16] }}">
+
+            <label for="end">End</label>
+            <input type="datetime-local" id="end" name="end" value="{{ event.end[:16] }}">
+
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" value="{{ event.location }}">
+
+            <label for="priority">Priority</label>
+            <select id="priority" name="priority">
+                <option value="high" {% if event.priority == 'high' %}selected{% endif %}>High</option>
+                <option value="medium" {% if event.priority == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="low" {% if event.priority == 'low' %}selected{% endif %}>Low</option>
+            </select>
+
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="confirmed" {% if event.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                <option value="cancelled" {% if event.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                <option value="tentative" {% if event.status == 'tentative' %}selected{% endif %}>Tentative</option>
+            </select>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+                <a href="{{ url_for('calendar-todo.event_detail', event_id=event.id) }}" class="btn-cancel" style="padding: 10px 24px; text-decoration: none; border: 1px solid #dadce0; border-radius: 4px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

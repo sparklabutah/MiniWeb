@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; text-decoration: none; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+
+        /* Upload page */
+        .upload-container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+        .upload-container h1 { font-size: 24px; font-weight: 600; margin-bottom: 32px; text-align: center; }
+
+        /* Drop zone */
+        .drop-zone { border: 2px dashed #303030; border-radius: 12px; padding: 60px 24px; text-align: center; margin-bottom: 32px; transition: border-color 0.2s; cursor: pointer; }
+        .drop-zone:hover { border-color: #3ea6ff; }
+        .drop-icon { font-size: 48px; margin-bottom: 16px; color: #555; }
+        .drop-text { font-size: 16px; margin-bottom: 8px; }
+        .drop-hint { font-size: 13px; color: #aaa; margin-bottom: 16px; }
+        .drop-zone input[type="file"] { display: none; }
+        .select-btn { background: #3ea6ff; color: #0f0f0f; border: none; padding: 10px 24px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .select-btn:hover { opacity: 0.9; }
+
+        /* Form */
+        .upload-form { display: flex; flex-direction: column; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 14px; font-weight: 500; color: #ccc; }
+        .form-group input[type="text"],
+        .form-group textarea,
+        .form-group select { background: #121212; border: 1px solid #303030; color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; }
+        .form-group input[type="text"]:focus,
+        .form-group textarea:focus,
+        .form-group select:focus { border-color: #3ea6ff; }
+        .form-group textarea { height: 120px; resize: vertical; }
+        .form-group .hint { font-size: 12px; color: #666; }
+
+        .form-row { display: flex; gap: 16px; }
+        .form-row .form-group { flex: 1; }
+
+        .submit-section { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+        .submit-section button { padding: 10px 24px; border-radius: 20px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }
+        .submit-section .cancel-btn { background: transparent; color: #fff; border: 1px solid #303030; }
+        .submit-section .cancel-btn:hover { background: #272727; }
+        .submit-section .publish-btn { background: #3ea6ff; color: #0f0f0f; }
+        .submit-section .publish-btn:hover { opacity: 0.9; }
+
+        .login-prompt { text-align: center; padding: 40px; background: #1a1a1a; border-radius: 12px; }
+        .login-prompt a { color: #3ea6ff; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="{{ url_for("video.search") }}" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="upload-container">
+        <h1>Upload Video</h1>
+
+        {% if not logged_in %}
+        <div class="login-prompt">
+            <p style="font-size:16px; margin-bottom:8px;">Sign in to upload videos</p>
+            <p><a href="{{ url_for('video.login') }}">Sign in</a> to start sharing your content.</p>
+        </div>
+        {% else %}
+
+        <!-- Drop zone -->
+        <div class="drop-zone" onclick="document.getElementById('file-input').click()">
+            <div class="drop-icon">&#8682;</div>
+            <div class="drop-text">Drag and drop video files to upload</div>
+            <div class="drop-hint">Your videos will be private until you publish them.</div>
+            <input type="file" id="file-input" accept="video/*">
+            <button type="button" class="select-btn" onclick="document.getElementById('file-input').click();">SELECT FILES</button>
+        </div>
+
+        <!-- Details form -->
+        <form class="upload-form" action="{{ url_for('video.api_video_create') }}" method="post">
+            <div class="form-group">
+                <label for="title">Title (required)</label>
+                <input type="text" id="title" name="title" placeholder="Add a title that describes your video" required>
+                <span class="hint">A catchy title can help you hook viewers.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" placeholder="Tell viewers about your video"></textarea>
+                <span class="hint">Include keywords to help viewers find your video.</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" name="category">
+                        <option value="">Select a category</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                        <option value="Entertainment">Entertainment</option>
+                        <option value="Education">Education</option>
+                        <option value="Music">Music</option>
+                        <option value="Gaming">Gaming</option>
+                        <option value="Sports">Sports</option>
+                        <option value="News">News</option>
+                        <option value="Science">Science &amp; Technology</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="visibility">Visibility</label>
+                    <select id="visibility" name="status">
+                        <option value="published">Public</option>
+                        <option value="unlisted">Unlisted</option>
+                        <option value="draft">Private</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="tags">Tags</label>
+                <input type="text" id="tags" name="tags" placeholder="e.g. tutorial, coding, python">
+                <span class="hint">Separate tags with commas. Tags help people discover your video.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="thumbnail_url">Thumbnail URL</label>
+                <input type="text" id="thumbnail_url" name="thumbnail_url" placeholder="https://example.com/thumbnail.jpg">
+                <span class="hint">Enter a URL for the video thumbnail image.</span>
+            </div>
+
+            <input type="hidden" id="video_url" name="video_url">
+            <input type="hidden" id="duration_seconds" name="duration_seconds">
+
+            <div class="submit-section">
+                <a href="{{ url_for('video.index') }}" class="cancel-btn" style="background:transparent; color:#fff; border:1px solid #303030; padding:10px 24px; border-radius:20px; font-size:14px;">Cancel</a>
+                <button type="submit" class="publish-btn">Publish</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+    <script>
+    (function () {
+        var fi = document.getElementById('file-input');
+        var form = document.querySelector('.upload-form');
+        var dropText = document.querySelector('.drop-text');
+        var vurl = document.getElementById('video_url');
+        var dur = document.getElementById('duration_seconds');
+        var durReady = Promise.resolve();
+        if (fi) fi.addEventListener('change', function () {
+            if (!fi.files || !fi.files.length) return;
+            var f = fi.files[0];
+            if (dropText) dropText.textContent = '✓ ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB) ready to publish';
+            if (vurl) vurl.value = 'uploaded://' + f.name;
+            // Read the real duration from the chosen clip so it isn't 0:00.
+            durReady = new Promise(function (resolve) {
+                try {
+                    var v = document.createElement('video');
+                    v.preload = 'metadata';
+                    v.onloadedmetadata = function () {
+                        if (dur && isFinite(v.duration) && v.duration > 0) dur.value = Math.max(1, Math.round(v.duration));
+                        URL.revokeObjectURL(v.src); resolve();
+                    };
+                    v.onerror = function () { resolve(); };
+                    v.src = URL.createObjectURL(f);
+                    setTimeout(resolve, 2000);   // don't hang the publish
+                } catch (e) { resolve(); }
+            });
+        });
+        if (form) form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var title = (document.getElementById('title') || {}).value || '';
+            if (!title.trim()) { alert('Please add a title.'); return; }
+            var btn = form.querySelector('.publish-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+            // Wait for the duration read so the published video isn't 0:00, then
+            // send as multipart so the chosen video file rides along.
+            durReady.then(function () {
+                var fd = new FormData(form);
+                if (fi && fi.files && fi.files.length) fd.append('file', fi.files[0]);
+                return fetch(form.getAttribute('action'), { method: 'POST', body: fd });
+            })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (res.ok && res.d && res.d.id) {
+                        window.location.href = '/sites/video/watch/' + res.d.id;
+                    } else {
+                        if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+                        alert((res.d && res.d.error) || 'Upload failed');
+                    }
+                })
+                .catch(function () {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+                    alert('Upload failed');
+                });
+        });
+    })();
+    </script>
+</body>
+</html>

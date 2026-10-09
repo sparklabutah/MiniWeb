@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tool.name }} -- CalcTools</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a73e8; color: #fff; padding: .9rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: rgba(255,255,255,.85); text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .container { max-width: 600px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .tool-title { font-size: 1.5rem; color: #1a73e8; margin-bottom: .5rem; }
+        .tool-desc { color: #666; margin-bottom: 1.5rem; }
+        .calc-box { background: #fff; border: 1px solid #e0e0e0; border-radius: .5rem; padding: 1.5rem; }
+        .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-end; }
+        .form-group { flex: 1; }
+        .form-group label { display: block; font-size: .85rem; color: #555; margin-bottom: .3rem; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: 1rem; }
+        .form-group input:focus { border-color: #1a73e8; outline: none; }
+        .btn-calculate { width: 100%; padding: .75rem; background: #d93025; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; cursor: pointer; margin-top: .5rem; }
+        .btn-calculate:hover { background: #b7271d; }
+        .result-box { margin-top: 1.5rem; padding: 1.2rem; background: #fce8e6; border-radius: .4rem; text-align: center; display: none; }
+        .result-box .result-value { font-size: 1.8rem; color: #d93025; font-weight: 700; }
+        .result-box .result-label { font-size: .9rem; color: #555; margin-top: .3rem; }
+        .result-box .result-detail { font-size: .85rem; color: #777; margin-top: .5rem; }
+        .save-form { margin-top: 1rem; text-align: center; }
+        .btn-save { padding: .5rem 1.5rem; background: #34a853; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .9rem; }
+        .btn-save:hover { background: #2d8f47; }
+        .back-link { display: inline-block; margin-bottom: 1rem; color: #1a73e8; text-decoration: none; font-size: .9rem; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('converters-calculators.index') }}">CalcTools</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('converters-calculators.index') }}">Home</a>
+            {% if user %}
+            <a href="{{ url_for('converters-calculators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('converters-calculators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('converters-calculators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="{{ url_for('converters-calculators.index') }}" class="back-link">&larr; All Tools</a>
+        <h2 class="tool-title">{{ tool.name }}</h2>
+        <p class="tool-desc">{{ tool.description }}</p>
+
+        {% if tool.id == 'bmi' %}
+        <div class="calc-box">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="weight">Weight (kg)</label>
+                    <input type="number" id="weight" step="any" value="70" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="height">Height (m)</label>
+                    <input type="number" id="height" step="any" value="1.75" autocomplete="off">
+                </div>
+            </div>
+            <button class="btn-calculate" onclick="calcBMI()">Calculate BMI</button>
+        </div>
+        <div class="result-box" id="result-box">
+            <div class="result-value" id="result-value"></div>
+            <div class="result-label" id="result-label"></div>
+            <div class="result-detail" id="result-detail"></div>
+            {% if user %}
+            <form class="save-form" method="post" action="{{ url_for('converters-calculators.form_save_conversion') }}">
+                <input type="hidden" name="tool" value="bmi">
+                <input type="hidden" name="from_value" id="save-from-value">
+                <input type="hidden" name="from_unit" value="kg/m">
+                <input type="hidden" name="to_unit" value="bmi">
+                <input type="hidden" name="result" id="save-result">
+                <input type="hidden" name="redirect_to" value="{{ request.url }}">
+                <button type="submit" class="btn-save">Save to Dashboard</button>
+            </form>
+            {% endif %}
+        </div>
+        <script>
+        function calcBMI() {
+            var w = document.getElementById('weight').value;
+            var h = document.getElementById('height').value;
+            fetch('{{ url_for("converters-calculators.api_calculate_bmi") }}?weight=' + w + '&height=' + h)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        document.getElementById('result-value').textContent = 'Error';
+                        document.getElementById('result-label').textContent = data.error;
+                        document.getElementById('result-detail').textContent = '';
+                    } else {
+                        document.getElementById('result-value').textContent = data.bmi;
+                        document.getElementById('result-label').textContent = 'Category: ' + data.category;
+                        document.getElementById('result-detail').textContent = 'Weight ' + w + ' kg, Height ' + h + ' m';
+                        var sfv = document.getElementById('save-from-value');
+                        if (sfv) { sfv.value = w + ' kg / ' + h + ' m'; }
+                        var sr = document.getElementById('save-result');
+                        if (sr) { sr.value = data.bmi + ' (' + data.category + ')'; }
+                    }
+                    document.getElementById('result-box').style.display = 'block';
+                });
+        }
+        </script>
+
+        {% elif tool.id == 'mortgage' %}
+        <div class="calc-box">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="principal">Loan Amount ($)</label>
+                    <input type="number" id="principal" step="any" value="300000" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="rate">Annual Interest Rate (%)</label>
+                    <input type="number" id="rate" step="any" value="6.5" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="years">Loan Term (years)</label>
+                    <input type="number" id="years" value="30" autocomplete="off">
+                </div>
+            </div>
+            <button class="btn-calculate" onclick="calcMortgage()">Calculate</button>
+        </div>
+        <div class="result-box" id="result-box">
+            <div class="result-value" id="result-value"></div>
+            <div class="result-label" id="result-label"></div>
+            <div class="result-detail" id="result-detail"></div>
+            {% if user %}
+            <form class="save-form" method="post" action="{{ url_for('converters-calculators.form_save_conversion') }}">
+                <input type="hidden" name="tool" value="mortgage">
+                <input type="hidden" name="from_value" id="save-from-value">
+                <input type="hidden" name="from_unit" value="loan">
+                <input type="hidden" name="to_unit" value="payment">
+                <input type="hidden" name="result" id="save-result">
+                <input type="hidden" name="redirect_to" value="{{ request.url }}">
+                <button type="submit" class="btn-save">Save to Dashboard</button>
+            </form>
+            {% endif %}
+        </div>
+        <script>
+        function calcMortgage() {
+            var p = document.getElementById('principal').value;
+            var r = document.getElementById('rate').value;
+            var y = document.getElementById('years').value;
+            fetch('{{ url_for("converters-calculators.api_calculate_mortgage") }}?principal=' + p + '&rate=' + r + '&years=' + y)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        document.getElementById('result-value').textContent = 'Error';
+                        document.getElementById('result-label').textContent = data.error;
+                        document.getElementById('result-detail').textContent = '';
+                    } else {
+                        document.getElementById('result-value').textContent = '$' + data.monthly_payment.toLocaleString();
+                        document.getElementById('result-label').textContent = 'Monthly Payment';
+                        document.getElementById('result-detail').textContent =
+                            'Total Payment: $' + data.total_payment.toLocaleString() +
+                            ' | Total Interest: $' + data.total_interest.toLocaleString();
+                        var sfv = document.getElementById('save-from-value');
+                        if (sfv) { sfv.value = '$' + p + ' at ' + r + '% for ' + y + ' yrs'; }
+                        var sr = document.getElementById('save-result');
+                        if (sr) { sr.value = '$' + data.monthly_payment + '/mo'; }
+                    }
+                    document.getElementById('result-box').style.display = 'block';
+                });
+        }
+        </script>
+
+        {% elif tool.id == 'tip' %}
+        <div class="calc-box">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="bill">Bill Amount ($)</label>
+                    <input type="number" id="bill" step="any" value="85.50" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="tip-percent">Tip (%)</label>
+                    <select id="tip-percent" name="tip_percent">
+                        <option value="10">10%</option>
+                        <option value="15">15%</option>
+                        <option value="18">18%</option>
+                        <option value="20" selected>20%</option>
+                        <option value="25">25%</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="people">Split Between</label>
+                    <input type="number" id="people" value="1" min="1" autocomplete="off">
+                </div>
+            </div>
+            <button class="btn-calculate" onclick="calcTip()">Calculate Tip</button>
+        </div>
+        <div class="result-box" id="result-box">
+            <div class="result-value" id="result-value"></div>
+            <div class="result-label" id="result-label"></div>
+            <div class="result-detail" id="result-detail"></div>
+            {% if user %}
+            <form class="save-form" method="post" action="{{ url_for('converters-calculators.form_save_conversion') }}">
+                <input type="hidden" name="tool" value="tip">
+                <input type="hidden" name="from_value" id="save-from-value">
+                <input type="hidden" name="from_unit" value="bill">
+                <input type="hidden" name="to_unit" value="total">
+                <input type="hidden" name="result" id="save-result">
+                <input type="hidden" name="redirect_to" value="{{ request.url }}">
+                <button type="submit" class="btn-save">Save to Dashboard</button>
+            </form>
+            {% endif %}
+        </div>
+        <script>
+        function calcTip() {
+            var bill = document.getElementById('bill').value;
+            var tip = document.getElementById('tip-percent').value;
+            var people = document.getElementById('people').value;
+            fetch('{{ url_for("converters-calculators.api_calculate_tip") }}?bill=' + bill + '&tip_percent=' + tip + '&people=' + people)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        document.getElementById('result-value').textContent = 'Error';
+                        document.getElementById('result-label').textContent = data.error;
+                        document.getElementById('result-detail').textContent = '';
+                    } else {
+                        document.getElementById('result-value').textContent = '$' + data.total.toFixed(2);
+                        document.getElementById('result-label').textContent =
+                            'Tip: $' + data.tip_amount.toFixed(2) + ' | Total: $' + data.total.toFixed(2);
+                        if (parseInt(people) > 1) {
+                            document.getElementById('result-detail').textContent =
+                                'Per person: $' + data.per_person.toFixed(2) + ' (' + people + ' people)';
+                        } else {
+                            document.getElementById('result-detail').textContent = '';
+                        }
+                        var sfv = document.getElementById('save-from-value');
+                        if (sfv) { sfv.value = '$' + bill + ' + ' + tip + '% tip'; }
+                        var sr = document.getElementById('save-result');
+                        if (sr) { sr.value = '$' + data.total; }
+                    }
+                    document.getElementById('result-box').style.display = 'block';
+                });
+        }
+        </script>
+        {% endif %}
+    </div>
+</body>
+</html>

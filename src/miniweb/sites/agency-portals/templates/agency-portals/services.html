@@ -1,0 +1,54 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}Services - City of Lakeport{% endblock %}
+{% block content %}
+<div class="main-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
+        <h2 class="section-title" style="margin-bottom:0;">Municipal Services</h2> </div>
+
+    <form class="filters" method="get" action="{{ url_for('agency-portals.services_page') }}">
+        <div class="form-group">
+            <label for="q">Search</label>
+            <input type="text" id="q" name="q" value="{{ q }}" placeholder="Search services...">
+        </div>
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {{ 'selected' if category == cat }}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="department">Department</label>
+            <select id="department" name="department">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}" {{ 'selected' if dept_id == dept.id|string }}>{{ dept.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+
+    <p class="result-count">{{ services|length }} service(s) found</p>
+
+    <div class="card-grid">
+        {% for s in services %}
+        <div class="card">
+            <h3><a href="{{ url_for('agency-portals.service_detail', service_id=s.id) }}">{{ s.name }}</a></h3>
+            <p>{{ s.description }}</p>
+            <p style="font-size:.8rem;color:#71767a;margin-top:.5rem;">
+                <strong>Code:</strong> {{ s.code }} |
+                <strong>Category:</strong> {{ s.category }} |
+                <strong>Fee:</strong> {{ s.fee_range }}
+                {% if s.online %} | <strong>Available Online</strong>{% endif %}
+            </p>
+            {% if s.online %}
+            <a href="{{ url_for('agency-portals.apply_page', service_id=s.id) }}" class="card-link">Apply Online</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results - Lakeport Events</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .header-actions a { color: #fff; text-decoration: none; font-size: .9rem; margin-left: 1rem; padding: .4rem .8rem; border-radius: .3rem; }
+        .header-actions a:hover { background: rgba(255,255,255,.15); }
+        nav { max-width: 1200px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #333; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #fff5f5; color: #d63031; }
+        nav a.active { font-weight: 700; background: #fff0f0; color: #d63031; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+        .search-header { margin-bottom: 1.5rem; }
+        .search-header h2 { font-size: 1.4rem; margin-bottom: .5rem; }
+        .search-header p { color: #666; font-size: .9rem; }
+
+        .search-bar { display: flex; gap: .5rem; max-width: 600px; margin-bottom: 1.5rem; }
+        .search-bar input { flex: 1; padding: .7rem 1rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .95rem; }
+        .search-bar button { padding: .7rem 1.5rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: .95rem; font-weight: 600; cursor: pointer; }
+        .search-bar button:hover { background: #c0392b; }
+
+        .events-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.2rem; }
+        .event-card { background: #fff; border-radius: .5rem; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.07); transition: transform .15s, box-shadow .15s; }
+        .event-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+        .event-card a { text-decoration: none; color: inherit; }
+        .event-card-img { height: 160px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 2rem; position: relative; }
+        .event-card-badge { position: absolute; top: .6rem; right: .6rem; padding: .25rem .6rem; border-radius: .2rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+        .badge-on-sale { background: #00b894; color: #fff; }
+        .badge-completed { background: #636e72; color: #fff; }
+        .badge-sold-out { background: #d63031; color: #fff; }
+        .event-card-body { padding: 1rem 1.2rem; }
+        .event-card-category { font-size: .75rem; color: #d63031; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+        .event-card-title { font-size: 1.05rem; font-weight: 700; color: #1a1a2e; margin-bottom: .4rem; line-height: 1.3; }
+        .event-card-meta { font-size: .82rem; color: #666; line-height: 1.6; }
+        .event-card-meta strong { color: #333; }
+        .event-card-footer { padding: .7rem 1.2rem; border-top: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .event-card-price { font-weight: 700; color: #d63031; font-size: .95rem; }
+        .event-card-price.free { color: #00b894; }
+        .event-card-avail { font-size: .8rem; color: #999; }
+
+        .no-events { text-align: center; padding: 3rem; color: #999; }
+        .no-events h3 { margin-bottom: .5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+        <div class="header-actions">
+            {% if logged_in %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.settings_page') }}">Settings</a>
+                <a href="{{ url_for('ticketing-events.logout') }}">Sign Out ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('ticketing-events.index') }}">All Events</a>
+        <a href="{{ url_for('ticketing-events.search_page') }}" class="active">Search</a>
+        {% for cat in categories %}
+        <a href="{{ url_for('ticketing-events.index') }}?category={{ cat }}">{{ cat }}</a>
+        {% endfor %}
+    </nav>
+
+    <div class="container">
+        <div class="search-header">
+            <h2>Search Events</h2>
+            {% if q %}
+                <p>{{ events|length }} result{{ 's' if events|length != 1 else '' }} for "{{ q }}"</p>
+            {% else %}
+                <p>Enter a search term to find events.</p>
+            {% endif %}
+        </div>
+
+        <form class="search-bar" action="{{ url_for('ticketing-events.search_page') }}" method="get">
+            <input type="text" name="q" placeholder="Search events, venues, organizers..." value="{{ q }}">
+            <button type="submit">Search</button>
+        </form>
+
+        {% if events %}
+        <div class="events-grid">
+            {% for event in events %}
+            <div class="event-card">
+                <a href="{{ url_for('ticketing-events.event_detail', event_id=event.id) }}">
+                    <div class="event-card-img">
+                        <span class="category-icons">
+                            {% if event.category == 'Music' %}&#127925;
+                            {% elif event.category == 'Sports' %}&#9917;
+                            {% elif event.category == 'Arts' %}&#127912;
+                            {% elif event.category == 'Food & Drink' %}&#127860;
+                            {% elif event.category == 'Comedy' %}&#128514;
+                            {% elif event.category == 'Technology' %}&#128187;
+                            {% elif event.category == 'Workshop' %}&#128295;
+                            {% elif event.category == 'Festival' %}&#127881;
+                            {% else %}&#127915;{% endif %}
+                        </span>
+                        <span class="event-card-badge {% if event.status == 'on_sale' %}badge-on-sale{% elif event.status == 'completed' %}badge-completed{% else %}badge-sold-out{% endif %}">
+                            {{ event.status | replace('_', ' ') }}
+                        </span>
+                    </div>
+                    <div class="event-card-body">
+                        <div class="event-card-category">{{ event.category }}</div>
+                        <div class="event-card-title">{{ event.name }}</div>
+                        <div class="event-card-meta">
+                            <strong>{{ event.date }}</strong> at {{ event.get('time', '') }}<br>
+                            {{ event.get('venue', '') }}
+                        </div>
+                    </div>
+                    <div class="event-card-footer">
+                        {% set prices = event.get('ticket_types', []) | map(attribute='price') | list %}
+                        {% if prices and prices | min > 0 %}
+                            <span class="event-card-price">From ${{ '%.2f' | format(prices | min) }}</span>
+                        {% elif prices %}
+                            <span class="event-card-price free">Free</span>
+                        {% else %}
+                            <span class="event-card-price">--</span>
+                        {% endif %}
+                        <span class="event-card-avail">{{ event.get('ticket_types', []) | length }} ticket type{{ 's' if event.get('ticket_types', []) | length != 1 else '' }}</span>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif q %}
+        <div class="no-events">
+            <h3>No events found</h3>
+            <p>Try a different search term or <a href="{{ url_for('ticketing-events.index') }}">browse all events</a>.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

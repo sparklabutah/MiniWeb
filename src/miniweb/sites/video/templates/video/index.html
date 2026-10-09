@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamHub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: 'Roboto', Arial, sans-serif; }
+        a { color: #fff; text-decoration: none; }
+
+        /* Nav */
+        .navbar { background: #0f0f0f; border-bottom: 1px solid #272727; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #ff0000; letter-spacing: -0.5px; }
+        .nav-logo span { color: #fff; }
+        .nav-center { flex: 1; max-width: 640px; margin: 0 40px; }
+        .search-form { display: flex; }
+        .search-form input[type="text"] { flex: 1; background: #121212; border: 1px solid #303030; color: #fff; padding: 8px 16px; border-radius: 20px 0 0 20px; font-size: 14px; outline: none; }
+        .search-form input[type="text"]:focus { border-color: #1c62b9; }
+        .search-form button { background: #222; border: 1px solid #303030; border-left: none; color: #fff; padding: 8px 24px; border-radius: 0 20px 20px 0; cursor: pointer; font-size: 14px; }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .nav-btn { background: none; border: none; color: #fff; font-size: 14px; cursor: pointer; padding: 8px 12px; border-radius: 20px; }
+        .nav-btn:hover { background: #272727; }
+        .nav-btn.signin { background: transparent; border: 1px solid #3ea6ff; color: #3ea6ff; border-radius: 20px; padding: 6px 16px; font-weight: 500; }
+        .nav-btn.signin:hover { background: rgba(62,166,255,0.1); }
+        .user-menu { position: relative; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #7c4dff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; cursor: pointer; }
+
+        /* Filter bar */
+        .filter-bar { display: flex; gap: 8px; padding: 12px 24px; border-bottom: 1px solid #272727; flex-wrap: wrap; align-items: center; }
+        .filter-chip { background: #272727; border: none; color: #fff; padding: 6px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; text-decoration: none; }
+        .filter-chip:hover { background: #3a3a3a; }
+        .filter-chip.active { background: #fff; color: #0f0f0f; }
+
+        /* Video grid */
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 24px; }
+        .video-card { cursor: pointer; }
+        .video-card a { text-decoration: none; color: #fff; }
+        .thumb-wrap { position: relative; width: 100%; padding-top: 56.25%; background: #1a1a1a; border-radius: 12px; overflow: hidden; }
+        .thumb-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .thumb-placeholder { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .thumb-placeholder .play-icon { font-size: 36px; opacity: 0.7; }
+        .thumb-duration { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); color: #fff; font-size: 12px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+        .video-info { display: flex; gap: 12px; padding: 12px 0; }
+        .channel-avatar { width: 36px; height: 36px; border-radius: 50%; background: #7c4dff; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .video-meta { flex: 1; }
+        .video-title { font-size: 14px; font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+        .video-channel { font-size: 12px; color: #aaa; }
+        .video-channel:hover { color: #fff; }
+        .video-stats { font-size: 12px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('video.index') }}" class="nav-logo">Stream<span>Hub</span></a>
+        </div>
+        <div class="nav-center">
+            <form class="search-form" action="{{ url_for('video.search') }}" method="get">
+                <input type="text" name="q" placeholder="Search" aria-label="Search">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="nav-right">
+            {% if logged_in %}
+                <a href="{{ url_for('video.upload') }}" class="nav-btn">+ Upload</a>
+                <a href="{{ url_for('video.history') }}" class="nav-btn">History</a>
+                <a href="{{ url_for('video.playlists') }}" class="nav-btn">Playlists</a>
+                <a href="{{ url_for('video.settings') }}" class="nav-btn">Settings</a>
+                <a href="{{ url_for('video.logout') }}" class="nav-btn">Logout</a>
+            {% else %}
+                <a href="{{ url_for('video.login') }}" class="nav-btn signin">Sign in</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Filter chips -->
+    <div class="filter-bar">
+        <a href="{{ url_for('video.index') }}?sort=trending&category={{ category }}" class="filter-chip {{ 'active' if sort == 'trending' }}">Trending</a>
+        <a href="{{ url_for('video.index') }}?sort=latest&category={{ category }}" class="filter-chip {{ 'active' if sort == 'latest' }}">Latest</a>
+        <a href="{{ url_for('video.index') }}?sort=popular&category={{ category }}" class="filter-chip {{ 'active' if sort == 'popular' }}">Popular</a>
+        <a href="{{ url_for('video.index') }}?sort=liked&category={{ category }}" class="filter-chip {{ 'active' if sort == 'liked' }}">Most Liked</a>
+        {% if categories %}
+            <span style="color:#555; margin: 0 4px;">|</span>
+            <a href="{{ url_for('video.index') }}?sort={{ sort }}" class="filter-chip {{ 'active' if not category }}">All</a>
+            {% for cat in categories %}
+                <a href="{{ url_for('video.index') }}?sort={{ sort }}&category={{ cat }}" class="filter-chip {{ 'active' if category == cat }}">{{ cat }}</a>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Upload date range filter -->
+    <div class="filter-bar">
+        <form method="get" action="{{ url_for('video.index') }}" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="category" value="{{ category }}">
+            <label style="font-size:13px; color:#aaa;">Uploaded from</label>
+            <input type="date" name="date_from" value="{{ date_from }}" style="background:#121212; border:1px solid #303030; color:#fff; padding:6px 10px; border-radius:8px; font-size:13px; color-scheme: dark;">
+            <label style="font-size:13px; color:#aaa;">to</label>
+            <input type="date" name="date_to" value="{{ date_to }}" style="background:#121212; border:1px solid #303030; color:#fff; padding:6px 10px; border-radius:8px; font-size:13px; color-scheme: dark;">
+            <button type="submit" class="filter-chip" style="background:#3ea6ff; color:#0f0f0f; font-weight:500;">Apply Date Range</button>
+            {% if date_from or date_to %}
+                <a href="{{ url_for('video.index') }}?sort={{ sort }}&category={{ category }}" class="filter-chip">Clear Dates</a>
+                {% set newest = (videos | sort(attribute='upload_date', reverse=true) | first) %}
+                {% if newest %}
+                    <a href="{{ url_for('video.watch', video_id=newest.id) }}" class="filter-chip" style="background:#ff0000;">&#9654; Play Newest in Range</a>
+                {% endif %}
+            {% endif %}
+        </form>
+    </div>
+
+    <div style="padding: 0 24px;">
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='video-ad2') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    <!-- Video grid -->
+    <div class="video-grid">
+        {% for video in videos %}
+        <div class="video-card">
+            <a href="{{ url_for('video.watch', video_id=video.id) }}">
+                {% set tg = thumb_gradient(video.category) %}
+                <div class="thumb-wrap" style="background: {{ tg[0] }};">
+                    {% if video.thumbnail_url and video.thumbnail_url.startswith('/static') %}
+                    <img src="{{ video.thumbnail_url }}" alt="">
+                    {% else %}
+                    <div class="thumb-placeholder"><span class="play-icon" style="color: {{ tg[1] }};">&#9654;</span></div>
+                    {% endif %}
+                    <span class="thumb-duration">{{ format_duration(video.duration_seconds) }}</span>
+                </div>
+            </a>
+            <div class="video-info">
+                {% set ch = user_map.get(video.channel_id) %}
+                <a href="{{ url_for('video.channel', user_id=video.channel_id) }}">
+                    <div class="channel-avatar">{{ (ch.display_name or ch.username)[0] if ch else '?' }}</div>
+                </a>
+                <div class="video-meta">
+                    <a href="{{ url_for('video.watch', video_id=video.id) }}">
+                        <div class="video-title">{{ video.title }}</div>
+                    </a>
+                    {% if ch %}
+                        <a href="{{ url_for('video.channel', user_id=video.channel_id) }}" class="video-channel">{{ ch.channel_name or ch.display_name }}</a>
+                    {% endif %}
+                    <div class="video-stats">{{ format_views(video.views) }} views &middot; {{ time_ago(video.upload_date) }}</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="padding: 0 24px 24px;">
+        {% set ad_format = 'grid' %}
+        {% set ads = product_ads(4, seed='video-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    {% if not videos %}
+        <div style="text-align: center; padding: 60px 24px; color: #aaa;">
+            <p style="font-size: 18px;">No videos found.</p>
+        </div>
+    {% endif %}
+</body>
+</html>

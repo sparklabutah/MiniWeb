@@ -1,0 +1,156 @@
+# How every number in the paper is produced (read by scripts/reproduce.py).
+#
+# Which run folders the paper reads is recorded by the figure configs: the named runs of
+# docs/figures/tables/tables_config.yaml (one list per benchmark; mean over the list) and the run lists of
+# docs/figures/rq1/rq1_config.yaml, rq3/data_config.yaml and scaling/scaling_wv_config.yaml. This file says how to make
+# each of them: the model server, the agent configuration on each benchmark, the grading, and the trained adapters.
+# `python scripts/reproduce.py status` checks every run the paper reads; `python scripts/reproduce.py show <arm>` prints its commands.
+
+paper_dir: docs/paper/MiniWeb            # LaTeX source; `scripts/reproduce.py figures` copies generated figures/tables into it
+
+# ── model server ─────────────────────────────────────────────────────────────────────────────────────────────────────
+# src/miniwebagent/scripts/serve.sh (vLLM, the webmix env). One Qwen3.5-4B server with every adapter an arm needs loaded as a LoRA.
+server:
+  model: Qwen/Qwen3.5-4B
+  served: qwen35-4b
+  port: 8400
+  env: {MAX_LORA_RANK: 64, MAX_LORAS: 8}
+
+# ── benchmarks ──────────────────────────────────────────────────────────────────────────────────────────────────────
+# n: tasks per run. MiniWeb needs the app on ports 8300-8320 (the runner starts them); WebArena-Lite needs the four
+# WebArena instances and src/miniwebagent/scripts/webarena/ready.sh; live web needs only a browser and the judges' API keys.
+benchmarks:
+  single:  {kind: miniweb, n: 103, runner: "-m miniwebagent.evaluate --tasks data/webmix/valgen/val_v2.jsonl",
+            about: "generated single-primitive tasks of the 13 held-out sites (103 of 115 are of well-covered primitives)"}
+  heldout: {kind: miniweb, n: 63, runner: "-m miniwebagent.evaluate --human",
+            about: "human tasks of the 13 held-out sites (data/datagen/site_split.json)"}
+  wa:      {kind: webarena, n: 154, runner: "-m miniwebagent.wa --split all --instances 1,2,3,4",
+            about: "WebArena-Lite (ScaleCUA's 154-task release), benchmark evaluators; fuzzy matches by gemini-3.5-flash-lite"}
+  wv:      {kind: webvoyager, n: 536, runner: "-m miniwebagent.om2w --bench webvoyager --tasks data/webmix/webvoyager/WebVoyager_reduced_536.jsonl",
+            judge: "-m miniwebagent.om2w_judge {run} --bench webvoyager --workers 4", judged: "{run}_wvjudge",
+            about: "WebVoyager, normalized set (536 of 643: time-sensitive dates moved, unreachable sites dropped)"}
+  om2w:    {kind: om2w, n: 280, runner: "-m miniwebagent.om2w --bench om2w --tasks data/webmix/om2w/Online_Mind2Web_reduced_280.json",
+            judge: "-m miniwebagent.om2w_judge {run} --bench om2w --workers 4", judged: "{run}_webjudge",
+            about: "Online-Mind2Web, normalized set (280 of 300), WebJudge (o4-mini)"}
+
+# ── agent configurations ────────────────────────────────────────────────────────────────────────────────────────────
+# A single agent acts with one model; the planner (untrained Qwen3.5-4B, agent v6) hands each primitive-level step to
+# an executor. {executor} is the served LoRA name (or qwen35-4b for the untrained model). Arguments per benchmark kind:
+configs:
+  single:
+    miniweb:  "--arm {arm_flag} --verifier-only --workers 6"          # arm_flag: base, or pooled --pooled-name <lora>
+    webarena: "--arm {name} --model {executor}"
+    live:     "--arm base --model {executor} --timeout 14400 --max-steps 100"
+  planner:
+    miniweb:  "--arm agent_planner --agent-version v6 --timeout 2400 --planner-name qwen35-4b --adapters {adapters} --fallback {executor} --verifier-only --workers 6"
+    webarena: "--router planner_agent --agent-version v6 --timeout 2400 --planner-name qwen35-4b --adapters {adapters} --fallback {executor} --arm {name}"
+    live:     "--arm agent --agent-version v6 --timeout 14400 --max-steps 100 --planner-turns 60 --planner-name qwen35-4b --adapters {adapters} --fallback {executor}"
+
+# ── arms: the paper's agents (names as in tables_config.yaml `runs:` where they appear there) ───────────────────────
+arms:
+  base:           {config: single, executor: qwen35-4b, label: "Single agent, untrained"}
+  pooled:         {config: single, executor: pooled_v4, label: "Single agent, trained"}
+  planner:        {config: planner, executor: qwen35-4b, label: "Planner, untrained executor"}
+  planner_pooled: {config: planner, executor: pooled_v4, label: "MiniWebAgent (planner + trained executor)"}
+  taskcentric:    {config: planner, executor: taskgen_pooled, label: "Planner + executor trained on task-centric trajectories (Tab. 3)",
+                   runs: {heldout: [data/webmix/eval/pagent_taskgen_s1, data/webmix/eval/pagent_taskgen_s2, data/webmix/eval/pagent_taskgen_s3],
+                          wa: [data/webmix/wa/seeds/agent_taskgen_s1, data/webmix/wa/seeds/agent_taskgen_s2, data/webmix/wa/seeds/agent_taskgen_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_taskgen_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_agent_taskgen_webjudge]}}
+  agent:          {config: planner, executor: pooled_v4, adapters: "drag,io,select,rest,reasoning",
+                   label: "Planner + family specialists (Supp.)", server_loras: [drag_v5b, io_v5b, select_v5b, rest_v5b, reasoning_v4]}
+  nodone:         {config: single, executor: pooled_nodone, label: "Stop-early control: trained without final done steps",
+                   runs: {heldout: [data/webmix/eval/r1_control_nodone_s1, data/webmix/eval/r1_control_nodone_s2, data/webmix/eval/r1_control_nodone_s3],
+                          wa: [data/webmix/wa/seeds/nodone_s1, data/webmix/wa/seeds/nodone_s2, data/webmix/wa/seeds/nodone_s3]}}
+
+# Protocol deviations, kept as they ran (the paper or its supplement states each):
+deviations:
+  - "WebVoyager, trained single agent (pooled, wv): 40 steps and 1,800 s instead of 100 steps and 14,400 s."
+  - "WebArena-Lite single-agent arms ran at the default --timeout 900 s; planner arms at 2,400 s."
+  - "Held-out, untrained single agent run 1 used --workers 4 (runs 2-3: 6)."
+  - "Online-Mind2Web base started at --timeout 3600 on 300 tasks and resumed at 14,400 s; scored on the 280-task set."
+  - "Live-web runs ended by model-server timeouts were set aside and rerun (src/miniwebagent/scripts/cluster/retry_timeouts.py); base runs were not affected."
+
+# ── RQ1: ten untrained agents on all 376 tasks (Tab. 2, Fig. 5-6) ───────────────────────────────────────────────────
+# Run folder data/webmix/eval/rq1_<served>_all; graded by the task verifiers (results.jsonl, regraded with the flash-lite
+# answer tier) and the VLM judge (judge.jsonl: python -m miniweb.evaluation.judge_runs --runs <run> --parallel 4).
+rq1:
+  browser_use:      # python -m miniwebagent.evaluate --human --human-split all --arm base --base-name <served> --verifier-only
+    - {served: qwen35-4b, model: Qwen/Qwen3.5-4B, run: rq1_qwen35_4b_all, workers: 6}
+    - {served: qwen35-9b, model: Qwen/Qwen3.5-9B, run: rq1_qwen35_9b_all, workers: 12}
+    - {served: qwen3vl-8b, model: Qwen/Qwen3-VL-8B-Instruct, run: rq1_qwen3vl-8b_all, workers: 12, timeout: 1800,
+       server_env: {NO_LORA: 1, CHAT_KWARGS: none, EXTRA_ARGS: '--structured-outputs-config {"backend":"xgrammar","disable_any_whitespace":true}'}}
+    - {served: internvl35-8b, model: OpenGVLab/InternVL3_5-8B, run: rq1_internvl35-8b_all, workers: 12, timeout: 1800,
+       server_env: {NO_LORA: 1, CHAT_KWARGS: none, EXTRA_ARGS: '--trust-remote-code --structured-outputs-config {"backend":"xgrammar","disable_any_whitespace":true}'}}
+  own_loop:         # python -m miniweb.evaluation.fara_rq1 prep; the agent's released loop; python -m miniweb.evaluation.fara_rq1 grade --arm <served>
+    - {served: fara15-4b, model: microsoft/Fara1.5-4B, run: rq1_fara15_4b_all, loop: "src/miniweb/evaluation/fara_runner.py (fara venv)"}
+    - {served: fara-7b, model: microsoft/Fara-7B, run: rq1_fara-7b_all, loop: "ownloop_runner fara7b", server_env: {MM_LIMIT: '{"image": 3}'}}
+    - {served: uitars15-7b, model: ByteDance-Seed/UI-TARS-1.5-7B, run: rq1_uitars15-7b_all, loop: "ownloop_runner uitars"}
+    - {served: molmoweb-4b, model: allenai/MolmoWeb-4B, run: rq1_molmoweb-4b_all, loop: "ownloop_runner molmoweb"}
+    - {served: molmoweb-8b, model: allenai/MolmoWeb-8B, run: rq1_molmoweb-8b_all, loop: "ownloop_runner molmoweb"}
+    - {served: opencua-7b, model: xlangai/OpenCUA-7B, run: rq1_opencua-7b_all, loop: "ownloop_runner opencua (src/miniwebagent/scripts/cluster/ownloop.sh: tokenizer + vLLM plugin)"}
+
+# ── trained adapters ────────────────────────────────────────────────────────────────────────────────────────────────
+# torchrun --standalone --nproc_per_node <gpus> -m miniwebagent.train --out data/webmix/adapters/<name> <args>, with
+# WEBMIX_REPLAY_DIR = a folder of the replayed episodes listed in <pool> (scripts/reproduce.py train builds it as symlinks).
+# Recipe for all: LoRA rank 64, alpha 128, lr 1e-4, one epoch, a global batch of 8 rows (--grad-accum is global:
+# miniwebagent.train divides it by the GPU count, so the GPU count changes speed, not the recipe), no KL anchor (beta 0).
+recipe: "--adapter pooled --epochs 1 --lr 1e-4 --rank 64 --alpha 128 --grad-accum 8 --beta 0 --seed 0"
+adapters:
+  pooled_v4:     {pool: scripts/pools/pool3k_dirs.txt, gpus: 4, rows: 27646,
+                  about: "MiniWebAgent's executor: the 27.6K-step set (3,128 generated trajectories + 857 chains + 629 recoveries)"}
+  pooled_nodone: {pool: scripts/pools/pool3k_dirs.txt, gpus: 4, args: "--drop-done", rows: 23288,
+                  about: "review control: the 27.6K-step set without each episode's final done step"}
+  taskgen_pooled: {rows_dir: data/webmix/taskgen/rows_27k, gpus: 4, rows: 27644,
+                  about: "the task-centric executor of Tab. 3: InSTA's pipeline on the 52 training sites (data.taskgen), 3,795 trajectories"}
+
+# ── data: MiniWebGen and the training set ───────────────────────────────────────────────────────────────────────────
+# The paper's pool is fixed by scripts/pools/pool3k_plain_ids.txt (3,128 generated trajectories) and
+# pool3k_dirs.txt (the 4,614 replayed episodes: plain + chain + recovery). Regenerating draws a new pool with the same
+# recipe; the numbers in the paper come from the listed one.
+data:
+  generate: "python -m miniwebgen run --run-id <id> --macros <primitives> --target <n> --workers 12 --servers 6 --attempts 3 --no-judge"
+  runs: [kinds2, slice1, slice2, slice3, all46, all46b, scale50a, scale50b, scale50c, scale50d, scale50e, scale50f, scale50g, scale100a]
+  retired: data/datagen/retired.json            # trajectories dropped after review (excluded from replay)
+  replay: "python -m miniwebgen replay --shard k/4 --memory-model qwen35-4b   # k = 0..3, then once more to retry failures"
+  augment:
+    - "python -m miniwebgen replay --augment recovery --share 0.35"
+    - "python -m miniwebgen replay --augment chain --per-page 3"
+  valset: "python src/miniwebgen/scripts/make_valset.py   # the 115 generated single-primitive test tasks of the held-out sites"
+  taskgen: "python -m miniwebgen.taskgen propose | judge | rows   # the task-centric comparison data (attempts: miniwebagent.evaluate --tasks)"
+  release: "python scripts/build_release.py   # the consolidated, split-labelled, anonymized data folder"
+# scripts/generate_data.py prints (and with --run runs) all of the above in order, each run with its recorded arguments.
+
+# ── figures and tables, in build order ──────────────────────────────────────────────────────────────────────────────
+# Each generator writes into docs/figures/<dir>/ (tracked); `to` is the destination inside paper_dir.
+figures:
+  - {cmd: docs/figures/teaser/make_teaser_v2.py --variant radar, copy: {docs/figures/teaser/teaser_v2_radar.pdf: figures/teaser.pdf}}
+  - {cmd: docs/figures/sites/make_sites.py, copy: {docs/figures/sites/sites.pdf: figures/sites.pdf}}
+  - {cmd: docs/figures/method/make_method.py, copy: {docs/figures/method/method.pdf: figures/method.pdf}}
+  - {cmd: docs/figures/construction/make_construction.py, copy: {docs/figures/construction/construction.pdf: figures/construction.pdf}}
+  - {cmd: docs/figures/rq1/make_rq1_table.py, copy: {docs/figures/rq1/rq1_table.tex: tables/rq1_table.tex}}
+  - {cmd: docs/figures/rq1/drag_failures.py, copy: {docs/figures/rq1/drag_failures.pdf: figures/drag_failures.pdf}}
+  - {cmd: docs/figures/chain/make_chain.py, copy: {docs/figures/chain/chain_length.pdf: figures/chain_length.pdf}}
+  - {cmd: docs/figures/rq3/make_results_row.py, copy: {docs/figures/rq3/results_row.pdf: figures/results_row.pdf}}   # Fig. 7: practice per skill family
+  - {cmd: docs/figures/rq3/make_rq3_table.py, copy: {docs/figures/rq3/rq3_table.tex: tables/rq3_transfer.tex}}        # Tab. 3: the four benchmarks
+  - {cmd: docs/figures/supp/make_supp.py, copy: {docs/figures/supp/supp_primitives.tex: tables/supp_primitives.tex,
+                                                 docs/figures/supp/supp_ops.tex: tables/supp_ops.tex,
+                                                 docs/figures/supp/supp_gallery.tex: tables/supp_gallery.tex,
+                                                 docs/figures/supp/figures/sites: figures/sites,
+                                                 docs/figures/supp/figures/annotation: figures/annotation}}
+  - {cmd: docs/figures/rq1/text_numbers.py}             # Sec. 4.1's text: pooled drag CI, group means, Spearman rho
+  - {cmd: docs/figures/review/round1_numbers.py}
+  - {cmd: docs/figures/review/compute_budget.py}
+  - {cmd: docs/figures/review/make_round1_supp.py --out docs/figures/review/supp_results.tex,
+     copy: {docs/figures/review/supp_results.tex: sections/supp/supp_results.tex}}
+  - {cmd: docs/figures/mining/mining_stats.py}                    # Supp. A: the mining stage, from the brainstorm sheet
+  - {cmd: docs/figures/mining/make_mining_supp.py --out docs/figures/mining/supp_mining.tex,
+     copy: {docs/figures/mining/supp_mining.tex: sections/supp/supp_mining.tex}}
+  - {cmd: docs/figures/review/make_graders_supp.py --out docs/figures/review/supp_graders.tex,      # Supp. grader validation
+     copy: {docs/figures/review/supp_graders.tex: sections/supp/supp_graders.tex}}
+
+# Analyses quoted in the text (Sec. 3 grader validity; review round 1 grader audit):
+analyses:
+  grader_agreement: "python -m miniweb.evaluation.grader_agreement --parallel 4      # data/webmix/eval/grader_agreement.json"
+  grader_audit_sample: "python src/miniweb/scripts/build_grader_audit.py             # data/grader_audit/{cases,key.json}"
+  grader_audit_score: "python src/miniweb/scripts/grader_audit_report.py --url <deployment>   # data/grader_audit/report.json"

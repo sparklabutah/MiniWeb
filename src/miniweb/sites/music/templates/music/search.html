@@ -1,0 +1,76 @@
+{% extends "music/base.html" %}
+{% set active = 'search' %}
+{% block title %}Search{% if q %}: {{ q }}{% endif %} — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<form action="{{ url_for('music.search_page') }}" method="get" style="margin-bottom:26px;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search artists, albums, tracks..." autofocus autocomplete="off" style="width:100%;max-width:600px;padding:12px 18px;border-radius:24px;font-size:1.05rem;">
+</form>
+
+{% if not q %}
+<div class="empty-state">Type something to search for artists, albums, and tracks.</div>
+{% elif not artists and not albums and not tracks %}
+<div class="empty-state">No results found for "{{ q }}".</div>
+{% else %}
+<h1 class="page-h">Results for "{{ q }}"</h1>
+<div style="font-size:.9rem;color:#888;margin-bottom:22px;">
+    {{ artists|length }} artist{{ 's' if artists|length != 1 }} &middot;
+    {{ albums|length }} album{{ 's' if albums|length != 1 }} &middot;
+    {{ tracks|length }} track{{ 's' if tracks|length != 1 }}
+</div>
+
+{% if artists %}
+<div class="section">
+    <h2 class="section-title">Artists</h2>
+    <div class="grid">
+        {% for artist in artists %}
+        <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="card artist">
+            <div class="art" style="background: linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+            <div class="nm">{{ artist.name }}</div>
+            <div class="mt">{{ artist.genre }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if albums %}
+<div class="section">
+    <h2 class="section-title">Albums</h2>
+    <div class="grid">
+        {% for album in albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.artist_name }} &middot; {{ album.release_date }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if tracks %}
+<div class="section">
+    <h2 class="section-title">Tracks</h2>
+    <ul class="tracks">
+        {% for track in tracks %}
+        <li class="trow">
+            <span class="tnum">{{ loop.index }}</span>
+            <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a> &middot; {{ track.album_title }}</div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

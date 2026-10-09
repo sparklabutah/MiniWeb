@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ repo.name }} - MeridianGit</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-logo svg { fill: #f0f6fc; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-user .user-name { color: #e6edf3; font-weight: 500; font-size: 14px; }
+        .nav-user .btn-signin { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 16px; border-radius: 6px; font-size: 14px; }
+        .nav-user .btn-logout { color: #8b949e; font-size: 13px; }
+
+        .main-container { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+        /* Repo header */
+        .repo-header { padding: 16px 0; border-bottom: 1px solid #21262d; margin-bottom: 0; }
+        .repo-path { font-size: 20px; color: #e6edf3; margin-bottom: 8px; }
+        .repo-path .owner { color: #58a6ff; font-weight: 400; }
+        .repo-path .sep { color: #484f58; margin: 0 2px; }
+        .repo-path .name { color: #58a6ff; font-weight: 600; }
+        .repo-visibility-tag { font-size: 12px; font-weight: 500; color: #8b949e; border: 1px solid #30363d; border-radius: 12px; padding: 0 7px; line-height: 20px; margin-left: 8px; vertical-align: middle; }
+
+        .repo-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .btn-action { display: inline-flex; align-items: center; gap: 6px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 3px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+        .btn-action:hover { background: #30363d; border-color: #8b949e; text-decoration: none; }
+        .btn-action svg { fill: #8b949e; }
+        .btn-action .count { background: #30363d; padding: 0 6px; border-radius: 10px; margin-left: 4px; font-size: 12px; }
+        .btn-action.starred { background: #1f232a; }
+        .btn-action.starred svg { fill: #e3b341; }
+
+        .repo-desc-line { font-size: 14px; color: #8b949e; margin-top: 8px; }
+
+        /* Repo tabs */
+        .repo-tabs { display: flex; gap: 0; border-bottom: 1px solid #21262d; margin-bottom: 16px; padding: 0; background: #0d1117; }
+        .repo-tab { padding: 8px 16px; font-size: 14px; color: #8b949e; cursor: pointer; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; }
+        .repo-tab:hover { color: #e6edf3; }
+        .repo-tab.active { color: #e6edf3; border-bottom-color: #f78166; font-weight: 600; }
+        .repo-tab svg { fill: currentColor; }
+        .tab-count { background: #30363d; color: #e6edf3; padding: 0 6px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* File tree */
+        .branch-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .branch-selector { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 5px 12px; font-size: 14px; display: inline-flex; align-items: center; gap: 4px; }
+        .branch-selector svg { fill: #8b949e; }
+
+        .file-table { width: 100%; border-collapse: collapse; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+        .file-table th { background: #161b22; text-align: left; padding: 8px 16px; font-size: 12px; font-weight: 400; color: #8b949e; border-bottom: 1px solid #30363d; }
+        .file-table td { padding: 6px 16px; font-size: 14px; border-bottom: 1px solid #21262d; }
+        .file-table tr:last-child td { border-bottom: none; }
+        .file-table tr:hover { background: #161b22; }
+        .file-icon { margin-right: 6px; fill: #8b949e; vertical-align: middle; }
+        .file-name { color: #e6edf3; }
+        .file-name.dir { color: #58a6ff; font-weight: 500; }
+        .file-size { color: #484f58; font-size: 13px; text-align: right; }
+
+        /* README */
+        .readme-container { border: 1px solid #30363d; border-radius: 6px; margin-top: 16px; }
+        .readme-header { background: #161b22; padding: 8px 16px; border-bottom: 1px solid #30363d; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .readme-header svg { fill: #8b949e; }
+        .readme-body { padding: 24px 32px; font-size: 14px; line-height: 1.6; }
+        .readme-body pre { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; margin: 12px 0; color: #e6edf3; white-space: pre; }
+        .readme-body h1, .readme-body h2, .readme-body h3 { border-bottom: 1px solid #21262d; padding-bottom: 8px; margin: 20px 0 12px; }
+        .readme-body h1 { font-size: 24px; }
+        .readme-body h2 { font-size: 20px; }
+        .readme-body h3 { font-size: 16px; border-bottom: none; }
+        .readme-body p { margin: 8px 0; }
+        .readme-body ul, .readme-body ol { margin: 8px 0 8px 24px; }
+        .readme-body table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+        .readme-body table th, .readme-body table td { border: 1px solid #30363d; padding: 6px 13px; }
+        .readme-body table th { background: #161b22; font-weight: 600; }
+        .readme-body code { background: #161b22; border-radius: 4px; padding: 2px 6px; font-size: 85%; }
+
+        /* Commits */
+        .commits-list { list-style: none; }
+        .commit-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #21262d; }
+        .commit-info { flex: 1; min-width: 0; }
+        .commit-msg { font-size: 14px; font-weight: 600; color: #e6edf3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .commit-author { font-size: 12px; color: #8b949e; margin-top: 2px; }
+        .commit-sha-col { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .commit-sha { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: #58a6ff; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 2px 8px; }
+        .commit-sha:hover { background: #1f6feb; color: #fff; text-decoration: none; }
+        .commit-diff { font-size: 12px; color: #8b949e; }
+        .commit-diff .add { color: #3fb950; }
+        .commit-diff .del { color: #f85149; }
+
+        /* Issues */
+        .issues-list { list-style: none; }
+        .issue-item { display: flex; align-items: flex-start; gap: 8px; padding: 12px 0; border-bottom: 1px solid #21262d; }
+        .issue-icon { flex-shrink: 0; margin-top: 2px; }
+        .issue-icon.open svg { fill: #3fb950; }
+        .issue-icon.closed svg { fill: #8957e5; }
+        .issue-info { flex: 1; }
+        .issue-title { font-size: 14px; font-weight: 600; color: #e6edf3; }
+        .issue-title:hover { color: #58a6ff; }
+        .issue-labels { display: inline-flex; gap: 4px; margin-left: 8px; }
+        .issue-label { font-size: 12px; font-weight: 500; padding: 0 7px; border-radius: 12px; line-height: 20px; }
+        .label-bug { background: #da363380; color: #f85149; }
+        .label-enhancement { background: #1f6feb40; color: #58a6ff; }
+        .label-security { background: #da363360; color: #f85149; }
+        .label-default { background: #30363d; color: #8b949e; }
+        .issue-meta { font-size: 12px; color: #8b949e; margin-top: 2px; }
+
+        .section-empty { padding: 24px; text-align: center; color: #8b949e; font-size: 14px; }
+
+        /* Inline panels / forms (upload, new issue, new MR, edit, comments, compare) */
+        .panel-box { border: 1px solid #30363d; border-radius: 6px; margin-top: 16px; background: #161b22; }
+        .panel-box .panel-title { padding: 8px 16px; border-bottom: 1px solid #30363d; font-size: 14px; font-weight: 600; color: #e6edf3; }
+        .panel-box .panel-body { padding: 16px; }
+        .panel-box label { display: block; font-size: 12px; color: #8b949e; margin: 8px 0 4px; }
+        .panel-box input[type="text"], .panel-box textarea, .panel-box select, .panel-box input[type="file"] {
+            width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            color: #e6edf3; padding: 6px 10px; font-size: 14px; font-family: inherit; }
+        .panel-box textarea { min-height: 70px; resize: vertical; }
+        .btn-primary-vc { background: #238636; color: #fff; border: 1px solid rgba(240,246,252,0.1); padding: 5px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 12px; }
+        .btn-primary-vc:hover { background: #2ea043; }
+        .btn-secondary-vc { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 3px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+        .btn-secondary-vc:hover { background: #30363d; }
+        .form-status { font-size: 13px; margin-top: 8px; color: #3fb950; }
+        .form-status.error { color: #f85149; }
+        .issue-controls { margin-top: 8px; display: flex; gap: 8px; }
+        .issue-edit-form, .issue-comment-form { display: none; margin-top: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
+        .issue-edit-form.open, .issue-comment-form.open { display: block; }
+        .issue-edit-form input[type="text"], .issue-edit-form select, .issue-comment-form textarea {
+            width: 100%; background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            color: #e6edf3; padding: 6px 10px; font-size: 13px; font-family: inherit; margin-bottom: 8px; }
+        .compare-bar { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #21262d; margin-bottom: 4px; font-size: 13px; color: #8b949e; }
+        .compare-result { display: none; border: 1px solid #30363d; border-radius: 6px; background: #161b22; padding: 12px 16px; margin-top: 12px; font-size: 13px; color: #c9d1d9; }
+        .commit-compare-radios { display: flex; gap: 8px; align-items: center; margin-right: 8px; font-size: 11px; color: #8b949e; }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+    <a href="{{ url_for('version-control.index') }}" class="nav-logo">
+        <svg height="28" width="28" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        MeridianGit
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('version-control.index') }}">Dashboard</a>
+        <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+        <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+        <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+        <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+    </div>
+    <div class="nav-user">
+        {% if session.get('vc_username') %}
+        <a class="user-name" href="{{ url_for('version-control.user_profile', user_id=session.vc_user_id) }}" style="text-decoration:none;">{{ session.vc_name }}</a>
+        <a href="{{ url_for('version-control.logout') }}" class="btn-logout">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('version-control.login_page') }}" class="btn-signin" style="text-decoration:none;">Sign in</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="main-container">
+    <!-- Repo header -->
+    <div class="repo-header">
+        <div class="repo-path">
+            <svg width="16" height="16" viewBox="0 0 16 16" style="fill:#8b949e; vertical-align:middle; margin-right:4px;"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"></path></svg>
+            {% if repo.owner_is_group %}
+            <a href="{{ url_for('version-control.group_page', name=repo.owner_username) }}" class="owner">{{ repo.owner_username }}</a>
+            {% else %}
+            <a href="{{ url_for('version-control.user_profile', user_id=repo.owner_user_id) }}" class="owner">{{ repo.owner_username }}</a>
+            {% endif %}
+            <span class="sep">/</span>
+            <a href="{{ url_for('version-control.repo_detail', repo_id=repo.id) }}" class="name">{{ repo.name }}</a>
+            <span class="repo-visibility-tag">{{ repo.visibility | default('private') }}</span>
+        </div>
+        <p class="repo-desc-line">{{ repo.description }}</p>
+        <div class="repo-actions">
+            <form method="post" action="{{ url_for('version-control.api_repo_star', repo_id=repo.id) }}" style="display:inline;">
+                <button type="submit" class="btn-action {% if starred %}starred{% endif %}">
+                    <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
+                    {% if starred %}Starred{% else %}Star{% endif %}
+                    <span class="count">{{ repo.stars }}</span>
+                </button>
+            </form>
+            <span class="btn-action">
+                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path></svg>
+                Fork
+                <span class="count">{{ repo.forks }}</span>
+            </span>
+            <a class="btn-action" id="export-repos-csv" href="{{ url_for('version-control.api_export_repos', format='csv') }}" title="Download repository data as CSV">
+                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path></svg>
+                Export CSV
+            </a>
+            <a class="btn-action" id="export-repos-json" href="{{ url_for('version-control.api_export_repos', format='json') }}" title="Download repository data as JSON">
+                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path></svg>
+                Export JSON
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="repo-tabs">
+        <div class="repo-tab active" onclick="showTab('code')">
+            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4.72 3.22a.75.75 0 0 1 1.06 1.06L2.06 8l3.72 3.72a.75.75 0 1 1-1.06 1.06L.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25Zm6.56 0a.75.75 0 1 0-1.06 1.06L13.94 8l-3.72 3.72a.75.75 0 1 0 1.06 1.06l4.25-4.25a.75.75 0 0 0 0-1.06l-4.25-4.25Z"></path></svg>
+            Code
+        </div>
+        <div class="repo-tab" onclick="showTab('issues')">
+            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path></svg>
+            Issues
+            <span class="tab-count">{{ issues|length }}</span>
+        </div>
+        <div class="repo-tab" onclick="showTab('commits')">
+            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"></path></svg>
+            Commits
+            <span class="tab-count">{{ commits|length }}</span>
+        </div>
+    </div>
+
+    <!-- Code tab -->
+    <div id="tab-code" class="tab-panel active">
+        <div class="branch-bar">
+            <span class="branch-selector">
+                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM3.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path></svg>
+                {{ repo.default_branch }}
+            </span>
+        </div>
+
+        <table class="file-table" id="file-tree">
+            <thead>
+                <tr><th style="width:50%">Name</th><th>Type</th><th style="text-align:right">Size</th></tr>
+            </thead>
+            <tbody>
+            {% for f in files %}
+            <tr>
+                <td>
+                    {% if f.type == 'dir' %}
+                    <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
+                    <span class="file-name dir">{{ f.name }}</span>
+                    {% else %}
+                    <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path></svg>
+                    <span class="file-name">{{ f.name }}</span>
+                    {% endif %}
+                </td>
+                <td style="color:#484f58; font-size:13px;">{{ f.type }}</td>
+                <td class="file-size">{% if f.type == 'file' %}{{ f.size }} B{% else %}--{% endif %}</td>
+            </tr>
+            {% if f.type == 'dir' and f.children %}
+                {% for child in f.children %}
+                <tr>
+                    <td style="padding-left: 40px;">
+                        {% if child.type == 'dir' %}
+                        <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
+                        <span class="file-name dir">{{ child.name }}</span>
+                        {% else %}
+                        <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path></svg>
+                        <span class="file-name">{{ child.name }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:#484f58; font-size:13px;">{{ child.type }}</td>
+                    <td class="file-size">{% if child.type == 'file' %}{{ child.size }} B{% else %}--{% endif %}</td>
+                </tr>
+                    {% if child.type == 'dir' and child.children %}
+                        {% for gc in child.children %}
+                        <tr>
+                            <td style="padding-left: 64px;">
+                                <svg class="file-icon" width="14" height="14" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path></svg>
+                                <span class="file-name">{{ gc.name }}</span>
+                            </td>
+                            <td style="color:#484f58; font-size:13px;">{{ gc.type }}</td>
+                            <td class="file-size">{% if gc.type == 'file' %}{{ gc.size }} B{% else %}--{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if readme %}
+        <div class="readme-container">
+            <div class="readme-header">
+                <svg width="14" height="14" viewBox="0 0 16 16" style="fill:#8b949e;"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg>
+                README.md
+            </div>
+            <div class="readme-body">
+                {{ readme | replace('\n\n', '</p><p>') | replace('\n', '<br>') | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not is_raw %}
+        <!-- Upload file to repository (upload_by_upload) -->
+        <div class="panel-box" id="upload-panel">
+            <div class="panel-title">Upload file to repository</div>
+            <div class="panel-body">
+                <form id="upload-form">
+                    <label for="upload-file">File</label>
+                    <input type="file" id="upload-file" name="file" required>
+                    <label for="upload-path">Destination path (optional)</label>
+                    <input type="text" id="upload-path" name="path" placeholder="e.g. docs/notes.md">
+                    <label for="upload-commit-message">Commit message</label>
+                    <input type="text" id="upload-commit-message" name="commit_message" placeholder="Upload file via web">
+                    <button type="submit" class="btn-primary-vc">Upload file</button>
+                    <div class="form-status" id="upload-status"></div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Issues tab -->
+    <div id="tab-issues" class="tab-panel">
+        {% if issues %}
+        <ul class="issues-list" id="issues-table">
+            {% for i in issues %}
+            <li class="issue-item">
+                <span class="issue-icon {{ i.state }}">
+                    {% if i.state == 'open' %}
+                    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path></svg>
+                    {% else %}
+                    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5ZM16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z"></path></svg>
+                    {% endif %}
+                </span>
+                <div class="issue-info">
+                    <div>
+                        {% if is_raw %}
+                        <a class="issue-title" href="{{ url_for('version-control.issue_detail', issue_id=i.id) }}">#{{ i.id }} {{ i.title }}</a>
+                        {% else %}
+                        <span class="issue-title">#{{ i.id }} {{ i.title }}</span>
+                        {% endif %}
+                        <span class="issue-labels">
+                            {% for label in i.labels %}
+                            <span class="issue-label {% if label == 'bug' %}label-bug{% elif label == 'enhancement' %}label-enhancement{% elif label == 'security' %}label-security{% else %}label-default{% endif %}">{{ label }}</span>
+                            {% endfor %}
+                        </span>
+                    </div>
+                    <div class="issue-meta">
+                        opened {{ i.created_at[:10] }} by {{ i.author }} &middot; {{ i.comments }} comment{{ 's' if i.comments != 1 else '' }}
+                    </div>
+                    {% if not is_raw %}
+                    <div class="issue-controls">
+                        <button type="button" class="btn-secondary-vc issue-edit-toggle" data-issue-id="{{ i.id }}">Edit</button>
+                        <button type="button" class="btn-secondary-vc issue-comment-toggle" data-issue-id="{{ i.id }}">Comment</button>
+                    </div>
+                    <div class="issue-edit-form" id="issue-edit-{{ i.id }}">
+                        <label style="display:block;font-size:12px;color:#8b949e;margin-bottom:4px;">Title</label>
+                        <input type="text" class="issue-edit-title" value="{{ i.title }}">
+                        <label style="display:block;font-size:12px;color:#8b949e;margin-bottom:4px;">State</label>
+                        <select class="issue-edit-state">
+                            <option value="open" {% if i.state == 'open' %}selected{% endif %}>Open</option>
+                            <option value="closed" {% if i.state == 'closed' %}selected{% endif %}>Closed</option>
+                        </select>
+                        <button type="button" class="btn-secondary-vc issue-edit-save" data-issue-id="{{ i.id }}">Save changes</button>
+                        <span class="form-status issue-edit-status"></span>
+                    </div>
+                    <div class="issue-comment-form" id="issue-comment-{{ i.id }}">
+                        <textarea class="issue-comment-body" rows="3" placeholder="Leave a comment on this issue..."></textarea>
+                        <button type="button" class="btn-secondary-vc issue-comment-post" data-issue-id="{{ i.id }}">Post comment</button>
+                        <span class="form-status issue-comment-status"></span>
+                    </div>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="section-empty">No issues found for this repository.</div>
+        {% endif %}
+
+        <!-- New issue form (submit_by_form) — available on all repos -->
+        <div class="panel-box" id="new-issue-panel">
+            <div class="panel-title">New issue</div>
+            <div class="panel-body">
+                <form id="new-issue-form">
+                    <label for="new-issue-title">Title</label>
+                    <input type="text" id="new-issue-title" placeholder="Issue title" required>
+                    <label for="new-issue-labels">Labels (comma-separated)</label>
+                    <input type="text" id="new-issue-labels" placeholder="bug, enhancement">
+                    <button type="submit" class="btn-primary-vc">Submit new issue</button>
+                    <div class="form-status" id="new-issue-status"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Commits tab -->
+    <div id="tab-commits" class="tab-panel">
+        {% if commits %}
+        {% if not is_raw %}
+        <div class="compare-bar">
+            <span>Select a <strong>base</strong> and a <strong>compare</strong> commit, then press Compare.</span>
+            <button type="button" class="btn-secondary-vc" id="compare-commits-btn">Compare commits</button>
+        </div>
+        {% endif %}
+        <ul class="commits-list" id="commits-table">
+            {% for c in commits %}
+            <li class="commit-item">
+                {% if not is_raw %}
+                <span class="commit-compare-radios">
+                    <label title="Base commit"><input type="radio" name="compare-from" value="{{ c.sha }}"> base</label>
+                    <label title="Compare commit"><input type="radio" name="compare-to" value="{{ c.sha }}"> compare</label>
+                </span>
+                {% endif %}
+                <div class="commit-info">
+                    <div class="commit-msg">{{ c.message }}</div>
+                    <div class="commit-author">{{ c.author }} committed on {{ c.date[:10] }}</div>
+                </div>
+                <div class="commit-sha-col">
+                    <span class="commit-diff">
+                        <span class="add">+{{ c.additions }}</span> /
+                        <span class="del">-{{ c.deletions }}</span>
+                    </span>
+                    <span class="commit-sha">{{ c.sha }}</span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if not is_raw %}
+        <div class="compare-result" id="compare-result"></div>
+        {% endif %}
+        {% else %}
+        <div class="section-empty">No commits found.</div>
+        {% endif %}
+
+        <!-- New merge request form (submit_by_form) — available on all repos -->
+        <div class="panel-box" id="new-mr-panel">
+            <div class="panel-title">Open a merge request</div>
+            <div class="panel-body">
+                <form id="new-mr-form">
+                    <label for="new-mr-title">Title</label>
+                    <input type="text" id="new-mr-title" placeholder="Merge request title" required>
+                    <label for="new-mr-source">Source branch</label>
+                    <input type="text" id="new-mr-source" placeholder="feature/my-branch" required>
+                    <label for="new-mr-target">Target branch</label>
+                    <input type="text" id="new-mr-target" value="{{ repo.default_branch }}">
+                    <label for="new-mr-description">Description</label>
+                    <textarea id="new-mr-description" placeholder="Describe your changes..."></textarea>
+                    <button type="submit" class="btn-primary-vc">Create merge request</button>
+                    <div class="form-status" id="new-mr-status"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.repo-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+}
+</script>
+<script>
+(function() {
+    var repoId = {{ repo.id }};
+
+    function setStatus(el, msg, isError) {
+        el.textContent = msg;
+        el.classList.toggle('error', !!isError);
+    }
+
+    // Upload file to repository (upload_by_upload)
+    var uploadForm = document.getElementById('upload-form');
+    if (uploadForm) uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var status = document.getElementById('upload-status');
+        var fileInput = document.getElementById('upload-file');
+        if (!fileInput.files.length) { setStatus(status, 'Choose a file first.', true); return; }
+        var fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        var path = document.getElementById('upload-path').value.trim();
+        if (path) fd.append('path', path);
+        var msg = document.getElementById('upload-commit-message').value.trim();
+        if (msg) fd.append('commit_message', msg);
+        fetch('/sites/version-control/api/repos/' + repoId + '/upload', {method: 'POST', body: fd})
+            .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function(d) { setStatus(status, 'Uploaded "' + d.path + '" (' + d.size + ' bytes) to ' + d.branch + '.'); uploadForm.reset(); })
+            .catch(function() { setStatus(status, 'Upload failed.', true); });
+    });
+
+    // New issue (submit_by_form)
+    var newIssueForm = document.getElementById('new-issue-form');
+    if (newIssueForm) newIssueForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var status = document.getElementById('new-issue-status');
+        var labels = document.getElementById('new-issue-labels').value
+            .split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        fetch('/sites/version-control/api/repos/' + repoId + '/issues', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title: document.getElementById('new-issue-title').value.trim(), labels: labels})
+        })
+            .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function(d) { setStatus(status, 'Issue #' + d.id + ' created. Reload to see it in the list.'); newIssueForm.reset(); })
+            .catch(function() { setStatus(status, 'Could not create issue.', true); });
+    });
+
+    // New merge request (submit_by_form)
+    var newMrForm = document.getElementById('new-mr-form');
+    if (newMrForm) newMrForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var status = document.getElementById('new-mr-status');
+        fetch('/sites/version-control/api/repos/' + repoId + '/merge_requests', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                title: document.getElementById('new-mr-title').value.trim(),
+                source_branch: document.getElementById('new-mr-source').value.trim(),
+                target_branch: document.getElementById('new-mr-target').value.trim() || '{{ repo.default_branch }}',
+                description: document.getElementById('new-mr-description').value.trim()
+            })
+        })
+            .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function(d) { setStatus(status, 'Merge request !' + d.id + ' created (' + d.source_branch + ' → ' + d.target_branch + ').'); newMrForm.reset(); })
+            .catch(function() { setStatus(status, 'Could not create merge request.', true); });
+    });
+
+    // Issue edit + comment controls (edit_by_form, post_from_free_text)
+    document.querySelectorAll('.issue-edit-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('issue-edit-' + btn.dataset.issueId).classList.toggle('open');
+        });
+    });
+    document.querySelectorAll('.issue-comment-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('issue-comment-' + btn.dataset.issueId).classList.toggle('open');
+        });
+    });
+    document.querySelectorAll('.issue-edit-save').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var box = document.getElementById('issue-edit-' + btn.dataset.issueId);
+            var status = box.querySelector('.issue-edit-status');
+            fetch('/sites/version-control/api/repos/' + repoId + '/issues/' + btn.dataset.issueId, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title: box.querySelector('.issue-edit-title').value.trim(),
+                    state: box.querySelector('.issue-edit-state').value
+                })
+            })
+                .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function() { setStatus(status, 'Saved.'); })
+                .catch(function() { setStatus(status, 'Save failed.', true); });
+        });
+    });
+    document.querySelectorAll('.issue-comment-post').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var box = document.getElementById('issue-comment-' + btn.dataset.issueId);
+            var status = box.querySelector('.issue-comment-status');
+            var body = box.querySelector('.issue-comment-body').value.trim();
+            if (!body) { setStatus(status, 'Comment cannot be empty.', true); return; }
+            fetch('/sites/version-control/api/repos/' + repoId + '/issues/' + btn.dataset.issueId + '/comments', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({body: body})
+            })
+                .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function() { setStatus(status, 'Comment posted.'); box.querySelector('.issue-comment-body').value = ''; })
+                .catch(function() { setStatus(status, 'Could not post comment.', true); });
+        });
+    });
+
+    // Commit comparison (compare_from_table)
+    var compareBtn = document.getElementById('compare-commits-btn');
+    if (compareBtn) compareBtn.addEventListener('click', function() {
+        var from = document.querySelector('input[name="compare-from"]:checked');
+        var to = document.querySelector('input[name="compare-to"]:checked');
+        var out = document.getElementById('compare-result');
+        out.style.display = 'block';
+        if (!from || !to) { out.textContent = 'Select one base and one compare commit first.'; return; }
+        fetch('/sites/version-control/api/repos/' + repoId + '/commits/compare?from=' +
+              encodeURIComponent(from.value) + '&to=' + encodeURIComponent(to.value))
+            .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function(d) {
+                out.innerHTML = '<strong>Comparing ' + d.from.sha + ' → ' + d.to.sha + '</strong><br>' +
+                    'Base: ' + d.from.message + '<br>Compare: ' + d.to.message + '<br>' +
+                    'Additions delta: ' + d.diff_summary.additions_delta +
+                    ' &middot; Deletions delta: ' + d.diff_summary.deletions_delta +
+                    ' &middot; Files changed delta: ' + d.diff_summary.files_changed_delta;
+            })
+            .catch(function() { out.textContent = 'Comparison failed.'; });
+    });
+})();
+</script>
+</body>
+</html>

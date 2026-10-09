@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Article - Lakeport Tribune</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f4f4f4; color: #222; font-family: Georgia, 'Times New Roman', serif; line-height: 1.6; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { color: #0d3b5e; text-decoration: underline; }
+        .site-header { background: #1a1a2e; color: #fff; }
+        .header-brand { text-align: center; padding: 1rem 1rem .6rem; border-bottom: 3px double #444; }
+        .header-brand h1 { font-size: 2rem; letter-spacing: 2px; color: #fff; }
+        .header-brand h1 a { color: #fff; text-decoration: none; }
+        .container { max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+        .form-box { background: #fff; border-radius: .4rem; padding: 2rem 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .form-box h2 { font-size: 1.3rem; color: #1a1a2e; margin-bottom: .5rem; }
+        .form-box .article-ref { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #888; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: .3rem; }
+        .form-group select, .form-group textarea { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .95rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .form-group textarea { height: 100px; resize: vertical; }
+        .btn-submit { display: block; width: 100%; padding: .7rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .btn-submit:hover { background: #c0392b; }
+        .success-msg { background: #d4edda; color: #155724; padding: .8rem 1rem; border-radius: .3rem; margin-bottom: 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .9rem; }
+        .site-footer { background: #1a1a2e; color: #888; padding: 2rem 1.5rem; margin-top: 3rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-brand">
+            <h1><a href="{{ url_for('news.index') }}">Lakeport Tribune</a></h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="form-box">
+            <h2>Report Article</h2>
+            <div class="article-ref">Article: "{{ article.title }}"</div>
+
+            {% if success %}
+            <div class="success-msg">Thank you. Your report has been submitted and will be reviewed by our editorial team.</div>
+            <p style="text-align:center; margin-top:1rem;"><a href="{{ url_for('news.article_detail', article_id=article.id) }}">Back to article</a></p>
+            {% else %}
+            <form method="post" action="{{ url_for('news.report_submit', article_id=article.id) }}">
+                <div class="form-group">
+                    <label for="reason">Reason</label>
+                    <select id="reason" name="reason" required>
+                        <option value="">-- Select a reason --</option>
+                        <option value="inaccurate">Inaccurate information</option>
+                        <option value="offensive">Offensive content</option>
+                        <option value="spam">Spam or advertisement</option>
+                        <option value="copyright">Copyright violation</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="details">Additional details (optional)</label>
+                    <textarea id="details" name="details" placeholder="Please describe the issue..."></textarea>
+                </div>
+                <button type="submit" class="btn-submit">Submit Report</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <p>&copy; Lakeport Tribune</p>
+    </footer>
+</body>
+</html>

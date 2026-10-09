@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = 'players' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="page-title">Players Directory</div>
+
+        <form class="add-form card" method="get" action="{{ url_for('sports-esports.players_page') }}" style="align-items:end;">
+            <div class="form-group">
+                <label class="label">Search</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Name, position, team...">
+            </div>
+            <div class="form-group">
+                <label class="label">League</label>
+                <select name="league_id">
+                    <option value="">All Leagues</option>
+                    {% for l in leagues %}
+                    <option value="{{ l.id }}" {% if league_id == l.id %}selected{% endif %}>{{ l.abbreviation }} - {{ l.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="label">Team</label>
+                <select name="team_id">
+                    <option value="">All Teams</option>
+                    {% for t in teams %}
+                    <option value="{{ t.id }}" {% if team_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-primary">Filter</button>
+        </form>
+
+        {% if players %}
+        <div class="fav-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+            {% for p in players %}
+            <a href="{{ url_for('sports-esports.player_detail', player_id=p.id) }}" class="card" style="display:block;margin-bottom:0;">
+                <div style="font-size:1.05rem;font-weight:800;margin-bottom:.2rem;">{% if p.jersey_number %}#{{ p.jersey_number }} {% endif %}{{ p.name }}</div>
+                <div class="meta" style="margin-bottom:.5rem;">
+                    <span class="team-dot" style="background: {{ p.team.logo_color|default('#999') }};margin-right:.3rem;"></span>
+                    {{ p.team.name }} &middot; {{ p.position }}
+                </div>
+                <div style="font-size:.8rem;color:#475569;display:flex;flex-wrap:wrap;gap:.5rem;">
+                    {% if p.stats %}
+                    {% for k, v in p.stats.items() %}{% if loop.index <= 3 %}
+                    <span style="background:#f1f5f9;padding:.2rem .5rem;border-radius:.3rem;">{{ k.replace('_',' ').title() }}: {{ v }}</span>
+                    {% endif %}{% endfor %}
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No players found matching your criteria.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

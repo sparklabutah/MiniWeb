@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ paper.title }} | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
+    <style>
+        .breadcrumb { font-size: 12px; color: #8c8c8c; margin-bottom: 14px; }
+        .forum-title { font-size: 22px; font-weight: 500; line-height: 1.35; margin-bottom: 4px; }
+        .forum-authors { font-size: 13.5px; color: #8c8c8c; font-style: italic; margin-bottom: 8px; }
+        .forum-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: #666; margin-bottom: 14px; }
+        .note-content { font-size: 13.5px; line-height: 1.65; color: #333; margin-bottom: 4px; }
+        .note-content .field-name { font-weight: 700; }
+        .forum-note { border-bottom: 1px solid #eee; padding-bottom: 18px; margin-bottom: 18px; }
+        .actions { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+        .replies-heading { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+        .replies-heading .count { font-weight: 400; font-size: 13px; color: #8c8c8c; margin-left: 6px; }
+        .related { margin-top: 34px; }
+        .related h3 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+        .related-item { padding: 7px 0; border-bottom: 1px solid #f0f0f0; }
+        .related-item:last-child { border-bottom: none; }
+        .related-item .meta { font-size: 12px; color: #8c8c8c; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-content" style="max-width:900px;">
+        <div class="breadcrumb">
+            <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a> &rsaquo;
+            {% if venue %}
+            <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>
+            {% else %}
+            <span>{{ paper.conference }}</span>
+            {% endif %}
+            &rsaquo; Submission
+        </div>
+
+        <div class="forum-note">
+            <h1 class="forum-title">{{ paper.title }}</h1>
+            <div class="forum-authors">Anonymous (Double-Blind Submission)</div>
+            <div class="forum-meta">
+                {% if venue and venue.status != 'under_review' %}
+                    {% if paper.accepted %}
+                    <span class="label label-success">Accept</span>
+                    {% else %}
+                    <span class="label label-danger">Reject</span>
+                    {% endif %}
+                {% else %}
+                    <span class="label label-info">Under Review</span>
+                {% endif %}
+                {% if show_reviews and paper.avg_score is not none %}
+                <span>Avg. Rating: <strong>{{ paper.avg_score }}/10</strong></span>
+                {% endif %}
+                <span style="color:#8c8c8c">{{ paper.num_reviews }} review{{ 's' if paper.num_reviews != 1 }}{% if paper.num_meta_reviews > 0 %}, {{ paper.num_meta_reviews }} meta-review{{ 's' if paper.num_meta_reviews != 1 }}{% endif %}</span>
+                {% if venue %}
+                <span style="color:#8c8c8c">&middot; {{ venue.name }}</span>
+                {% endif %}
+            </div>
+
+            <div class="note-content"><span class="field-name">Abstract:</span> {{ paper.abstract }}</div>
+            <div class="note-content"><span class="field-name">Venue:</span> {% if venue %}<a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>{% else %}{{ paper.conference }}{% endif %}</div>
+            <div class="note-content"><span class="field-name">Authors:</span> <span style="color:#8c8c8c;font-style:italic">Hidden (Double-Blind Review)</span></div>
+            {% if venue and venue.status != 'under_review' %}
+            <div class="note-content"><span class="field-name">Decision:</span>
+                {% if paper.accepted %}<span class="label label-success">Accept</span>{% else %}<span class="label label-danger">Reject</span>{% endif %}
+            </div>
+            {% endif %}
+            {% if show_reviews %}
+            <div class="note-content"><span class="field-name">Avg. Rating:</span> {{ paper.avg_score if paper.avg_score is not none else 'N/A' }} {% if paper.scored_review_count %}({{ paper.scored_review_count }} rated reviews){% endif %}</div>
+            {% endif %}
+            <div class="note-content"><span class="field-name">Total Reviews:</span> {{ paper.num_reviews }} official review{{ 's' if paper.num_reviews != 1 }}{% if paper.num_meta_reviews > 0 %}, {{ paper.num_meta_reviews }} meta-review{{ 's' if paper.num_meta_reviews != 1 }}{% endif %}</div>
+
+            <div class="actions">
+                {% if user %}
+                <form method="post" action="{{ url_for('conference-review-submission.form_bid', paper_id=paper.id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-default">
+                        {% set user_bids = user.bids if user.bids is mapping else {} %}
+                        {% if paper.id|string in user_bids %}Withdraw Bid{% else %}Bid to Review{% endif %}
+                    </button>
+                </form>
+                {% if user.role in ['reviewer', 'chair', 'admin'] %}
+                <a class="btn btn-primary" href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}">Submit Review</a>
+                {% endif %}
+                <form method="post" action="{{ url_for('conference-review-submission.form_withdraw', paper_id=paper.id) }}"
+                      style="display:inline" onsubmit="return confirm('Withdraw this submission? It will be removed from the venue.')">
+                    <button type="submit" class="btn btn-danger-outline" id="withdraw-btn">Withdraw Submission</button>
+                </form>
+                {% else %}
+                <a class="btn btn-primary" href="{{ url_for('conference-review-submission.login_page') }}">Login to Review</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if user and user.role in ['chair', 'admin'] %}
+        <div class="panel" id="chair-decision">
+            <div class="panel-heading">Program Chair Decision</div>
+            <div class="panel-body">
+                <div style="font-size:13px;color:#555;margin-bottom:10px;">
+                    Current decision:
+                    {% if paper.status == 'accepted' %}<span class="label label-success">Accept</span>
+                    {% elif paper.status == 'rejected' %}<span class="label label-danger">Reject</span>
+                    {% else %}<span class="label label-info">Under Review</span>{% endif %}
+                </div>
+                <form method="post" action="{{ url_for('conference-review-submission.form_decision', paper_id=paper.id) }}" style="display:flex;gap:8px;margin:0;">
+                    <button type="submit" name="decision" value="accept" id="accept-btn" class="btn btn-success">Accept</button>
+                    <button type="submit" name="decision" value="reject" id="reject-btn" class="btn btn-danger-outline">Reject</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if show_reviews %}
+        <div class="replies-heading">Official Reviews<span class="count">{{ paper.reviews|length }} total</span></div>
+
+        {% for review in paper.reviews %}
+        <div class="reply {{ 'meta-review' if review.is_meta_review }}" id="review-{{ loop.index }}">
+            <div class="reply-heading" onclick="toggleReview({{ loop.index }})">
+                <span class="reply-title">
+                    {% if review.is_meta_review %}
+                    Meta Review by Area Chair
+                    {% else %}
+                    Official Review by Reviewer {{ loop.index }}
+                    {% endif %}
+                    {% if review.title %} &mdash; {{ review.title }}{% endif %}
+                </span>
+                <span class="reply-date">
+                    {% if review.recommendation is not none %}Rating: {{ review.recommendation }}/10{% endif %}
+                    {% if review.date %} &middot; {{ review.date }}{% endif %}
+                </span>
+            </div>
+
+            {% if review.recommendation is not none or review.confidence is not none or review.originality is not none %}
+            <div class="reply-fields">
+                {% if review.recommendation is not none %}<div class="field"><strong>Rating:</strong> {{ review.recommendation }}/10</div>{% endif %}
+                {% if review.confidence is not none %}<div class="field"><strong>Confidence:</strong> {{ review.confidence }}/5</div>{% endif %}
+                {% if review.originality is not none %}<div class="field"><strong>Originality:</strong> {{ review.originality }}</div>{% endif %}
+                {% if review.clarity is not none %}<div class="field"><strong>Clarity:</strong> {{ review.clarity }}</div>{% endif %}
+                {% if review.soundness is not none %}<div class="field"><strong>Soundness:</strong> {{ review.soundness }}</div>{% endif %}
+                {% if review.meaningful_comparison is not none %}<div class="field"><strong>Meaningful Comparison:</strong> {{ review.meaningful_comparison }}</div>{% endif %}
+            </div>
+            {% endif %}
+
+            {% if review.comments %}
+            <div class="reply-body collapsed" id="review-body-{{ loop.index }}">{{ review.comments }}</div>
+            <div class="toggle-review" id="toggle-{{ loop.index }}" onclick="toggleReview({{ loop.index }})">Show more</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if not paper.reviews %}
+        <p style="color:#999;font-size:13px;padding:16px 0">No reviews have been submitted yet.</p>
+        {% endif %}
+
+        {% else %}
+        <div class="panel">
+            <div class="panel-body" style="text-align:center;color:#666;font-size:13px;">
+                Reviews are not publicly visible for this venue.
+                {% if not user %}
+                <a href="{{ url_for('conference-review-submission.login_page') }}">Log in</a> to see reviews if you are an assigned reviewer.
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Submissions</h3>
+            {% for r in related %}
+            <div class="related-item">
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=r.id) }}">{{ r.title }}</a>
+                <div class="meta">
+                    {% if show_reviews %}
+                    {% if r.accepted %}<span class="label label-success">Accept</span>{% else %}<span class="label label-danger">Reject</span>{% endif %}
+                    &middot; Avg. Rating: {{ r.avg_score if r.avg_score is not none else 'N/A' }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+
+    <script>
+    function toggleReview(idx) {
+        var body = document.getElementById('review-body-' + idx);
+        var toggle = document.getElementById('toggle-' + idx);
+        if (!body) return;
+        if (body.classList.contains('collapsed')) {
+            body.classList.remove('collapsed');
+            toggle.textContent = 'Show less';
+        } else {
+            body.classList.add('collapsed');
+            toggle.textContent = 'Show more';
+        }
+    }
+    </script>
+</body>
+</html>

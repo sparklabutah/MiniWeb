@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Members - Meridian Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1d21; color: #d1d2d3; height: 100vh; display: flex; flex-direction: column; }
+        a { color: #1d9bd1; text-decoration: none; } a:hover { text-decoration: underline; }
+        .topbar { background: #19171d; height: 38px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #383838; }
+        .topbar .workspace-name { color: #fff; font-weight: 700; font-size: 15px; }
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 260px; background: #19171d; border-right: 1px solid #383838; overflow-y: auto; flex-shrink: 0; }
+        .sidebar-section { padding: 12px 16px 4px; }
+        .sidebar-section-title { font-size: 13px; font-weight: 700; color: #ababad; text-transform: uppercase; }
+        .sidebar-nav { list-style: none; } .sidebar-nav li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .sidebar-nav li a:hover { background: #27242c; text-decoration: none; color: #fff; } .sidebar-nav li a.active { background: #1264a3; color: #fff; }
+        .channel-list { list-style: none; } .channel-list li a { display: flex; align-items: center; padding: 4px 16px; color: #ababad; font-size: 14px; border-radius: 4px; }
+        .channel-list li a:hover { background: #27242c; text-decoration: none; color: #fff; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; }
+        .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+        .filters input, .filters select { background: #222529; border: 1px solid #3f3f42; color: #d1d2d3; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+        .filters input { flex: 1; }
+        .filters button { background: #1264a3; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .member-card { background: #222529; border-radius: 8px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; }
+        .member-card .avatar { width: 44px; height: 44px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .avatar-0 { background: #e04e4e; } .avatar-1 { background: #e07b2e; } .avatar-2 { background: #d4a72c; }
+        .avatar-3 { background: #2ea854; } .avatar-4 { background: #1d9bd1; } .avatar-5 { background: #7b68ee; } .avatar-6 { background: #e05eb3; }
+        .member-info .name { color: #fff; font-weight: 700; font-size: 14px; }
+        .member-info .title { color: #ababad; font-size: 13px; }
+        .member-info .dept { color: #8b8b8d; font-size: 12px; margin-top: 2px; }
+        .member-info .status { font-size: 12px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="topbar"><span class="workspace-name">Meridian Systems</span></div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <ul class="sidebar-nav">
+                    <li><a href="{{ url_for('team-chat-workspace.index') }}">All Channels</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.threads_view') }}">Threads</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.dms_index') }}">Direct Messages</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.members_view') }}" class="active">Members</a></li>
+                    <li><a href="{{ url_for('team-chat-workspace.search_view') }}">Search</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Channels</div>
+                <ul class="channel-list">
+                    {% for ch in channels %}
+                    <li><a href="{{ url_for('team-chat-workspace.channel_view', channel_id=ch.id) }}">#{{ ch.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="content">
+            <h2 style="color:#fff;margin-bottom:16px;">Members ({{ users|length }})</h2>
+            <form class="filters" method="get">
+                <input type="text" name="q" value="{{ search_q }}" placeholder="Search members...">
+                <select name="department">
+                    <option value="">All Departments</option>
+                    {% for d in departments %}
+                    <option value="{{ d }}" {% if dept_filter == d %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Filter</button>
+            </form>
+            <div class="member-grid">
+                {% for u in users %}
+                <div class="member-card">
+                    <div class="avatar avatar-{{ loop.index0 % 7 }}">{{ u.display_name[:1] }}</div>
+                    <div class="member-info" style="flex:1;">
+                        <div class="name">{{ u.display_name }}</div>
+                        <div class="title">{{ u.title }}</div>
+                        <div class="dept">{{ u.department }}</div>
+                        {% if u.status_text %}<div class="status">{{ u.status_emoji }} {{ u.status_text }}</div>{% endif %}
+                    </div>
+                    {% if current_user and u.id != current_user.id %}
+                    {% set is_blocked = u.id in (current_user.get('blocked_users') or []) %}
+                    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-self:flex-start;">
+                        <a class="dm-btn" href="{{ url_for('team-chat-workspace.dm_view', user_id=u.id) }}"
+                           style="background:#007a5a;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;">
+                            Message
+                        </a>
+                        <button class="block-toggle-btn" data-url="{{ url_for('team-chat-workspace.api_member_block', member_id=u.id) }}"
+                                onclick="toggleBlock(this)"
+                                style="background:{{ '#e04e4e' if is_blocked else '#3f3f42' }};color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;">
+                            {{ 'Blocked' if is_blocked else 'Block' }}
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <script>
+    function toggleBlock(btn) {
+        fetch(btn.getAttribute('data-url'), {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var blocked = d.action === 'blocked';
+            btn.textContent = blocked ? 'Blocked' : 'Block';
+            btn.style.background = blocked ? '#e04e4e' : '#3f3f42';
+        });
+    }
+    </script>
+</body>
+</html>

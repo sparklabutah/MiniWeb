@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fares &amp; Passes - Lakeport Transit Authority</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 16px; color: #1a237e; }
+        .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-bar select { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
+        .fare-table-wrap { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .fare-table-wrap h3 { font-size: 18px; color: #1a237e; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 14px; background: #f8f9fa; border-bottom: 2px solid #ddd; font-size: 13px; font-weight: 600; }
+        td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
+        tr:hover { background: #f8f9fa; }
+        .zone-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #e8eaf6; color: #283593; }
+        .info-section { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .info-section h3 { font-size: 18px; color: #1a237e; margin-bottom: 12px; }
+        .info-section p { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 8px; }
+        .info-section ul { margin-left: 20px; font-size: 14px; color: #555; }
+        .info-section li { margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Public Transit for Lakeport and the Region</div>
+    </div>
+    <div class="nav">
+        <a href="{{ url_for('transit-directions.index') }}">Home</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}">Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}">Stops</a>
+        <a href="{{ url_for('transit-directions.trip_planner') }}">Trip Planner</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}" class="active">Fares</a>
+        <a href="{{ url_for('transit-directions.login') }}">Sign In</a>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">Fares &amp; Passes</h2>
+
+        <form class="filter-bar" method="get" action="{{ url_for('transit-directions.fares_page') }}">
+            <select name="zone">
+                <option value="">All Zones</option>
+                {% for zone_key, zone_info in fares.fare_zones.items() %}
+                <option value="{{ zone_key }}" {% if current_zone == zone_key %}selected{% endif %}>Zone {{ zone_key }} - {{ zone_info.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="rider">
+                <option value="">All Riders</option>
+                <option value="adult" {% if current_rider == 'adult' %}selected{% endif %}>Adult</option>
+                <option value="youth_6_18" {% if current_rider == 'youth_6_18' %}selected{% endif %}>Youth (6-18)</option>
+                <option value="senior_65_plus" {% if current_rider == 'senior_65_plus' %}selected{% endif %}>Senior (65+)</option>
+                <option value="disabled" {% if current_rider == 'disabled' %}selected{% endif %}>Disabled</option>
+                <option value="child_under_6" {% if current_rider == 'child_under_6' %}selected{% endif %}>Child (Under 6)</option>
+            </select>
+            <select name="pass_type">
+                <option value="">All Pass Types</option>
+                <option value="single_ride" {% if current_pass == 'single_ride' %}selected{% endif %}>Single Ride</option>
+                <option value="day_pass" {% if current_pass == 'day_pass' %}selected{% endif %}>Day Pass</option>
+                <option value="monthly_pass" {% if current_pass == 'monthly_pass' %}selected{% endif %}>Monthly Pass</option>
+                <option value="annual_pass" {% if current_pass == 'annual_pass' %}selected{% endif %}>Annual Pass</option>
+            </select>
+            <button type="submit" style="background:#1a237e;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;">Filter</button>
+        </form>
+
+        <!-- Export fare data (export_by_dropdown) -->
+        <form method="get" action="{{ url_for('transit-directions.api_export') }}" id="fare-export-form" style="background:white;border-radius:12px;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#666;">Export fare data:</span>
+            <input type="hidden" name="data" value="fares">
+            <select name="format" id="fare-export-format" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit" style="background:#1a237e;color:white;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:14px;">Export</button>
+        </form>
+
+        {% set pass_types = [('single_ride', 'Single Ride'), ('day_pass', 'Day Pass'), ('monthly_pass', 'Monthly Pass'), ('annual_pass', 'Annual Pass')] %}
+        {% set rider_types = [('adult', 'Adult'), ('youth_6_18', 'Youth (6-18)'), ('senior_65_plus', 'Senior (65+)'), ('disabled', 'Disabled'), ('child_under_6', 'Child (Under 6)')] %}
+
+        {% for pt_key, pt_label in pass_types %}
+        {% if not current_pass or current_pass == pt_key %}
+        <div class="fare-table-wrap">
+            <h3>{{ pt_label }}</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Zone</th>
+                        {% for rt_key, rt_label in rider_types %}
+                        {% if not current_rider or current_rider == rt_key %}
+                        <th>{{ rt_label }}</th>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for zone_key in fares.fare_zones.keys() %}
+                    {% if not current_zone or current_zone == zone_key %}
+                    <tr>
+                        <td><span class="zone-badge">Zone {{ zone_key }}</span> {{ fares.fare_zones[zone_key].name }}</td>
+                        {% set zone_data = fares[pt_key]['zone_' + zone_key] %}
+                        {% for rt_key, rt_label in rider_types %}
+                        {% if not current_rider or current_rider == rt_key %}
+                        <td>{% if zone_data[rt_key] is defined %}${{ "%.2f"|format(zone_data[rt_key]) }}{% else %}N/A{% endif %}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <div class="info-section">
+            <h3>Transfer Policy</h3>
+            <p>{{ fares.transfer_policy.notes }}</p>
+            <p>Free transfer window: {{ fares.transfer_policy.free_transfer_window_minutes }} minutes. Maximum transfers: {{ fares.transfer_policy.max_transfers }}.</p>
+        </div>
+
+        <div class="info-section">
+            <h3>Payment Methods</h3>
+            <ul>
+                {% for method in fares.payment_methods %}
+                <li>{{ method }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="info-section">
+            <h3>{{ fares.employer_programs.name }}</h3>
+            <p>{{ fares.employer_programs.description }}</p>
+            <p>Participating employers: {{ fares.employer_programs.participating_employers | join(', ') }}</p>
+            <p>Discounted monthly Zone A: ${{ "%.2f"|format(fares.employer_programs.discounted_monthly_zone_A) }} | Zone B: ${{ "%.2f"|format(fares.employer_programs.discounted_monthly_zone_B) }}</p>
+        </div>
+    </div>
+</body>
+</html>

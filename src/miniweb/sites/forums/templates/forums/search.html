@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search: {{ query }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            {% if query %}
+            <div class="rd-sortbar">
+                <span style="font-weight:700;font-size:.9rem;">Results for "{{ query }}"</span>
+                <span class="dot" style="color:var(--faint);">·</span>
+                <span style="font-size:.82rem;color:var(--muted);">{{ results | length }} found</span>
+                <span class="sp"></span>
+                <a href="{{ url_for('forums.search_page', q=query, sort='top') }}" class="{{ 'active' if sort == 'top' }}">↑ Top</a>
+                <a href="{{ url_for('forums.search_page', q=query, sort='new') }}" class="{{ 'active' if sort == 'new' }}">✦ New</a>
+                <a href="{{ url_for('forums.search_page', q=query, sort='hot') }}" class="{{ 'active' if sort == 'hot' }}">🔥 Hot</a>
+            </div>
+
+            {% for post in results %}
+            {% include "forums/_postcard.html" %}
+            {% else %}
+            <div class="rd-empty">No results found for "{{ query }}"</div>
+            {% endfor %}
+            {% else %}
+            <div class="rd-empty">Enter a search term above to find posts.</div>
+            {% endif %}
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">Search Tips</div>
+                <div class="widget-pad">
+                    Search across all communities by title and content. Use the sort options to reorder results by top score, newest, or hot.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "forums/_feedjs.html" %}
+</body>
+</html>

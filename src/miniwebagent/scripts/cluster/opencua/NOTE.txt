@@ -1,0 +1,7 @@
+OpenCUA-7B tokenizer for vLLM 0.30 / transformers 5.17 ($W/env), 2026-10-03.
+Files copied from the HF snapshot xlangai/OpenCUA-7B a2efb7d2b104d477a4a2666a357e79550a28aafc:
+tokenization_opencua.py and tiktoken.model unchanged; tokenizer_config.json without its "unk_token" and "pad_token" keys.
+Why: transformers 5 does not pass additional_special_tokens to the remote TikTokenV3.__init__, so it takes its
+"dumping mode" branch, which raises if unk_token/pad_token are given and otherwise sets [UNK]/[PAD] itself.
+Checked: all 24 added_tokens_decoder entries map to the same ids; the chat template renders identically.
+Used by ownloop2.sh (vllm serve ... --tokenizer $W/opencua_tokenizer).

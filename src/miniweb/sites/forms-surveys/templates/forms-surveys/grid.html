@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlow - Edit Responses - {{ form.title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
+        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #ce93d8; font-size: .85rem; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        .form-header { background: #fff; border-radius: 8px; border: 1px solid #dadce0; border-top: 4px solid #673ab7; padding: 1.2rem 1.5rem; margin-bottom: 1rem; }
+        .form-header h2 { font-size: 1.3rem; margin-bottom: .3rem; }
+        .form-header .desc { color: #5f6368; font-size: .88rem; }
+        .btn { padding: .5rem 1rem; font-size: .88rem; border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124; text-decoration: none; cursor: pointer; font-weight: 500; }
+        .btn:hover { background: #f1f3f4; }
+        .btn.primary { background: #673ab7; color: #fff; border-color: #673ab7; }
+        .btn.primary:hover { background: #5e35b1; }
+        .action-bar { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .hint { background: #ede7f6; border: 1px solid #d1c4e9; color: #5e35b1; padding: .6rem .9rem; border-radius: 6px; font-size: .82rem; margin-bottom: 1rem; }
+        .grid-wrap { background: #fff; border: 1px solid #dadce0; border-radius: 8px; overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #e0e0e0; padding: 0; font-size: .85rem; text-align: left; }
+        thead th { background: #f5f0fb; color: #5f6368; font-weight: 600; padding: .5rem .6rem; white-space: nowrap; }
+        td.row-header, th.row-header { background: #faf8fd; color: #80868b; text-align: center; width: 3rem; padding: .4rem; font-weight: 600; }
+        td:has(input.cell-input):hover { background: #f3effa; cursor: text; }
+        input.cell-input { border: none; background: none; width: 100%; min-width: 8rem; font-size: .85rem; padding: .45rem .6rem; outline: none; cursor: text; color: #202124; }
+        input.cell-input:focus { background: #fff; box-shadow: inset 0 0 0 2px #673ab7; }
+        .grid-actions { padding: .7rem 1rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; border-top: 1px solid #e0e0e0; }
+        .btn-green { background: #188038; color: #fff; border-color: #188038; }
+        .btn-green:hover { background: #137333; }
+        .grid-actions .note { font-size: .74rem; color: #80868b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FormFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
+            <a href="{{ url_for('forms-surveys.create_form_page') }}">Create</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('forms-surveys.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('forms-surveys.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="form-header">
+            <h2>Edit Responses &mdash; {{ form.title }}</h2>
+            <p class="desc">{{ responses|length }} response{{ 's' if responses|length != 1 else '' }} &middot; {{ form.fields|length }} question{{ 's' if form.fields|length != 1 else '' }}</p>
+        </div>
+
+        <div class="action-bar">
+            <a href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}" class="btn">&larr; Back to Form</a>
+            <a href="{{ url_for('forms-surveys.form_results', form_id=form.id) }}" class="btn">View Results</a>
+        </div>
+
+        <div class="hint">
+            Click any cell to type a new value, or use <strong>+ Add row</strong> to enter a
+            brand-new response, then press <strong>Save Changes</strong>.
+        </div>
+
+        <div class="grid-wrap">
+            <form method="post" action="{{ url_for('forms-surveys.form_grid_submit', form_id=form.id) }}">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="row-header">#</th>
+                        {% for field in form.fields %}
+                        <th>{{ field.label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="grid-body" data-cols="{{ form.fields|length }}">
+                    {% for resp in responses %}
+                    {% set row_idx = loop.index0 %}
+                    <tr>
+                        <td class="row-header">
+                            {{ loop.index }}
+                            <input type="hidden" name="row_{{ row_idx }}" value="{{ resp.id }}">
+                        </td>
+                        {% for field in form.fields %}
+                        {% set val = resp.answers.get(field.id, '') %}
+                        <td>
+                            <input type="text" class="cell-input" name="cell_{{ row_idx }}_{{ loop.index0 }}"
+                                   value="{% if val is string %}{{ val }}{% elif val is iterable %}{{ val|join(', ') }}{% else %}{{ val }}{% endif %}">
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="grid-actions">
+                <button type="button" class="btn" onclick="gridAddRow()">+ Add row</button>
+                <button type="submit" class="btn-green btn">Save Changes</button>
+                <span class="note">New rows post as cell_&lt;row&gt;_&lt;col&gt; and are saved as new responses.</span>
+            </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // Append an empty editable row. It has no hidden row_<r> input, so the save
+    // endpoint treats it as a brand-new response (edit_by_cell add-row).
+    function gridAddRow() {
+        var body = document.getElementById('grid-body');
+        var cols = parseInt(body.dataset.cols, 10) || 0;
+        var r = body.querySelectorAll('tr').length;   // next 0-based row index
+        var tr = document.createElement('tr');
+        var rh = document.createElement('td');
+        rh.className = 'row-header';
+        rh.textContent = r + 1;
+        tr.appendChild(rh);
+        for (var c = 0; c < cols; c++) {
+            var td = document.createElement('td');
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'cell-input';
+            inp.name = 'cell_' + r + '_' + c;
+            td.appendChild(inp);
+            tr.appendChild(td);
+        }
+        body.appendChild(tr);
+        var first = tr.querySelector('input');
+        if (first) first.focus();
+    }
+    </script>
+</body>
+</html>

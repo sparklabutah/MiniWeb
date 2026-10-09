@@ -1,0 +1,59 @@
+{% extends "music/base.html" %}
+{% set active = '' %}
+{% block title %}{{ playlist.name }} — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<!-- Playlist header -->
+<div style="display:flex;align-items:flex-end;gap:24px;margin-bottom:26px;flex-wrap:wrap;">
+    <div class="art" style="width:220px;height:220px;margin:0;flex-shrink:0;background:linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+    <div style="flex:1;min-width:240px;">
+        <div style="font-size:.8rem;color:#ccc;text-transform:uppercase;letter-spacing:1px;">Playlist</div>
+        <h1 class="page-h" style="margin:6px 0;font-size:2.4rem;">{{ playlist.name }}</h1>
+        <div style="font-size:.95rem;color:#aaa;margin-bottom:6px;">{{ playlist.description }}</div>
+        <div style="font-size:.9rem;color:#888;">
+            {% if owner %}{{ owner.display_name }} &middot; {% endif %}
+            {{ tracks|length }} songs, {{ total_duration }}
+            {% if not playlist.is_public %} &middot; Private{% endif %}
+        </div>
+        <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-green" onclick="MusicPlayer.play('playlist', {{ playlist.id }})">&#9654; Play</button>
+            {% if is_owner %}
+            <button class="btn-outline" onclick="deletePlaylist({{ playlist.id }})" style="border-color:#e74c3c;color:#e74c3c;">Delete</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    {% if tracks %}
+    <ul class="tracks">
+        {% for track in tracks %}
+        <li class="trow">
+            <span class="tnum">{{ loop.index }}</span>
+            <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a> &middot; <a href="{{ url_for('music.album_detail', album_id=track.album_id) }}">{{ track.album_title }}</a></div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">This playlist is empty. Add some tracks to get started.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deletePlaylist(id) {
+    if (!confirm("Delete this playlist?")) return;
+    fetch("/sites/music/api/playlists/" + id, {method: "DELETE"})
+        .then(r => r.json())
+        .then(() => { window.location.href = "{{ url_for('music.playlists_page') }}"; });
+}
+</script>
+{% endblock %}

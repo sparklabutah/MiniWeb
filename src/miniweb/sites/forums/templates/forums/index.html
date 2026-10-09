@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <div class="rd-sortbar">
+                <a class="{{ 'active' if sort == 'hot' }}" href="?sort=hot">🔥 Hot</a>
+                <a class="{{ 'active' if sort == 'new' }}" href="?sort=new">✦ New</a>
+                <a class="{{ 'active' if sort == 'top' }}" href="?sort=top">↑ Top</a>
+                <span class="sp"></span>
+            </div>
+
+            {% for post in posts %}
+            {% include "forums/_postcard.html" %}
+            {% if loop.index == 3 or (loop.last and loop.index < 3) %}
+            {% set ad_format = 'native' %}
+            {% set ads = product_ads(4, seed='forums-ad2') %}
+            {% include "ads/_product_ads.html" %}
+            {% endif %}
+            {% else %}
+            <div class="rd-empty">No posts found.</div>
+            {% endfor %}
+        </main>
+
+        <div class="rd-right">
+            <div class="widget">
+                <div class="widget-h">Recent Posts</div>
+                <div class="widget-b">
+                    {% for r in recent_posts %}
+                    <a class="rp-item" href="{{ url_for('forums.post_detail', post_id=r.id) }}">
+                        <div class="rp-sub"><span class="av" style="width:16px;height:16px;font-size:.55rem;background:{{ r._av }};">{{ r.subreddit[0]|upper }}</span> r/{{ r.subreddit }} · {{ format_time_ago(r.created_utc) }}</div>
+                        <div class="rp-title">{{ r.title }}</div>
+                        <div class="rp-meta">{{ "{:,}".format(r.score) }} upvotes · {{ r.num_comments }} comments</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="widget">
+                <div class="widget-h">About ForumHub</div>
+                <div class="widget-pad">
+                    Your front page of communities. Dive into discussions, share links and images, and vote on what matters.
+                    <div style="margin-top:12px;display:flex;gap:8px;">
+                        <a class="rd-btn" href="{{ url_for('forums.submit_page') }}" style="flex:1;text-align:center;">Create Post</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="widget">
+                <div class="widget-h">Sponsored</div>
+                <div class="widget-pad">
+                    {% set ad_format = 'rail' %}
+                    {% set ad_title = ' ' %}
+                    {% set ads = product_ads(3, seed='forums-rail') %}
+                    {% include "ads/_product_ads.html" %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "forums/_feedjs.html" %}
+</body>
+</html>

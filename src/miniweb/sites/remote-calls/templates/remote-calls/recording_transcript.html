@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcript - {{ recording.title }} - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 900px; margin: 1.5rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .breadcrumb a { color: #1976d2; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        h2.page-title { font-size: 1.3rem; margin-bottom: .3rem; }
+        .sub { font-size: .85rem; color: #64748b; margin-bottom: 1.2rem; }
+        .search-bar { display: flex; gap: .6rem; margin-bottom: 1.2rem; }
+        .search-bar input { flex: 1; padding: .55rem .8rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .9rem; }
+        .search-bar button { padding: .55rem 1.1rem; border: none; border-radius: .3rem; background: #1976d2; color: #fff; font-weight: 600; font-size: .85rem; cursor: pointer; }
+        .search-bar a { padding: .55rem 1rem; border-radius: .3rem; background: #e2e8f0; color: #334155; font-weight: 600; font-size: .85rem; text-decoration: none; }
+        .search-note { font-size: .85rem; color: #64748b; margin-bottom: 1rem; }
+        .transcript { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+        .segment { display: flex; gap: 1rem; padding: .9rem 1.5rem; border-bottom: 1px solid #f2f4f7; }
+        .segment:last-child { border-bottom: none; }
+        .segment .ts { font-family: monospace; font-size: .8rem; color: #1976d2; min-width: 64px; padding-top: .1rem; font-weight: 600; }
+        .segment .body .speaker { font-size: .82rem; font-weight: 700; color: #16213e; margin-bottom: .15rem; }
+        .segment .body .text { font-size: .92rem; color: #334155; line-height: 1.45; }
+        .empty-state { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 3rem 2rem; text-align: center; color: #64748b; }
+        .empty-state .icon { font-size: 2.4rem; margin-bottom: .8rem; }
+        .empty-state h3 { font-size: 1.1rem; color: #334155; margin-bottom: .5rem; }
+        .actions { display: flex; gap: .8rem; margin-top: 1.2rem; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .3rem; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}" class="active">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a> &raquo;
+            <a href="{{ url_for('remote-calls.recording_detail', recording_id=recording.id) }}">{{ recording.title }}</a> &raquo;
+            Transcript
+        </div>
+
+        <h2 class="page-title">Transcript &mdash; {{ recording.title }}</h2>
+
+        {% if has_transcript %}
+            <div class="sub">{{ total_segments }} segments &middot; speaker-tagged &middot; recorded {{ parse_dt(recording.date).strftime('%B %d, %Y') if parse_dt(recording.date) else recording.date }}</div>
+
+            <form class="search-bar" method="get" action="{{ url_for('remote-calls.recording_transcript', recording_id=recording.id) }}">
+                <input type="text" name="q" value="{{ query|e }}" placeholder="Search transcript...">
+                <button type="submit">Search</button>
+                {% if query %}<a href="{{ url_for('remote-calls.recording_transcript', recording_id=recording.id) }}">Clear</a>{% endif %}
+            </form>
+
+            {% if query %}
+                <div class="search-note">{{ segments|length }} of {{ total_segments }} segment(s) match &ldquo;{{ query|e }}&rdquo;.</div>
+            {% endif %}
+
+            {% if segments %}
+            <div class="transcript" data-transcript>
+                {% for seg in segments %}
+                <div class="segment">
+                    <div class="ts">{{ seg.ts }}</div>
+                    <div class="body">
+                        <div class="speaker">{{ seg.speaker }}</div>
+                        <div class="text">{{ seg.text }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="icon">&#128269;</div>
+                <h3>No matching segments</h3>
+                <p>No transcript lines match &ldquo;{{ query|e }}&rdquo;. Try a different search term.</p>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="empty-state">
+                <div class="icon">&#128441;</div>
+                <h3>No transcript available</h3>
+                <p>This recording was not transcribed. Transcripts are only generated for recordings with captions enabled.</p>
+            </div>
+        {% endif %}
+
+        <div class="actions">
+            <a href="{{ url_for('remote-calls.recording_detail', recording_id=recording.id) }}" class="btn btn-secondary">Back to Recording</a>
+        </div>
+    </div>
+</body>
+</html>

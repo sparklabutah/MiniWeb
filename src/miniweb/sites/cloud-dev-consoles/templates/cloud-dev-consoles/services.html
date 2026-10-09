@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services - CloudCore Console</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+        .top-bar { background: #232f3e; color: #fff; padding: 0 1.5rem; height: 48px; display: flex; align-items: center; justify-content: space-between; }
+        .top-bar .logo { font-size: 1.1rem; font-weight: 700; color: #ff9900; text-decoration: none; }
+        .top-bar .logo span { color: #fff; font-weight: 400; margin-left: .3rem; }
+        .nav-bar { background: #37475a; padding: 0 1.5rem; display: flex; gap: 0; overflow-x: auto; }
+        .nav-bar a { color: #d5dbdb; text-decoration: none; padding: .6rem 1rem; font-size: .85rem; white-space: nowrap; border-bottom: 2px solid transparent; }
+        .nav-bar a:hover, .nav-bar a.active { color: #fff; background: rgba(255,255,255,.08); border-bottom-color: #ff9900; }
+        .top-bar-right { display: flex; align-items: center; gap: 1rem; }
+        .top-bar-right a { color: #d5dbdb; text-decoration: none; font-size: .85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: 1rem; }
+        .filters { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1rem; align-items: center; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .filters label { font-size: .8rem; color: #64748b; }
+        .filters select, .filters input[type="text"] { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .85rem; }
+        .filters input[type="text"] { width: 220px; }
+        .filters button { padding: .4rem 1rem; background: #232f3e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .result-count { font-size: .85rem; color: #64748b; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        th { background: #f8f9fa; text-align: left; padding: .7rem 1rem; font-size: .8rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .88rem; border-bottom: 1px solid #f0f2f5; }
+        tr:hover { background: #f8f9fa; }
+        .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-stopped { background: #f8d7da; color: #721c24; }
+        a.link { color: #0073bb; text-decoration: none; }
+        a.link:hover { text-decoration: underline; }
+        .tag { display: inline-block; padding: .1rem .4rem; background: #e8ecef; border-radius: 3px; font-size: .75rem; color: #475569; margin-right: .3rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}" class="logo">CloudCore<span>Console</span></a>
+        <div class="top-bar-right">
+            {% if user %}<a href="{{ url_for('cloud-dev-consoles.dashboard') }}">{{ user.name }}</a>
+            <a href="{{ url_for('cloud-dev-consoles.logout') }}">Sign Out</a>
+            {% else %}<a href="{{ url_for('cloud-dev-consoles.login_page') }}">Sign In</a>{% endif %}
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('cloud-dev-consoles.index') }}">Home</a>
+        <a href="{{ url_for('cloud-dev-consoles.services_page') }}" class="active">Services</a>
+        <a href="{{ url_for('cloud-dev-consoles.instances_page') }}">Instances</a>
+        <a href="{{ url_for('cloud-dev-consoles.databases_page') }}">Databases</a>
+        <a href="{{ url_for('cloud-dev-consoles.functions_page') }}">Functions</a>
+        <a href="{{ url_for('cloud-dev-consoles.storage_page') }}">Storage</a>
+        <a href="{{ url_for('cloud-dev-consoles.api_gateway_page') }}">API Gateway</a>
+        <a href="{{ url_for('cloud-dev-consoles.iam_page') }}">IAM</a>
+        <a href="{{ url_for('cloud-dev-consoles.billing_page') }}">Billing</a>
+        <a href="{{ url_for('cloud-dev-consoles.logs_page') }}">Logs</a>
+        <a href="{{ url_for('cloud-dev-consoles.metrics_page') }}">Metrics</a>
+        <a href="{{ url_for('cloud-dev-consoles.alerts_page') }}">Alerts</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">Services</h1>
+        <form class="filters" method="GET">
+            <label>Search</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Search services...">
+            <label>Category</label>
+            <select name="category" id="category-filter">
+                <option value="">All Categories</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if cat == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+            <label>Status</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                <option value="warning" {% if status == 'warning' %}selected{% endif %}>Warning</option>
+                <option value="stopped" {% if status == 'stopped' %}selected{% endif %}>Stopped</option>
+            </select>
+            <label>Region</label>
+            <select name="region">
+                <option value="">All Regions</option>
+                {% for r in regions %}
+                <option value="{{ r }}" {% if region == r %}selected{% endif %}>{{ r }}</option>
+                {% endfor %}
+            </select>
+            <label>Sort</label>
+            <select name="sort">
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Name</option>
+                <option value="cost" {% if sort == 'cost' %}selected{% endif %}>Cost (High-Low)</option>
+                <option value="category" {% if sort == 'category' %}selected{% endif %}>Category</option>
+                <option value="date" {% if sort == 'date' %}selected{% endif %}>Newest</option>
+            </select>
+            <button type="submit">Apply</button>
+        </form>
+        <div class="result-count">{{ services|length }} services found</div>
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Category</th><th>Status</th><th>Health</th><th>Region</th><th>Monthly Cost</th><th>Tags</th></tr>
+            </thead>
+            <tbody>
+                {% for svc in services %}
+                <tr>
+                    <td><a class="link" href="{{ url_for('cloud-dev-consoles.service_detail', service_id=svc.id) }}">{{ svc.name }}</a></td>
+                    <td>{{ svc.category }}</td>
+                    <td><span class="status-badge status-{{ svc.status }}">{{ svc.status }}</span></td>
+                    <td><span class="status-badge {% if svc.health == 'healthy' %}status-active{% elif svc.health == 'degraded' %}status-warning{% else %}status-stopped{% endif %}">{{ svc.health }}</span></td>
+                    <td>{{ svc.region }}</td>
+                    <td>${{ "%.2f"|format(svc.monthly_cost) }}</td>
+                    <td>{% for t in svc.tags %}<span class="tag">{{ t }}</span>{% endfor %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

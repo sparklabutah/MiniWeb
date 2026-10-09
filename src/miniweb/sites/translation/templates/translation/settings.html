@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Settings - LinguaBridge</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: 'Google Sans', Roboto, -apple-system, sans-serif; background: #f8f9fa; color: #202124; }
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+        .container > a:first-child { display: inline-block; font-size: 14px; color: #1a73e8; text-decoration: none; padding: 8px 16px; border-radius: 8px; background: #e8f0fe; margin: 4px 0 20px; }
+        .container > a:first-child:hover { background: #d2e3fc; text-decoration: none; }
+        h1 { font-size: 24px; font-weight: 500; color: #202124; margin: 0 0 20px; }
+        h3 { font-size: 14px; font-weight: 500; color: #5f6368; margin: 28px 0 12px; }
+        .container > div { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; }
+        .container > div:hover { background: #f8f9fa; }
+        .container > div label { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #202124; cursor: pointer; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: #1a73e8; cursor: pointer; }
+        form { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        select { font-family: inherit; font-size: 14px; color: #1a73e8; font-weight: 500; background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 10px 12px; outline: none; cursor: pointer; }
+        select:focus { border-color: #1a73e8; }
+        button { font-family: inherit; font-size: 14px; font-weight: 500; color: #fff; background: #1a73e8; border: none; border-radius: 8px; padding: 10px 24px; cursor: pointer; }
+        button:hover { background: #1765cc; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('translation.index') }}">&larr; Back to Translate</a>
+        <h1>Translation Settings</h1>
+
+        <div>
+            <label>
+                <input type="checkbox" id="auto_detect" {% if settings.auto_detect %}checked{% endif %}>
+                Auto-detect source language
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="formal_mode" {% if settings.formal_mode %}checked{% endif %}>
+                Formal mode (use formal/polite forms)
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="auto_pronounce" {% if settings.auto_pronounce %}checked{% endif %}>
+                Auto-pronounce translations
+            </label>
+        </div>
+
+        <h3>Export Translations</h3>
+        <form method="GET" action="{{ url_for('translation.api_export') }}">
+            <select name="format" id="export_format">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+                <option value="txt">Plain Text</option>
+            </select>
+            <button type="submit" >Export</button>
+        </form>
+    </div>
+
+    <script>
+        (function () {
+            var userId = {{ user.id | tojson }};
+            var settingsUrl = "{{ url_for('translation.api_settings_update') }}";
+            ["auto_detect", "formal_mode", "auto_pronounce"].forEach(function (key) {
+                var box = document.getElementById(key);
+                if (!box) return;
+                box.addEventListener("change", function () {
+                    var body = {user_id: userId};
+                    body[key] = box.checked;
+                    fetch(settingsUrl, {
+                        method: "PUT",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify(body),
+                    }).catch(function () {
+                        // Revert the checkbox on failure so the UI matches stored state.
+                        box.checked = !box.checked;
+                    });
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

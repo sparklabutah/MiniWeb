@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Article - LakeportWiki</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; margin-left: 1rem; }
+        .main { max-width: 800px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .create-form label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .3rem; color: #1e3a5f; }
+        .create-form input[type="text"], .create-form textarea, .create-form select { width: 100%; padding: .6rem .8rem; border: 1px solid #cbd5e1; border-radius: .4rem; font-size: .92rem; margin-bottom: 1rem; font-family: inherit; }
+        .create-form textarea { min-height: 300px; line-height: 1.5; }
+        .create-form select { appearance: auto; }
+        .create-form button { padding: .7rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .95rem; }
+        .create-form button:hover { background: #1d4ed8; }
+        .cancel-link { margin-left: 1rem; font-size: .9rem; color: #64748b; text-decoration: none; }
+        .hint { font-size: .78rem; color: #94a3b8; margin-top: -.7rem; margin-bottom: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h2 style="margin-bottom:1rem; font-size:1.2rem; color:#1e3a5f;">Create New Article</h2>
+
+        <form class="create-form" method="post" action="{{ url_for('wikis.create_page_submit') }}">
+            <label for="title">Title</label>
+            <input type="text" name="title" id="title" placeholder="Article title" required>
+
+            <label for="slug">Slug (optional)</label>
+            <input type="text" name="slug" id="slug" placeholder="auto-generated-from-title">
+            <p class="hint">Leave blank to auto-generate from title.</p>
+
+            <label for="category">Category</label>
+            <select name="category" id="category">
+                {% for cat in categories %}
+                <option value="{{ cat.name }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="content">Content</label>
+            <textarea name="content" id="content" placeholder="Write your article content here..." required></textarea>
+
+            <button type="submit">Create Article</button>
+            <a class="cancel-link" href="{{ url_for('wikis.index') }}">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

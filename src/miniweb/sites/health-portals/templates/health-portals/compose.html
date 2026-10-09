@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compose Message - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'messages' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <a href="{{ url_for('health-portals.messages_page') }}" class="back">&larr; Back to Messages</a>
+        <div class="form-card">
+            <h2>{% if reply_to %}Reply{% else %}New Message{% endif %}</h2>
+            <form id="compose-form">
+                <div class="form-group">
+                    <label for="recipient">To (Provider)</label>
+                    <select id="recipient" name="recipient_id">
+                        {% for p in providers %}
+                        <option value="{{ p.id }}" {% if reply_to and p.id|string == reply_to|string %}selected{% endif %}>{{ p.full_name }} ({{ p.get('department', 'General') }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="subject">Subject</label>
+                    <input type="text" id="subject" name="subject" value="{{ subject }}" placeholder="Message subject">
+                </div>
+                <div class="form-group">
+                    <label for="body">Message</label>
+                    <textarea id="body" name="body" placeholder="Type your message here..."></textarea>
+                </div>
+                {% if thread_id %}
+                <input type="hidden" name="thread_id" value="{{ thread_id }}">
+                {% endif %}
+                <button type="submit" class="send-btn">Send Message</button>
+            </form>
+        </div>
+        <div class="upload-card">
+            <h2>Attach a Document for Your Care Team</h2>
+            <form id="document-upload-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="doc-file">Document (PDF, image, or lab result)</label>
+                    <input type="file" id="doc-file" name="file">
+                </div>
+                <div class="form-group">
+                    <label for="doc-description">Description</label>
+                    <input type="text" id="doc-description" name="description" placeholder="e.g. Outside lab results from March">
+                </div>
+                <button type="submit" class="send-btn">Upload Document</button>
+                <div class="upload-status" id="upload-status"></div>
+            </form>
+        </div>
+    </div>
+    {% include "health-portals/_footer.html" %}
+    <script>
+    document.getElementById('compose-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var data = {
+            recipient_id: parseInt(document.getElementById('recipient').value),
+            subject: document.getElementById('subject').value,
+            body: document.getElementById('body').value
+        };
+        var threadId = document.querySelector('input[name="thread_id"]');
+        if (threadId) data.thread_id = threadId.value;
+        fetch('{{ url_for("health-portals.api_messages_create") }}', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function() {
+            window.location.href = '{{ url_for("health-portals.messages_page") }}';
+        });
+    });
+
+    document.getElementById('document-upload-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var fileInput = document.getElementById('doc-file');
+        var status = document.getElementById('upload-status');
+        if (!fileInput.files.length) {
+            status.className = 'upload-status err';
+            status.textContent = 'Please choose a file to upload.';
+            return;
+        }
+        var formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('description', document.getElementById('doc-description').value);
+        fetch('{{ url_for("health-portals.api_document_upload") }}', {
+            method: 'POST', body: formData
+        }).then(function(r) {
+            return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+        }).then(function(res) {
+            if (res.ok) {
+                status.className = 'upload-status ok';
+                status.textContent = 'Uploaded "' + res.data.filename + '" — status: ' + res.data.status + '.';
+                document.getElementById('document-upload-form').reset();
+            } else {
+                status.className = 'upload-status err';
+                status.textContent = res.data.error || 'Upload failed.';
+            }
+        });
+    });
+    </script>
+</body>
+</html>

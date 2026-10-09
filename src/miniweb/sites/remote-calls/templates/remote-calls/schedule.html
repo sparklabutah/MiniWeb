@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Meeting - CallHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #4fc3f7; }
+        .header .user-info { color: #b0bec5; font-size: .85rem; }
+        .header .user-info strong { color: #fff; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a1a2e; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .4rem .7rem; border-radius: .3rem; }
+        nav a:hover { background: #e3f2fd; }
+        nav a.active { font-weight: 700; background: #bbdefb; color: #0d47a1; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
+        .form-card { background: #fff; border-radius: .5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #4fc3f7; outline: none; box-shadow: 0 0 0 3px rgba(79,195,247,.15); }
+        .form-group .hint { font-size: .78rem; color: #94a3b8; margin-top: .3rem; }
+        .participants-list { display: flex; flex-direction: column; gap: .4rem; max-height: 200px; overflow-y: auto; border: 1.5px solid #d1d5db; border-radius: .4rem; padding: .5rem; }
+        .participants-list label { display: flex; align-items: center; gap: .5rem; font-size: .88rem; font-weight: 400; cursor: pointer; padding: .3rem .4rem; border-radius: .3rem; }
+        .participants-list label:hover { background: #f0f4ff; }
+        .participants-list input[type="checkbox"] { width: auto; }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .3rem; font-size: .9rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #1976d2; color: #fff; }
+        .btn-primary:hover { background: #1565c0; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .form-actions { display: flex; gap: .8rem; margin-top: 1rem; }
+        .success-msg { background: #e8f5e9; color: #2e7d32; padding: .8rem 1rem; border-radius: .4rem; font-size: .9rem; margin-bottom: 1rem; border: 1px solid #c8e6c9; display: none; }
+        .error-msg { background: #fef2f2; color: #dc2626; padding: .8rem 1rem; border-radius: .4rem; font-size: .9rem; margin-bottom: 1rem; border: 1px solid #fee2e2; display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('remote-calls.index') }}">Call<span>Hub</span></a></h1>
+        <div class="user-info">
+            Signed in as <strong>{{ user.display_name }}</strong>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('remote-calls.index') }}">Dashboard</a>
+        <a href="{{ url_for('remote-calls.meetings_page') }}">Meetings</a>
+        <a href="{{ url_for('remote-calls.recordings_page') }}">Recordings</a>
+        <a href="{{ url_for('remote-calls.call_log_page') }}">Call Log</a>
+        <a href="{{ url_for('remote-calls.schedule_page') }}" class="active">Schedule</a>
+        <a href="{{ url_for('remote-calls.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>Schedule a Meeting</h2>
+
+        <div id="success-msg" class="success-msg"></div>
+        <div id="error-msg" class="error-msg"></div>
+
+        <div class="form-card">
+            <form id="schedule-form" onsubmit="return scheduleMeeting(event)">
+                <div class="form-group">
+                    <label for="title">Meeting Title</label>
+                    <input type="text" id="title" name="title" required placeholder="e.g. Team Standup, Project Review">
+                </div>
+                <div class="form-group">
+                    <label for="date">Date &amp; Time</label>
+                    <input type="datetime-local" id="date" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="duration">Duration (minutes)</label>
+                    <select id="duration" name="duration_minutes">
+                        <option value="15">15 minutes</option>
+                        <option value="30" selected>30 minutes</option>
+                        <option value="45">45 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="90">1.5 hours</option>
+                        <option value="120">2 hours</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="type">Meeting Type</label>
+                    <select id="type" name="type">
+                        <option value="work">Work</option>
+                        <option value="personal">Personal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Participants</label>
+                    <div class="participants-list">
+                        {% for u in other_users %}
+                        <label>
+                            <input type="checkbox" name="participants" value="{{ u.id }}">
+                            {{ u.display_name }} ({{ u.email }})
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="hint">You will be added as the host automatically.</div>
+                </div>
+                <div class="form-group">
+                    <label for="attachment">Attach Agenda or File (optional)</label>
+                    <input type="file" id="attachment" name="file" style="font-size:.88rem;">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Schedule Meeting</button>
+                    <a href="{{ url_for('remote-calls.meetings_page') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function scheduleMeeting(event) {
+        event.preventDefault();
+        var form = document.getElementById('schedule-form');
+        var title = document.getElementById('title').value.trim();
+        var date = document.getElementById('date').value;
+        var duration = document.getElementById('duration').value;
+        var type = document.getElementById('type').value;
+
+        var checkboxes = document.querySelectorAll('input[name="participants"]:checked');
+
+        // Use FormData so the optional agenda/file attachment is sent along
+        // with the meeting details (multipart/form-data).
+        var fd = new FormData();
+        fd.append('title', title);
+        fd.append('date', date);
+        fd.append('duration_minutes', parseInt(duration));
+        fd.append('type', type);
+        checkboxes.forEach(function(cb) { fd.append('participants', cb.value); });
+
+        var fileInput = document.getElementById('attachment');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            fd.append('file', fileInput.files[0]);
+        }
+
+        fetch('{{ url_for("remote-calls.api_meetings_create") }}', {
+            method: 'POST',
+            body: fd
+        })
+        .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+        .then(function(result) {
+            if (result.status === 201) {
+                var okMsg = 'Meeting "' + result.data.title + '" scheduled successfully! (ID: ' + result.data.id + ')';
+                if (result.data.attachment && result.data.attachment.filename) {
+                    okMsg += ' Attachment: ' + result.data.attachment.filename;
+                }
+                document.getElementById('success-msg').textContent = okMsg;
+                document.getElementById('success-msg').style.display = 'block';
+                document.getElementById('error-msg').style.display = 'none';
+                form.reset();
+            } else {
+                document.getElementById('error-msg').textContent = result.data.error || 'Failed to schedule meeting.';
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('success-msg').style.display = 'none';
+            }
+        })
+        .catch(function(err) {
+            document.getElementById('error-msg').textContent = 'Error: ' + err;
+            document.getElementById('error-msg').style.display = 'block';
+            document.getElementById('success-msg').style.display = 'none';
+        });
+
+        return false;
+    }
+    </script>
+</body>
+</html>

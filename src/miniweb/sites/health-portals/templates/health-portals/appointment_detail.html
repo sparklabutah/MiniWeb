@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Details - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'appointments' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a> &rsaquo; Appointment #{{ appointment.id }}
+        </div>
+
+        <div class="card">
+            <h2>{{ appointment.category }}
+                <span class="badge badge-{{ appointment.status }}">{{ appointment.status|capitalize }}</span>
+            </h2>
+
+            <div class="detail-grid" style="margin-top: 1.2rem;">
+                <div class="detail-item">
+                    <div class="label">Date</div>
+                    <div class="value">{{ appointment.date }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Time</div>
+                    <div class="value">{{ appointment.time }} ({{ appointment.duration_minutes }} min)</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Provider</div>
+                    <div class="value">{{ appointment.provider_name }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Patient</div>
+                    <div class="value">{{ appointment.patient_name }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Type</div>
+                    <div class="value">{{ appointment.type|replace('_', ' ')|title }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="label">Location</div>
+                    <div class="value">{{ appointment.location }}</div>
+                </div>
+                {% if appointment.room %}
+                <div class="detail-item">
+                    <div class="label">Room</div>
+                    <div class="value">{{ appointment.room }}</div>
+                </div>
+                {% endif %}
+                {% if appointment.check_in_time %}
+                <div class="detail-item">
+                    <div class="label">Check-in</div>
+                    <div class="value">{{ appointment.check_in_time }}</div>
+                </div>
+                {% endif %}
+                {% if appointment.check_out_time %}
+                <div class="detail-item">
+                    <div class="label">Check-out</div>
+                    <div class="value">{{ appointment.check_out_time }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if appointment.notes %}
+        <div class="card">
+            <h3>Visit Notes</h3>
+            <div class="notes-box">{{ appointment.notes }}</div>
+        </div>
+        {% endif %}
+
+        {% if appointment.status == 'scheduled' %}
+        <div class="actions">
+            <a href="{{ url_for('health-portals.appointments_page') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('health-portals.cancel_appointment_page', appt_id=appointment.id) }}" class="btn btn-danger">Cancel Appointment</a>
+        </div>
+        {% else %}
+        <div class="actions">
+            <a href="{{ url_for('health-portals.appointments_page') }}" class="btn btn-secondary">Back to Appointments</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

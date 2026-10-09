@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixShare - Feed</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
+        a { color: #0095f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #fff; border-bottom: 1px solid #dbdbdb; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { font-size: 22px; font-weight: 700; font-style: italic; color: #262626; }
+        .top-nav .nav-links { display: flex; gap: 16px; align-items: center; }
+        .top-nav .nav-links a { color: #262626; font-size: 14px; }
+        .top-nav .nav-links a:hover { color: #0095f6; }
+        .top-nav .user-info { font-size: 13px; color: #8e8e8e; }
+
+        .container { max-width: 614px; margin: 0 auto; padding: 20px 0; }
+
+        /* Story ring */
+        .stories-bar { background: #fff; border: 1px solid #dbdbdb; border-radius: 4px; padding: 16px; margin-bottom: 24px; overflow-x: auto; white-space: nowrap; }
+        .stories-bar h3 { font-size: 14px; color: #8e8e8e; margin-bottom: 12px; font-weight: 600; }
+        .story-ring { display: inline-flex; gap: 16px; }
+        .story-item { text-align: center; cursor: pointer; }
+        .story-avatar { width: 56px; height: 56px; border-radius: 50%; border: 2px solid #e1306c; padding: 2px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); display: flex; align-items: center; justify-content: center; }
+        .story-avatar-inner { width: 48px; height: 48px; border-radius: 50%; background: #ddd; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; }
+        .story-username { font-size: 11px; color: #262626; margin-top: 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Post card */
+        .post-card { background: #fff; border: 1px solid #dbdbdb; border-radius: 4px; margin-bottom: 24px; }
+        .post-header { display: flex; align-items: center; padding: 14px 16px; }
+        .post-avatar { width: 32px; height: 32px; border-radius: 50%; background: #0095f6; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 14px; margin-right: 12px; }
+        .post-author { font-weight: 600; font-size: 14px; }
+        .post-location { font-size: 12px; color: #8e8e8e; }
+        .post-image { width: 100%; aspect-ratio: 1; background: #efefef; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .post-image .type-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 4px; }
+        .post-image .placeholder-icon { font-size: 48px; color: #c7c7c7; }
+        .post-actions { padding: 8px 16px; display: flex; gap: 16px; }
+        .post-actions button { background: none; border: none; cursor: pointer; font-size: 22px; color: #262626; padding: 4px; }
+        .post-actions button:hover { color: #8e8e8e; }
+        .post-actions button.liked { color: #ed4956; }
+        .post-likes { padding: 0 16px; font-weight: 600; font-size: 14px; }
+        .post-caption { padding: 8px 16px; font-size: 14px; line-height: 1.5; }
+        .post-caption .author-name { font-weight: 600; margin-right: 4px; }
+        .post-tags { padding: 4px 16px 8px; }
+        .post-tags a { color: #00376b; font-size: 13px; margin-right: 4px; }
+        .post-comments-preview { padding: 4px 16px; }
+        .post-comments-preview a { color: #8e8e8e; font-size: 14px; }
+        .post-time { padding: 4px 16px 12px; font-size: 10px; color: #8e8e8e; text-transform: uppercase; letter-spacing: 0.2px; }
+        .comment-item { padding: 2px 16px; font-size: 14px; }
+        .comment-item .author-name { font-weight: 600; margin-right: 4px; }
+
+        /* Sidebar (on wide screens) */
+        .page-layout { display: flex; justify-content: center; gap: 32px; padding: 20px; }
+        .sidebar { width: 293px; position: sticky; top: 70px; align-self: flex-start; }
+        .sidebar .user-card { display: flex; align-items: center; margin-bottom: 20px; }
+        .sidebar .user-card .avatar { width: 44px; height: 44px; border-radius: 50%; background: #0095f6; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px; margin-right: 12px; }
+        .sidebar .user-card .name { font-weight: 600; font-size: 14px; }
+        .sidebar .user-card .handle { font-size: 12px; color: #8e8e8e; }
+
+        @media (max-width: 935px) { .sidebar { display: none; } }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #8e8e8e; }
+        .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: #262626; }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('multimedia-posting.index') }}" class="logo">PixShare</a>
+        <div class="nav-links">
+            <a href="{{ url_for('multimedia-posting.index') }}">Feed</a>
+            <a href="{{ url_for('multimedia-posting.explore') }}">Explore</a>
+            <a href="{{ url_for('multimedia-posting.stories_page') }}">Stories</a>
+            <a href="{{ url_for('multimedia-posting.messages_inbox') }}">Messages</a>
+            <a href="{{ url_for('multimedia-posting.settings_page') }}">Settings</a>
+            <a href="{{ url_for('multimedia-posting.create_page') }}">+ Create</a>
+            {% if logged_in %}
+                <a href="{{ url_for('multimedia-posting.profile', user_id=user.id) }}">{{ user.username }}</a>
+                <a href="{{ url_for('multimedia-posting.logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('multimedia-posting.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="page-layout">
+        <div class="container">
+            {% if stories %}
+            <div class="stories-bar">
+                <h3>Stories</h3>
+                <div class="story-ring">
+                    {% for story in stories %}
+                    <a href="{{ url_for('multimedia-posting.stories_page') }}" class="story-item" style="text-decoration:none;">
+                        <div class="story-avatar">
+                            <div class="story-avatar-inner" style="background: hsl({{ loop.index * 60 }}, 50%, 50%);">
+                                {{ story.author.display_name[0] if story.author else '?' }}
+                            </div>
+                        </div>
+                        <div class="story-username">{{ story.author.username if story.author else 'unknown' }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% set ad_format = 'banner' %}
+            {% set ads = product_ads(4, seed='multimedia-posting-ad2') %}
+            {% include "ads/_product_ads.html" %}
+
+            {% if posts %}
+                {% for post in posts %}
+                <div class="post-card" id="post-{{ post.id }}">
+                    <div class="post-header">
+                        <div class="post-avatar" style="background: hsl({{ (post.author.id | replace('mp-u-', '') | int * 40) if post.author.id else 0 }}, 50%, 50%);">
+                            {{ post.author.display_name[0] if post.author else '?' }}
+                        </div>
+                        <div>
+                            <a href="{{ url_for('multimedia-posting.profile', user_id=post.author_id) }}" class="post-author" style="color:#262626;">
+                                {{ post.author.username if post.author else post.author_id }}
+                            </a>
+                            {% if post.author.is_verified %}<span title="Verified" style="color:#0095f6;">&#10003;</span>{% endif %}
+                            {% if post.location %}
+                            <div class="post-location">{{ post.location }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('multimedia-posting.post_detail', post_id=post.id) }}">
+                        <div class="post-image">
+                            {% if post.type == 'video' %}
+                            <span class="type-badge">VIDEO</span>
+                            {% elif post.type == 'carousel' %}
+                            <span class="type-badge">{{ (post.additional_images | length) + 1 }} photos</span>
+                            {% endif %}
+                            {% if post.image_url %}
+                            <img src="{{ post.image_url }}" alt="{{ post.caption|default('post', true)|truncate(60) }}" style="width:100%;height:100%;object-fit:cover">
+                            {% else %}
+                            <span class="placeholder-icon">&#128247;</span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    <div class="post-actions">
+                        <button class="like-btn" data-post-id="{{ post.id }}" onclick="toggleLike('{{ post.id }}')" title="Like">&#9825;</button>
+                        <button onclick="location.href='{{ url_for('multimedia-posting.post_detail', post_id=post.id) }}'" title="Comment">&#128172;</button>
+                    </div>
+                    <div class="post-likes">{{ post.likes_count }} likes</div>
+                    <div class="post-caption">
+                        <span class="author-name">{{ post.author.username if post.author else post.author_id }}</span>
+                        {{ post.caption }}
+                    </div>
+                    {% if post.tags %}
+                    <div class="post-tags">
+                        {% for tag in post.tags %}
+                        <a href="{{ url_for('multimedia-posting.explore', tag=tag) }}">#{{ tag }}</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if post.comments_count > 0 %}
+                    <div class="post-comments-preview">
+                        <a href="{{ url_for('multimedia-posting.post_detail', post_id=post.id) }}">View all {{ post.comments_count }} comments</a>
+                    </div>
+                    {% endif %}
+                    {% if post.comments_list %}
+                        {% for c in post.comments_list[:2] %}
+                        <div class="comment-item">
+                            <span class="author-name">{{ c.author.username if c.author else c.author_id }}</span>
+                            {{ c.text }}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    <div class="post-time">{{ post.created_at[:10] }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <h2>No posts in your feed</h2>
+                    <p>Follow users to see their posts here, or <a href="{{ url_for('multimedia-posting.explore') }}">explore</a> to discover content.</p>
+                </div>
+            {% endif %}
+
+            {% set ad_format = 'native' %}
+            {% set ads = product_ads(4, seed='multimedia-posting-index') %}
+            {% include "ads/_product_ads.html" %}
+        </div>
+
+        <div class="sidebar">
+            <div class="user-card">
+                <div class="avatar" style="background: hsl({{ (user.id | replace('mp-u-', '') | int * 40) }}, 50%, 50%);">
+                    {{ user.display_name[0] }}
+                </div>
+                <div>
+                    <div class="name">{{ user.username }}</div>
+                    <div class="handle">{{ user.display_name }}</div>
+                </div>
+            </div>
+            <p style="font-size:12px; color:#8e8e8e;">{{ user.bio }}</p>
+        </div>
+    </div>
+
+    <script>
+    function toggleLike(postId) {
+        fetch(`{{ url_for('multimedia-posting.index') }}api/posts/${postId}/like`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const card = document.getElementById('post-' + postId);
+                if (card) {
+                    card.querySelector('.post-likes').textContent = data.likes_count + ' likes';
+                    const btn = card.querySelector('.like-btn');
+                    if (data.status === 'liked') {
+                        btn.classList.add('liked');
+                        btn.innerHTML = '&#9829;';
+                    } else {
+                        btn.classList.remove('liked');
+                        btn.innerHTML = '&#9825;';
+                    }
+                }
+            });
+    }
+    </script>
+</body>
+</html>

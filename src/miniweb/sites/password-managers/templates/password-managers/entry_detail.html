@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ entry.title }} - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .breadcrumb { font-size: .82rem; color: var(--muted); }
+        .breadcrumb a { color: var(--blue); }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .entry-head { display: flex; align-items: center; gap: .6rem; }
+        .fav-star { font-size: 1.3rem; color: {% if entry.favorite %}var(--warn){% else %}var(--border-2){% endif %}; }
+        .dl-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .04rem; color: var(--muted); margin-bottom: .2rem; font-weight: 600; }
+        .dl-value { font-size: .95rem; color: var(--text); word-break: break-all; }
+        .pw-mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: #f7f8fa; border: 1px solid var(--border-2); padding: .4rem .7rem; border-radius: .3rem; display: inline-block; letter-spacing: .05rem; }
+        .pw-revealed { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: #eaf6ec; border: 1px solid #cfe6d3; color: var(--good); padding: .4rem .7rem; border-radius: .3rem; display: inline-block; letter-spacing: .05rem; font-size: .95rem; }
+        .pin-input { width: 130px; padding: .4rem .6rem; font-size: 1.05rem; text-align: center; letter-spacing: 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+        .tags-list { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .card-brand { font-size: 1rem; font-weight: 600; color: var(--ink); }
+        .card-number { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 1.1rem; color: var(--text); letter-spacing: .1rem; margin: .3rem 0; }
+        .card-exp { font-size: .85rem; color: var(--muted); }
+        .notes-text { font-size: .9rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+        .timestamps { font-size: .8rem; color: var(--muted); }
+        .timestamps span { margin-right: 1.5rem; }
+        .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+        @media (max-width: 700px) { .detail-cols { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="breadcrumb">
+                <a href="{{ url_for('password-managers.index') }}">Vaults</a> &rsaquo;
+                {% if vault %}
+                <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}">{{ vault.name }}</a> &rsaquo;
+                {% endif %}
+                {{ entry.title }}
+            </div>
+
+            <div class="card card-pad">
+                <div class="card-title">
+                    <div class="entry-head">
+                        <span class="fav-star">{% if entry.favorite %}&#9733;{% else %}&#9734;{% endif %}</span>
+                        <span>{{ entry.title }}</span>
+                    </div>
+                    {% if entry.url %}
+                    {% if entry.url.startswith('/') %}
+                    <div style="margin-top:.3rem;font-size:.85rem;font-weight:400;"><a href="{{ entry.url }}">{{ entry.url }}</a></div>
+                    {% else %}
+                    <div class="muted" style="margin-top:.3rem;font-weight:400;">{{ entry.url }}</div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+
+                <div class="detail-cols">
+                    <div>
+                        <div class="section-title" style="margin-bottom:1rem;">Credentials</div>
+                        {% if entry.category == 'credit_card' and entry.card_details %}
+                        <div class="field">
+                            <div class="card-brand">{{ entry.card_details.brand }}</div>
+                            <div class="card-number">**** **** **** {{ entry.card_details.card_number_last4 }}</div>
+                            <div class="card-exp">{{ entry.card_details.cardholder_name }} &middot; Exp: {{ entry.card_details.expiration }}</div>
+                        </div>
+                        {% if entry.card_details.billing_address %}
+                        <div class="field">
+                            <div class="dl-label">Billing Address</div>
+                            <div class="dl-value">{{ entry.card_details.billing_address }}</div>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="field">
+                            <div class="dl-label">Username</div>
+                            <div class="dl-value">{{ entry.username or '(none)' }}</div>
+                        </div>
+                        <div class="field">
+                            <div class="dl-label">Password</div>
+                            <div id="pw-display">
+                                <div class="dl-value pw-mono" id="pw-masked">{{ masked_password or '(none)' }}</div>
+                                <div id="pw-reveal-flow" style="margin-top:.5rem">
+                                    <button id="btn-request-pin" class="btn btn-outline btn-sm" onclick="requestRevealPin()">Reveal</button>
+                                    <div id="pin-input-area" style="display:none;margin-top:.5rem">
+                                        <div class="muted" style="margin-bottom:.3rem">Enter the PIN sent to your instant messages</div>
+                                        <div style="display:flex;gap:.4rem;align-items:center">
+                                            <input type="text" id="pin-code" class="pin-input" maxlength="6" placeholder="000000" autocomplete="off">
+                                            <button class="btn btn-primary btn-sm" onclick="confirmRevealPin()">Verify</button>
+                                        </div>
+                                        <div id="pin-error" style="color:var(--bad);font-size:.75rem;margin-top:.3rem;display:none"></div>
+                                        <div id="pin-hint" style="color:var(--blue);font-size:.72rem;margin-top:.3rem">Check your Instant Messaging inbox for the code.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% if entry.strength %}
+                        <div class="field">
+                            <div class="dl-label">Strength</div>
+                            <span class="chip {% if entry.strength == 'excellent' %}good{% elif entry.strength == 'strong' %}{% elif entry.strength == 'fair' %}warn{% else %}bad{% endif %}">{{ entry.strength }}</span>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <div class="section-title" style="margin-bottom:1rem;">Details</div>
+                        <div class="field">
+                            <div class="dl-label">Category</div>
+                            <div class="dl-value">{{ entry.category|replace('_', ' ')|title }}</div>
+                        </div>
+                        {% if vault %}
+                        <div class="field">
+                            <div class="dl-label">Vault</div>
+                            <div class="dl-value">{{ vault.name }}</div>
+                        </div>
+                        {% endif %}
+                        <div class="field">
+                            <div class="dl-label">Tags</div>
+                            <div class="tags-list">
+                                {% for tag in entry.tags %}
+                                <span class="chip">{{ tag }}</span>
+                                {% endfor %}
+                                {% if not entry.tags %}
+                                <span class="muted">No tags</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if entry.notes %}
+                <div style="margin-top:1.4rem;">
+                    <div class="section-title" style="margin-bottom:.7rem;">Notes</div>
+                    <div class="notes-text">{{ entry.notes }}</div>
+                </div>
+                {% endif %}
+
+                <div class="timestamps" style="margin-top:1.4rem;">
+                    <span>Created: {{ entry.created_at[:10] if entry.created_at else 'N/A' }}</span>
+                    <span>Updated: {{ entry.updated_at[:10] if entry.updated_at else 'N/A' }}</span>
+                    <span>Last used: {{ entry.last_used[:10] if entry.last_used else 'N/A' }}</span>
+                </div>
+
+                <div style="margin-top:1.2rem;display:flex;gap:.6rem;">
+                    <a href="{{ url_for('password-managers.edit_entry_page', entry_id=entry.id) }}" class="btn btn-primary">Edit</a>
+                    <button id="delete-entry-btn" class="btn btn-danger">Delete</button>
+                    <script>
+                    document.getElementById('delete-entry-btn').addEventListener('click', function() {
+                        var btn = this;
+                        btn.textContent = 'Deleting...';
+                        btn.disabled = true;
+                        fetch('{{ url_for("password-managers.form_delete_entry", entry_id=entry.id) }}', {method: 'POST'})
+                            .then(function(r) { return r.ok ? r : Promise.reject(); })
+                            .then(function() { btn.textContent = 'Done!'; window.location.href = '{{ url_for("password-managers.index") }}'; })
+                            .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete'; btn.disabled = false; }, 2000); });
+                    });
+                    </script>
+                </div>
+            </div>
+
+            {% if audit_log %}
+            <div class="card card-pad">
+                <div class="section-title" style="margin-bottom:1rem;">Recent Activity for This Entry</div>
+                <table class="tbl">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Action</th>
+                            <th>Device</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in audit_log %}
+                        <tr>
+                            <td>{{ event.timestamp[:16]|replace('T', ' ') }}</td>
+                            <td><span class="chip">{{ event.action|replace('_', ' ') }}</span></td>
+                            <td>{{ event.device }}</td>
+                            <td>{{ event.details }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+    var entryId = {{ entry.id | tojson }};
+
+    function requestRevealPin() {
+        var btn = document.getElementById('btn-request-pin');
+        btn.disabled = true;
+        btn.textContent = 'Sending PIN...';
+
+        fetch('{{ url_for("password-managers.api_request_reveal", entry_id=entry.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.textContent = 'PIN Sent';
+            document.getElementById('pin-input-area').style.display = 'block';
+            document.getElementById('pin-code').focus();
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Reveal';
+        });
+    }
+
+    function confirmRevealPin() {
+        var pin = document.getElementById('pin-code').value.trim();
+        if (!pin) return;
+        var errEl = document.getElementById('pin-error');
+        errEl.style.display = 'none';
+
+        fetch('{{ url_for("password-managers.api_confirm_reveal", entry_id=entry.id) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pin: pin})
+        })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (!res.ok) {
+                errEl.textContent = res.data.error || 'Invalid PIN';
+                errEl.style.display = 'block';
+                return;
+            }
+            // Show the revealed password
+            var masked = document.getElementById('pw-masked');
+            masked.className = 'pw-revealed';
+            masked.textContent = res.data.password;
+            document.getElementById('pw-reveal-flow').style.display = 'none';
+        })
+        .catch(function() {
+            errEl.textContent = 'Request failed';
+            errEl.style.display = 'block';
+        });
+    }
+
+    // Allow Enter key in PIN input
+    var pinInput = document.getElementById('pin-code');
+    if (pinInput) {
+        pinInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmRevealPin(); }
+        });
+    }
+    </script>
+</body>
+</html>

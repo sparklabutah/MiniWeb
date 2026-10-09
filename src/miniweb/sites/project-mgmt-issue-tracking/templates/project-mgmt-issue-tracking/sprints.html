@@ -1,0 +1,68 @@
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active = 'sprints' %}
+{% block title %}Sprints - Meridian Tracker{% endblock %}
+{% block heading %}Sprints{% endblock %}
+{% block content %}
+
+<details class="card" style="margin-bottom:16px;">
+    <summary style="cursor:pointer;font-weight:700;">&#43; New Sprint</summary>
+    <form method="POST" action="{{ url_for('project-mgmt-issue-tracking.form_create_sprint') }}" style="margin-top:14px;">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+                <label for="sp-name" style="display:block;font-weight:600;margin-bottom:5px;">Sprint name *</label>
+                <input type="text" id="sp-name" name="name" required placeholder="e.g. MF Sprint 16">
+            </div>
+            <div>
+                <label for="sp-project" style="display:block;font-weight:600;margin-bottom:5px;">Project *</label>
+                <select id="sp-project" name="project_id" required>
+                    <option value="">Select project...</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }} ({{ p.key }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+                <label for="sp-start" style="display:block;font-weight:600;margin-bottom:5px;">Start date</label>
+                <input type="date" id="sp-start" name="start_date">
+            </div>
+            <div>
+                <label for="sp-end" style="display:block;font-weight:600;margin-bottom:5px;">End date</label>
+                <input type="date" id="sp-end" name="end_date">
+            </div>
+        </div>
+        <div style="margin-bottom:14px;">
+            <label for="sp-goal" style="display:block;font-weight:600;margin-bottom:5px;">Sprint goal</label>
+            <input type="text" id="sp-goal" name="goal" placeholder="What should this sprint deliver?">
+        </div>
+        <button type="submit" class="btn btn-primary">Create Sprint</button>
+    </form>
+</details>
+
+<div class="sec-h" style="margin-top:0;">All Sprints <span class="count">{{ sprint_data|length }}</span></div>
+
+{% for sd in sprint_data %}
+{% set pct = ((sd.done_points / sd.total_points) * 100)|int if sd.total_points > 0 else 0 %}
+<div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:1.02rem;">
+            <a href="{{ url_for('project-mgmt-issue-tracking.sprint_detail', sprint_id=sd.sprint.id) }}">{{ sd.sprint.name }}</a>
+            {% if sd.project %}<span class="chip" style="margin-left:6px;">{{ sd.project.name }}</span>{% endif %}
+        </div>
+        <span class="badge st-{{ 'in_progress' if sd.sprint.status == 'active' else ('done' if sd.sprint.status == 'closed' else 'open') }}"><span class="bd"></span>{{ sd.sprint.status|title }}</span>
+    </div>
+    <div style="font-size:.82rem;color:var(--faint);margin-bottom:6px;">{{ sd.sprint.start_date }} to {{ sd.sprint.end_date }}</div>
+    {% if sd.sprint.goal %}<div style="font-size:.88rem;color:var(--muted);margin-bottom:12px;line-height:1.45;">{{ sd.sprint.goal }}</div>{% endif %}
+    {% if sd.total_points > 0 %}
+    <div class="pbar" style="max-width:260px;margin-bottom:10px;" title="{{ pct }}% complete"><div class="pbar-fill" style="width:{{ pct }}%;background:#16a34a;"></div></div>
+    {% endif %}
+    <div style="display:flex;gap:26px;font-size:.85rem;">
+        <div><span style="font-weight:700;font-size:1.05rem;">{{ sd.done_issues }}/{{ sd.total_issues }}</span> <span style="color:var(--faint);">Issues Done</span></div>
+        <div><span style="font-weight:700;font-size:1.05rem;">{{ sd.done_points }}/{{ sd.total_points }}</span> <span style="color:var(--faint);">Story Points</span></div>
+    </div>
+</div>
+{% else %}
+<div class="empty">No sprints found.</div>
+{% endfor %}
+{% endblock %}

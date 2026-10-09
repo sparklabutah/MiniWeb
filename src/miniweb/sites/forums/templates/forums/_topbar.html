@@ -1,0 +1,63 @@
+<div class="rd-top">
+    <a class="rd-logo" href="{{ url_for('forums.index') }}">
+        <span class="snoo"><svg width="18" height="18" viewBox="0 0 20 20" fill="#fff"><circle cx="10" cy="11" r="7"/><circle cx="10" cy="2.5" r="1.6"/><line x1="10" y1="4" x2="10" y2="6" stroke="#fff" stroke-width="1.4"/><circle cx="7" cy="10.5" r="1.3" fill="#ff4500"/><circle cx="13" cy="10.5" r="1.3" fill="#ff4500"/></svg></span>
+        <span class="word">forumhub</span>
+    </a>
+    <form class="rd-search" method="get" action="{{ url_for('forums.search_page') }}">
+        <span class="mag"><svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="currentColor" stroke-width="2"/><line x1="13" y1="13" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <input name="q" placeholder="Search ForumHub" value="{{ request.args.get('q','') }}" autocomplete="off">
+    </form>
+    <div class="rd-top-right">
+        <a class="rd-create" href="{{ url_for('forums.submit_page') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+            Create
+        </a>
+        {% if current_user %}
+            <div class="rd-bell-wrap">
+                <button class="rd-iconbtn" id="rd-bell" onclick="toggleNotifs(event)" title="Notifications" aria-label="Notifications">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    {% if notif_count %}<span class="rd-badge" id="rd-notif-badge">{{ notif_count if notif_count < 100 else '99+' }}</span>{% endif %}
+                </button>
+                <div class="rd-notif-menu" id="rd-notif-menu">
+                    <div class="rd-notif-head">Notifications</div>
+                    <div class="rd-notif-body">
+                        {% for n in notifications %}
+                        <a class="rd-notif-item" href="{{ url_for('forums.post_detail', post_id=n.post_id) }}">
+                            <span class="av sm" style="background:{{ n.color }};">{{ n.actor[0]|upper }}</span>
+                            <span class="rd-notif-txt">
+                                <b>u/{{ n.actor }}</b> {{ 'replied to your comment' if n.kind == 'reply' else 'commented on your post' }}{% if n.post_title %} <span class="rd-notif-ctx">in “{{ n.post_title[:48] }}”</span>{% endif %}
+                                <span class="rd-notif-body-snip">{{ n.body[:80] }}</span>
+                                <span class="rd-notif-when">{{ format_time_ago(n.created_utc) }}</span>
+                            </span>
+                        </a>
+                        {% else %}
+                        <div class="rd-notif-empty">You're all caught up.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <a class="lnk rd-msg-lnk" href="{{ url_for('forums.messages_page') }}">Messages{% if unread_messages %} <span class="rd-badge inline">{{ unread_messages if unread_messages < 100 else '99+' }}</span>{% endif %}</a>
+            <a class="lnk" href="{{ url_for('forums.logout') }}">Log Out</a>
+            <a href="{{ url_for('forums.user_profile', username=current_user.username) }}" class="rd-uav" title="u/{{ current_user.username }}" style="background:{{ avatar_color(current_user.username) }};">{{ current_user.username[0]|upper }}</a>
+        {% else %}
+            <a class="rd-btn blue" href="{{ url_for('forums.login_page') }}" style="padding:7px 16px;">Log In</a>
+        {% endif %}
+    </div>
+</div>
+<script>
+    function toggleNotifs(e) {
+        e.stopPropagation();
+        var menu = document.getElementById('rd-notif-menu');
+        var open = menu.classList.toggle('open');
+        if (open) {
+            // Clear the badge server-side once the tray is opened.
+            var badge = document.getElementById('rd-notif-badge');
+            fetch('{{ url_for("forums.index") }}api/notifications/seen', {method: 'POST'})
+                .then(function(){ if (badge) badge.remove(); }).catch(function(){});
+        }
+    }
+    document.addEventListener('click', function(e){
+        var wrap = e.target.closest && e.target.closest('.rd-bell-wrap');
+        if (!wrap) { var m = document.getElementById('rd-notif-menu'); if (m) m.classList.remove('open'); }
+    });
+</script>

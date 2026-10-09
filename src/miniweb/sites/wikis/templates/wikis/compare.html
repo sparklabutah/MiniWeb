@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Pages - LakeportWiki</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; margin-left: 1rem; }
+        .main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .compare-form { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .compare-form .field { flex: 1; min-width: 200px; }
+        .compare-form label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: .3rem; color: #1e3a5f; }
+        .compare-form select { width: 100%; padding: .5rem .7rem; border: 1px solid #cbd5e1; border-radius: .4rem; font-size: .9rem; appearance: auto; }
+        .compare-form button { padding: .55rem 1.2rem; background: #2563eb; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; }
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .compare-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.2rem; }
+        .compare-panel h3 { font-size: 1.1rem; color: #1e3a5f; margin-bottom: .5rem; }
+        .compare-table { width: 100%; border-collapse: collapse; font-size: .88rem; margin-bottom: 1rem; }
+        .compare-table th { text-align: left; padding: .4rem .5rem; background: #f8fafc; color: #64748b; border-bottom: 1px solid #e2e8f0; width: 110px; }
+        .compare-table td { padding: .4rem .5rem; border-bottom: 1px solid #f1f5f9; }
+        .compare-content { font-size: .85rem; line-height: 1.6; max-height: 400px; overflow-y: auto; border-top: 1px solid #e2e8f0; padding-top: .8rem; }
+        .no-selection { text-align: center; color: #94a3b8; padding: 3rem; font-size: .92rem; }
+    </style>
+</head>
+<body>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+            <a href="{{ url_for('wikis.recent_changes') }}">Recent Changes</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <h2 style="margin-bottom:1rem; font-size:1.2rem; color:#1e3a5f;">Compare Pages</h2>
+
+        <form class="compare-form" action="{{ url_for('wikis.compare_page') }}" method="get">
+            <div class="field">
+                <label for="page1">Page 1</label>
+                <select name="page1" id="page1">
+                    <option value="">-- Select page --</option>
+                    {% for p in pages %}
+                    <option value="{{ p.slug }}" {{ 'selected' if slug1 == p.slug else '' }}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="page2">Page 2</label>
+                <select name="page2" id="page2">
+                    <option value="">-- Select page --</option>
+                    {% for p in pages %}
+                    <option value="{{ p.slug }}" {{ 'selected' if slug2 == p.slug else '' }}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit">Compare</button>
+        </form>
+
+        {% if page1 and page2 %}
+        <div class="compare-grid">
+            <div class="compare-panel">
+                <h3><a href="{{ url_for('wikis.wiki_page', slug=page1.slug) }}" style="color:#1e3a5f; text-decoration:none;">{{ page1.title }}</a></h3>
+                <table class="compare-table">
+                    <tr><th>Category</th><td>{{ page1.category }}</td></tr>
+                    <tr><th>Views</th><td>{{ page1.views }}</td></tr>
+                    <tr><th>Created</th><td>{{ page1.created_at[:10] }}</td></tr>
+                    <tr><th>Last Edited</th><td>{{ page1.updated_at[:10] }}</td></tr>
+                    <tr><th>Links</th><td>{{ page1.linked_pages|length }}</td></tr>
+                </table>
+                <div class="compare-content">{% if '<' in page1.content and '>' in page1.content %}{{ page1.content[:800]|safe }}{% else %}{{ page1.content[:800] }}{% endif %}{% if page1.content|length > 800 %}...{% endif %}</div>
+            </div>
+            <div class="compare-panel">
+                <h3><a href="{{ url_for('wikis.wiki_page', slug=page2.slug) }}" style="color:#1e3a5f; text-decoration:none;">{{ page2.title }}</a></h3>
+                <table class="compare-table">
+                    <tr><th>Category</th><td>{{ page2.category }}</td></tr>
+                    <tr><th>Views</th><td>{{ page2.views }}</td></tr>
+                    <tr><th>Created</th><td>{{ page2.created_at[:10] }}</td></tr>
+                    <tr><th>Last Edited</th><td>{{ page2.updated_at[:10] }}</td></tr>
+                    <tr><th>Links</th><td>{{ page2.linked_pages|length }}</td></tr>
+                </table>
+                <div class="compare-content">{% if '<' in page2.content and '>' in page2.content %}{{ page2.content[:800]|safe }}{% else %}{{ page2.content[:800] }}{% endif %}{% if page2.content|length > 800 %}...{% endif %}</div>
+            </div>
+        </div>
+        {% elif slug1 or slug2 %}
+        <div class="no-selection">Please select two pages to compare.</div>
+        {% else %}
+        <div class="no-selection">Select two wiki pages from the dropdowns above to see a side-by-side comparison.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

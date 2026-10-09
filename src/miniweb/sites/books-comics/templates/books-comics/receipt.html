@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt {{ order.order_number }} -- BookVerse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #faf7f2; }
+        .header { border-bottom: 2px solid #e8dfd3; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+        .header h1 { font-size: 1.4rem; margin: 0; color: #8b4513; }
+        .header h1 span { color: #d4a574; }
+        .header-nav a { margin-left: 1rem; font-size: .85rem; color: #6b5b4f; text-decoration: none; }
+        .main { max-width: 620px; margin: 2rem auto; padding: 0 1.5rem 3rem; }
+        .back-link { font-size: .9rem; display: inline-block; margin-bottom: 1rem; color: #8b4513; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .receipt { border: 1px solid #e8dfd3; border-radius: .5rem; background: #fff; padding: 1.6rem 1.8rem; }
+        .receipt-head { text-align: center; border-bottom: 2px dashed #e8dfd3; padding-bottom: 1rem; margin-bottom: 1rem; }
+        .receipt-head .brand { font-size: 1.3rem; color: #8b4513; font-weight: 700; }
+        .receipt-head .brand span { color: #d4a574; }
+        .receipt-head .rnum { font-size: .95rem; color: #2d2d2d; margin-top: .4rem; font-weight: 600; }
+        .receipt-head .rmeta { font-size: .82rem; color: #a09080; margin-top: .2rem; }
+        .kv { display: flex; justify-content: space-between; font-size: .85rem; color: #6b5b4f; padding: .15rem 0; }
+        .lines { list-style: none; padding: 0; margin: 1rem 0; }
+        .lines li { display: flex; justify-content: space-between; font-size: .9rem; color: #4a4a4a; padding: .45rem 0; border-bottom: 1px solid #f5efe6; }
+        .lines li a { color: #8b4513; text-decoration: none; }
+        .lines li a:hover { text-decoration: underline; }
+        .totals { margin-top: 1rem; border-top: 2px dashed #e8dfd3; padding-top: 1rem; }
+        .totals .kv.grand { font-size: 1.05rem; font-weight: 700; color: #2d2d2d; }
+        .status-pill { font-size: .78rem; color: #2e7d32; background: #e8f5e9; padding: .2rem .6rem; border-radius: 1rem; }
+        .foot-note { text-align: center; font-size: .8rem; color: #a09080; margin-top: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('books-comics.index') }}" style="color:inherit;text-decoration:none">Book<span>Verse</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('books-comics.orders_page') }}">Orders</a>
+            <a href="{{ url_for('books-comics.dashboard') }}">My Library</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <a href="{{ url_for('books-comics.orders_page') }}" class="back-link">&larr; Back to orders</a>
+        <div class="receipt" id="receipt-{{ order.id }}">
+            <div class="receipt-head">
+                <div class="brand">Book<span>Verse</span></div>
+                <div class="rnum">Receipt &middot; Order {{ order.order_number }}</div>
+                <div class="rmeta">{{ order.created_at }} &middot; <span class="status-pill">{{ order.status }}</span></div>
+            </div>
+
+            <div class="kv"><span>Billed to</span><span>{{ order.name }}</span></div>
+            <div class="kv"><span>Email</span><span>{{ order.email }}</span></div>
+            <div class="kv"><span>Payment</span><span>{{ order.payment_method|capitalize }}{% if order.card_last4 %} &middot; card ****{{ order.card_last4 }}{% endif %}</span></div>
+
+            <ul class="lines">
+                {% for item in order["items"] %}
+                <li>
+                    <a href="{{ url_for('books-comics.book_detail', book_id=item.book_id) }}">{{ item.title }}</a>
+                    <span>{% if item.price and item.price > 0 %}${{ "%.2f"|format(item.price) }}{% else %}Free{% endif %}</span>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <div class="totals">
+                <div class="kv"><span>Subtotal ({{ order.item_count }} item(s))</span><span>${{ "%.2f"|format(order.subtotal) }}</span></div>
+                <div class="kv grand"><span>Total</span><span>${{ "%.2f"|format(order.total) }}</span></div>
+            </div>
+
+            <div class="foot-note">Thank you for your purchase. Your books are in your reading library.</div>
+        </div>
+    </div>
+</body>
+</html>

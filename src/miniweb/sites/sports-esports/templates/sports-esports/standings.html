@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standings - Lakeport Sports Hub</title>
+    <link rel="stylesheet" href="/static/sportscenter.css">
+</head>
+<body>
+    {% set active_nav = 'standings' %}
+    {% include "sports-esports/_nav.html" %}
+    <div class="container">
+        <div class="page-title">League Standings</div>
+
+        <div class="card" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:.85rem;color:#6b7280;font-weight:600;white-space:nowrap;">Min Wins: <span id="wins-slider-val">0</span></label>
+            <input type="range" id="wins-slider" min="0" max="50" step="1" value="0" oninput="document.getElementById('wins-slider-val').textContent=this.value;filterStandings(parseInt(this.value))" style="width:200px;accent-color:#00d4aa;">
+        </div>
+
+        <script>
+        function filterStandings(minWins) {
+            document.querySelectorAll('tr[data-wins]').forEach(function(row) {
+                row.style.display = parseInt(row.getAttribute('data-wins')) >= minWins ? '' : 'none';
+            });
+        }
+        </script>
+
+        {% for league in leagues %}
+        <div class="league-section" style="margin-bottom:2rem;">
+            <div class="section-title">
+                <a href="{{ url_for('sports-esports.league_detail', league_id=league.id) }}">{{ league.name }}</a>
+                <span class="label">{{ league.sport }}</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th>Team</th>
+                        <th>W</th>
+                        <th>L</th>
+                        <th>GP</th>
+                        <th>Win %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in standings[league.id] %}
+                    <tr data-wins="{{ team.wins }}">
+                        <td class="rank {% if team.standing == 1 %}rank-1{% elif team.standing == 2 %}rank-2{% elif team.standing == 3 %}rank-3{% endif %}">{{ team.standing }}</td>
+                        <td>
+                            <div class="team-cell" style="display:flex;align-items:center;gap:.5rem;">
+                                <span class="team-dot" style="background: {{ team.logo_color }}"></span>
+                                <a href="{{ url_for('sports-esports.team_detail', team_id=team.id) }}">{{ team.name }}</a>
+                            </div>
+                        </td>
+                        <td class="win-col">{{ team.wins }}</td>
+                        <td class="loss-col">{{ team.losses }}</td>
+                        <td>{{ team.wins + team.losses }}</td>
+                        <td class="pct-col win-pct">{{ "%.3f"|format(team.wins / (team.wins + team.losses)) if (team.wins + team.losses) > 0 else "0.000" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

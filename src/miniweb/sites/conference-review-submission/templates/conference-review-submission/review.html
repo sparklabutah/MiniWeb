@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Review | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
+    <style>
+        .breadcrumb { font-size: 12px; color: #8c8c8c; margin-bottom: 14px; }
+        .page-title { font-size: 20px; font-weight: 500; margin-bottom: 2px; }
+        .paper-ref { font-size: 14.5px; color: #555; font-style: italic; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
+        .form-section { margin-bottom: 20px; }
+        .form-section textarea.form-control { min-height: 240px; resize: vertical; line-height: 1.6; }
+        .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-content" style="max-width:760px;">
+        <div class="breadcrumb">
+            <a href="{{ url_for('conference-review-submission.venues_page') }}">Venues</a>
+            {% if venue %}
+            &rsaquo; <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">{{ venue.name }}</a>
+            {% endif %}
+            &rsaquo; <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">Paper</a>
+            &rsaquo; Submit Review
+        </div>
+
+        <div class="page-title">Official Review</div>
+        <div class="paper-ref">{{ paper.title }}</div>
+
+        <div class="alert alert-info">
+            Your review will be posted anonymously. Please provide constructive and detailed feedback on the paper's strengths, weaknesses, clarity, originality, and significance.
+        </div>
+
+        <form class="review-form" method="post" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}">
+            <div class="form-section">
+                <label class="control-label" for="title">Review Summary</label>
+                <div class="help-block">A one-line summary of your assessment</div>
+                <input type="text" class="form-control" name="title" id="title" placeholder="e.g., Interesting approach but insufficient evaluation" required>
+            </div>
+
+            <div class="score-grid">
+                <div class="form-section">
+                    <label class="control-label" for="recommendation">Rating</label>
+                    <div class="help-block">1 = strong reject, 10 = strong accept</div>
+                    <select class="form-control" name="recommendation" id="recommendation" required>
+                        <option value="">Select...</option>
+                        <option value="10">10: Top 5% of accepted papers, seminal</option>
+                        <option value="9">9: Top 15%, strong accept</option>
+                        <option value="8">8: Top 50%, clear accept</option>
+                        <option value="7">7: Good paper, accept</option>
+                        <option value="6">6: Marginally above threshold</option>
+                        <option value="5">5: Marginally below threshold</option>
+                        <option value="4">4: Ok but not good enough, reject</option>
+                        <option value="3">3: Clear reject</option>
+                        <option value="2">2: Strong reject</option>
+                        <option value="1">1: Trivial or wrong</option>
+                    </select>
+                </div>
+
+                <div class="form-section">
+                    <label class="control-label" for="confidence">Confidence</label>
+                    <div class="help-block">How confident are you in your assessment?</div>
+                    <select class="form-control" name="confidence" id="confidence" required>
+                        <option value="">Select...</option>
+                        <option value="5">5: Absolutely certain (expert)</option>
+                        <option value="4">4: Quite confident</option>
+                        <option value="3">3: Fairly confident</option>
+                        <option value="2">2: Willing to defend but not absolutely certain</option>
+                        <option value="1">1: Best guess</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <label class="control-label" for="comments">Review</label>
+                <div class="help-block">Provide detailed comments on strengths, weaknesses, clarity, novelty, significance, and questions for the authors</div>
+                <textarea class="form-control" name="comments" id="comments" placeholder="## Summary&#10;Briefly summarize the paper and its contributions.&#10;&#10;## Strengths&#10;- &#10;&#10;## Weaknesses&#10;- &#10;&#10;## Questions&#10;- &#10;&#10;## Minor Comments&#10;- " required></textarea>
+            </div>
+
+            <div class="form-section">
+                <label class="control-label" for="attachment">Supplementary Material (optional)</label>
+                <div class="help-block">Attach annotated PDF, additional figures, or supporting documents</div>
+                <input type="file" name="file" id="attachment" accept=".pdf,.doc,.docx,.txt,.png,.jpg" style="font-size:13px;padding:6px 0">
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit Review</button>
+                <a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-default">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+</body>
+</html>

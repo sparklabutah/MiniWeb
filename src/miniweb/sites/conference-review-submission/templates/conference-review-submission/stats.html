@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistics | {{ venue.name }} | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
+    <style>
+        .venue-header { padding: 26px 0 0; }
+        .venue-title { font-size: 24px; font-weight: 500; margin-bottom: 2px; }
+        .venue-subtitle { font-size: 13.5px; color: #777; margin-bottom: 10px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { border: 1px solid #ddd; border-radius: 4px; padding: 16px; text-align: center; background: #fff; }
+        .stat-card .val { font-size: 26px; font-weight: 700; color: #333; }
+        .stat-card .lbl { font-size: 12px; color: #8c8c8c; margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+        .stat-card.green .val { color: #5cb85c; }
+        .stat-card.red .val { color: #d9534f; }
+
+        .section-title { font-size: 16px; font-weight: 700; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #eee; }
+
+        .compare-row { display: flex; gap: 12px; }
+        .compare-box { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 16px; text-align: center; background: #fff; }
+        .compare-box h4 { font-size: 12px; color: #8c8c8c; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+        .compare-box .val { font-size: 22px; font-weight: 700; }
+        .val-green { color: #5cb85c; }
+        .val-red { color: #d9534f; }
+
+        .dist-table { width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+        .dist-table th { text-align: left; padding: 8px 12px; background: #f5f5f5; color: #8c8c8c; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+        .dist-table td { padding: 8px 12px; font-size: 13px; color: #444; border-top: 1px solid #f0f0f0; }
+        .dist-bar { height: 16px; background: #eee; border-radius: 3px; overflow: hidden; }
+        .dist-fill { height: 100%; border-radius: 3px; }
+        .dist-fill.high { background: #5cb85c; }
+        .dist-fill.low { background: #d9534f; }
+        .dist-fill.mid { background: #f0ad4e; }
+    </style>
+</head>
+<body>
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-container venue-header">
+        <div class="venue-title">{{ venue.name }}</div>
+        <div class="venue-subtitle">{{ venue.full_name }}</div>
+        <div class="nav-tabs">
+            <a href="{{ url_for('conference-review-submission.venue_detail', venue_id=venue.id) }}">Submissions</a>
+            <a href="{{ url_for('conference-review-submission.stats_page', venue_id=venue.id) }}" class="active">Statistics</a>
+            {% if user %}
+            <a href="{{ url_for('conference-review-submission.console') }}">Console</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="or-container" style="padding-bottom:64px;">
+        {% if total == 0 %}
+        <div class="empty-state">No submissions available for this venue to compute statistics.</div>
+        {% else %}
+        <div class="stats-grid">
+            <div class="stat-card"><div class="val">{{ total }}</div><div class="lbl">Submissions</div></div>
+            <div class="stat-card green"><div class="val">{{ accepted }}</div><div class="lbl">Accepted</div></div>
+            <div class="stat-card red"><div class="val">{{ rejected }}</div><div class="lbl">Rejected</div></div>
+            <div class="stat-card"><div class="val">{{ acceptance_rate }}%</div><div class="lbl">Accept Rate</div></div>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="stat-card"><div class="val">{{ total_reviews }}</div><div class="lbl">Total Reviews</div></div>
+            <div class="stat-card"><div class="val">{{ avg_reviews_per_paper }}</div><div class="lbl">Avg Reviews / Paper</div></div>
+            <div class="stat-card"><div class="val">{{ avg_overall }}</div><div class="lbl">Avg Score</div></div>
+        </div>
+
+        <h2 class="section-title">Score Comparison</h2>
+        <div class="compare-row">
+            <div class="compare-box"><h4>Avg Score (Accepted)</h4><div class="val val-green">{{ avg_accepted }}</div></div>
+            <div class="compare-box"><h4>Avg Score (Rejected)</h4><div class="val val-red">{{ avg_rejected }}</div></div>
+            <div class="compare-box"><h4>Median Score</h4><div class="val">{{ median_score }}</div></div>
+        </div>
+
+        <h2 class="section-title">Score Distribution</h2>
+        <table class="dist-table">
+            <thead><tr><th>Score</th><th style="width:60px">Count</th><th>Distribution</th></tr></thead>
+            <tbody>
+                {% for bucket in range(10, 0, -1) %}
+                {% set count = score_dist.get(bucket, 0) %}
+                {% set pct = (count / total * 100) if total > 0 else 0 %}
+                <tr>
+                    <td>
+                        <strong>{{ bucket }}</strong>
+                        <span style="color:#999;font-size:12px">
+                            {% if bucket >= 8 %} (Accept){% elif bucket >= 6 %} (Weak Accept){% elif bucket >= 4 %} (Weak Reject){% else %} (Reject){% endif %}
+                        </span>
+                    </td>
+                    <td>{{ count }}</td>
+                    <td>
+                        <div class="dist-bar">
+                            <div class="dist-fill {% if bucket >= 7 %}high{% elif bucket >= 5 %}mid{% else %}low{% endif %}" style="width: {{ pct * 4 }}%"></div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+</body>
+</html>

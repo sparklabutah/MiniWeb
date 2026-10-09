@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ phone.name }} — PhoneCompare</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a237e; color: #fff; padding: .7rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; margin-left: .8rem; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+
+        .main { max-width: 900px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+        .breadcrumb { font-size: .8rem; color: #888; margin-bottom: 1rem; }
+        .breadcrumb a { color: #1a237e; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .phone-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+        .phone-title h2 { font-size: 1.6rem; color: #1a237e; }
+        .phone-title .brand-tag { display: inline-block; background: #e8eaf6; color: #1a237e; padding: .15rem .6rem; border-radius: .2rem; font-size: .75rem; font-weight: 600; margin-top: .3rem; }
+        .phone-title .release-info { font-size: .8rem; color: #888; margin-top: .3rem; }
+
+        .phone-actions { display: flex; gap: .5rem; }
+        .phone-actions form { display: inline; }
+        .btn { padding: .45rem 1rem; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; text-decoration: none; display: inline-block; }
+        .btn-fav { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+        .btn-fav:hover { background: #ffe0b2; }
+        .btn-compare { background: #ff6600; color: #fff; }
+        .btn-compare:hover { background: #e55b00; }
+
+        .price-banner { background: #fff; border-left: 4px solid #ff6600; padding: .8rem 1.2rem; margin-bottom: 1.5rem; border-radius: .3rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .price-banner .price-label { font-size: .75rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+        .price-banner .price-value { font-size: 1.4rem; font-weight: 700; color: #2e7d32; }
+        .price-banner .price-raw { font-size: .8rem; color: #999; margin-top: .2rem; }
+
+        .spec-card { background: #fff; border-radius: .4rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.5rem; overflow: hidden; }
+        .spec-card h3 { background: #f0f0f0; padding: .6rem 1rem; font-size: .9rem; color: #555; border-bottom: 2px solid #ddd; }
+
+        .spec-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .spec-table tr { border-bottom: 1px solid #f0f0f0; }
+        .spec-table tr:last-child { border-bottom: none; }
+        .spec-table th { text-align: left; padding: .55rem 1rem; color: #666; font-weight: 500; width: 35%; background: #fafafa; }
+        .spec-table td { padding: .55rem 1rem; color: #333; }
+
+        .key-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
+        .feature-box { background: #fff; padding: .8rem; border-radius: .4rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .feature-box .feat-val { font-size: 1.1rem; font-weight: 700; color: #1a237e; }
+        .feature-box .feat-label { font-size: .7rem; color: #888; text-transform: uppercase; margin-top: .2rem; }
+
+        .related-section { margin-top: 2rem; }
+        .related-section h3 { font-size: 1rem; color: #555; margin-bottom: .8rem; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .8rem; }
+        .related-card { background: #fff; padding: .8rem; border-radius: .4rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .related-card a { color: #1a237e; text-decoration: none; font-weight: 500; font-size: .85rem; }
+        .related-card a:hover { text-decoration: underline; }
+        .related-card .related-specs { font-size: .75rem; color: #888; margin-top: .3rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('comparison-aggregators.index') }}">PhoneCompare</a></h1>
+                <div class="header-nav">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Browse</a>
+            <a href="{{ url_for('comparison-aggregators.compare_page') }}">Compare</a>
+            {% if user %}
+            <a href="{{ url_for('comparison-aggregators.favorites_page') }}">Favorites</a>
+            <a href="{{ url_for('comparison-aggregators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('comparison-aggregators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('comparison-aggregators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Home</a> &rsaquo;
+            <a href="{{ url_for('comparison-aggregators.brand_page', brand_name=phone.brand) }}">{{ phone.brand }}</a> &rsaquo;
+            {{ phone.name }}
+        </div>
+
+        <div class="phone-header">
+            <div class="phone-title">
+                <h2>{{ phone.name }}</h2>
+                <span class="brand-tag">{{ phone.brand }}</span>
+                {% if phone.released_at %}
+                <div class="release-info">Released: {{ phone.released_at }}</div>
+                {% endif %}
+            </div>
+            {% if user %}
+            <div class="phone-actions">
+                <form method="post" action="{{ url_for('comparison-aggregators.form_toggle_favorite', phone_id=phone.id) }}">
+                    <button class="btn btn-fav" type="submit">
+                        {% if phone.id in user.get('favorites', []) %}Unfavorite{% else %}Favorite{% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{{ url_for('comparison-aggregators.form_add_compare', phone_id=phone.id) }}">
+                    <button class="btn btn-compare" type="submit">
+                        {% if phone.id in user.get('compare_lists', []) %}Remove from Compare{% else %}Add to Compare{% endif %}
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if phone.price is not none %}
+        <div class="price-banner">
+            <div class="price-label">Price</div>
+            <div class="price-value">${{ "%.2f"|format(phone.price) }}</div>
+            {% if phone.price_raw %}<div class="price-raw">{{ phone.price_raw }}</div>{% endif %}
+        </div>
+        {% elif phone.price_raw %}
+        <div class="price-banner">
+            <div class="price-label">Price</div>
+            <div class="price-value">{{ phone.price_raw }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Key Features -->
+        <div class="key-features">
+            {% if phone.display_size %}
+            <div class="feature-box">
+                <div class="feat-val">{{ phone.display_size }}</div>
+                <div class="feat-label">Display</div>
+            </div>
+            {% endif %}
+            {% if phone.camera_pixels %}
+            <div class="feature-box">
+                <div class="feat-val">{{ phone.camera_pixels }}</div>
+                <div class="feat-label">Camera</div>
+            </div>
+            {% endif %}
+            {% if phone.ram %}
+            <div class="feature-box">
+                <div class="feat-val">{{ phone.ram }}</div>
+                <div class="feat-label">RAM</div>
+            </div>
+            {% endif %}
+            {% if phone.battery_size %}
+            <div class="feature-box">
+                <div class="feat-val">{{ phone.battery_size }}</div>
+                <div class="feat-label">Battery</div>
+            </div>
+            {% endif %}
+            {% if phone.storage %}
+            <div class="feature-box">
+                <div class="feat-val">{{ phone.storage }}</div>
+                <div class="feat-label">Storage</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Specifications -->
+        <div class="spec-card">
+            <h3>Display</h3>
+            <table class="spec-table">
+                <tr><th>Size</th><td>{{ phone.display_size or '-' }}</td></tr>
+                <tr><th>Resolution</th><td>{{ phone.display_resolution or '-' }}</td></tr>
+            </table>
+        </div>
+
+        <div class="spec-card">
+            <h3>Performance</h3>
+            <table class="spec-table">
+                <tr><th>Processor / Chipset</th><td>{{ phone.chipset or '-' }}</td></tr>
+                <tr><th>RAM</th><td>{{ phone.ram or '-' }}</td></tr>
+                <tr><th>Storage</th><td>{{ phone.storage or '-' }}</td></tr>
+                <tr><th>Operating System</th><td>{{ phone.os or '-' }}</td></tr>
+            </table>
+        </div>
+
+        <div class="spec-card">
+            <h3>Camera</h3>
+            <table class="spec-table">
+                <tr><th>Main Camera</th><td>{{ phone.camera_pixels or '-' }}</td></tr>
+            </table>
+        </div>
+
+        <div class="spec-card">
+            <h3>Battery</h3>
+            <table class="spec-table">
+                <tr><th>Capacity</th><td>{{ phone.battery_size or '-' }}</td></tr>
+                <tr><th>Type</th><td>{{ phone.battery_type or '-' }}</td></tr>
+            </table>
+        </div>
+
+        <div class="spec-card">
+            <h3>Design & Build</h3>
+            <table class="spec-table">
+                <tr><th>Body</th><td>{{ phone.body or '-' }}</td></tr>
+                <tr><th>Weight</th><td>{{ phone.weight or '-' }}</td></tr>
+                <tr><th>SIM</th><td>{{ phone.sim or '-' }}</td></tr>
+                <tr><th>Colors</th><td>{{ phone.colors or '-' }}</td></tr>
+            </table>
+        </div>
+
+        <div class="spec-card">
+            <h3>Connectivity</h3>
+            <table class="spec-table">
+                <tr><th>WLAN</th><td>{{ phone.wlan or '-' }}</td></tr>
+                <tr><th>Bluetooth</th><td>{{ phone.bluetooth or '-' }}</td></tr>
+                <tr><th>GPS</th><td>{{ phone.gps or '-' }}</td></tr>
+                <tr><th>NFC</th><td>{{ phone.nfc or '-' }}</td></tr>
+                <tr><th>USB</th><td>{{ phone.usb or '-' }}</td></tr>
+                <tr><th>Sensors</th><td>{{ phone.sensors or '-' }}</td></tr>
+            </table>
+        </div>
+
+        {% if related %}
+        <div class="related-section">
+            <h3>More from {{ phone.brand }}</h3>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-card">
+                    <a href="{{ url_for('comparison-aggregators.phone_detail', phone_id=r.id) }}">{{ r.name }}</a>
+                    <div class="related-specs">
+                        {% if r.display_size %}{{ r.display_size }}{% endif %}
+                        {% if r.ram %} | {{ r.ram }}{% endif %}
+                        {% if r.battery_size %} | {{ r.battery_size }}{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,653 @@
+"""Pluggable agent interface and browser-use implementation.
+
+AgentRunner is the protocol every agent must satisfy. The evaluation harness
+only calls this interface -- it never touches browser-use (or any other library)
+directly.
+
+Built-in:
+  - BrowserUseAgent: wraps the browser-use library with any LLM backend.
+  - MockAgent: no LLM, no browser -- exercises the pipeline for free.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import json
+import pathlib
+import re
+import shutil
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from html.parser import HTMLParser
+from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+
+@dataclass
+class AgentResult:
+    """Result returned by an agent after running a single task."""
+
+    elapsed: float
+    steps: int
+    is_done: bool
+    final_result: str | None
+    errors: list[str] = field(default_factory=list)
+
+
+@runtime_checkable
+class AgentRunner(Protocol):
+    """Interface that every agent implementation must satisfy."""
+
+    async def setup(self, server_url: str) -> None:
+        """One-time setup before running tasks (e.g. start browser)."""
+        ...
+
+    async def run(self, task: str, server_url: str, task_dir: Path) -> AgentResult:
+        """Execute a single task. Save trajectory artifacts to *task_dir*."""
+        ...
+
+    async def teardown(self) -> None:
+        """Release resources (e.g. close browser)."""
+        ...
+
+
+# -- Chrome flags to reduce per-instance resource usage under parallel load --
+_EXTRA_CHROME_ARGS = [
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--disable-extensions",
+    "--no-sandbox",
+    # OFFLINE: fail DNS for every host except localhost, so the agent physically
+    # cannot reach the outside web (127.0.0.1 is an IP, not DNS-resolved, so it's
+    # unaffected). Keeps the eval self-contained and reproducible.
+    "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost",
+]
+
+_RETRYABLE_ERRORS = ("Timeout", "ReadTimeout", "ConnectionError", "WebSocket", "CDP")
+
+
+def _is_retryable(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}"
+    return any(k in text for k in _RETRYABLE_ERRORS)
+
+
+def _route_uploads_through_miniweb_picker():
+    """Let browser-use click <input type=file>, so uploads go through MiniWeb's picker.
+
+    browser-use refuses a click on a file input twice (the click handler and the CDP click both
+    answer "use the upload function"). On MiniWeb that click is exactly how a person picks a file:
+    src/miniweb/app/static/file-explorer.js catches it (capture phase, default prevented, so no native chooser
+    opens) and shows the in-page Finder over the simulated file system. For file inputs only, the
+    click handler runs with the node's type masked; everything else is unchanged. Must run before a
+    BrowserSession starts: its watchdogs bind their handlers then. Idempotent."""
+    import functools
+
+    from browser_use.browser.watchdogs.default_action_watchdog import DefaultActionWatchdog as W
+    if getattr(W, "_miniweb_file_clicks", False):
+        return
+    original = W.on_ClickElementEvent
+
+    @functools.wraps(original)
+    async def on_ClickElementEvent(self, event):
+        node = event.node
+        attrs = node.attributes if isinstance(getattr(node, "attributes", None), dict) else None
+        is_file = ((getattr(node, "node_name", "") or "").upper() == "INPUT" and attrs is not None
+                   and str(attrs.get("type", "")).lower() == "file")
+        if not is_file:
+            return await original(self, event)
+        attrs["type"] = "miniweb-file"          # past both guards; the page still has a file input
+        try:
+            return await original(self, event)
+        finally:
+            attrs["type"] = "file"
+
+    W.on_ClickElementEvent = on_ClickElementEvent
+    W._miniweb_file_clicks = True
+
+
+class BrowserUseAgent:
+    """AgentRunner backed by the *browser-use* library."""
+
+    def __init__(
+        self,
+        llm,
+        *,
+        use_vision: bool = False,
+        max_steps: int = 50,
+        timeout: int = 300,
+        headless: bool = True,
+        available_file_paths: list[str] | None = None,
+        executable_path: str | None = None,
+    ):
+        self.llm = llm
+        self.use_vision = use_vision
+        self.max_steps = max_steps
+        self.timeout = timeout
+        self.headless = headless
+        # Browser binary. Unset, browser-use picks the first Chromium it finds; on this
+        # machine that is Playwright's Chrome for Testing 149 (build 1228), which never
+        # completes a page load in headless mode (2026-09-26), while Chromium 125 does.
+        # MINIWEB_BROWSER pins one for every run.
+        self.executable_path = executable_path or os.environ.get("MINIWEB_BROWSER") or None
+        # Uploads go through MiniWeb's own file picker (src/miniweb/app/static/file-explorer.js, the
+        # in-page Finder over the simulated file system), as a person would pick a file:
+        # browser-use's upload_file shortcut is removed and file inputs are clickable (see
+        # _route_uploads_through_miniweb_picker). `available_file_paths` is accepted for
+        # compatibility but no longer handed to the agent (2026-09-28).
+        self.available_file_paths = available_file_paths or []
+        self._session = None
+        self._server_url: str | None = None
+
+    async def _start_session(self, max_retries: int = 3) -> None:
+        from browser_use import BrowserSession
+
+        _route_uploads_through_miniweb_picker()         # before the session binds its handlers
+
+        for attempt in range(1, max_retries + 1):
+            self._session = BrowserSession(
+                headless=self.headless,
+                keep_alive=True,
+                args=_EXTRA_CHROME_ARGS,
+                **({"executable_path": self.executable_path} if self.executable_path else {}),
+                # agent-level guard: only localhost is navigable (belt to the
+                # host-resolver-rules braces — gives a clean refusal, not a DNS error)
+                allowed_domains=["localhost", "127.0.0.1"],
+            )
+            try:
+                await self._session.start()
+                await self._enable_clipboard()
+                return
+            except Exception as e:
+                if attempt < max_retries and _is_retryable(e):
+                    print(
+                        f"    [BrowserUseAgent] start attempt "
+                        f"{attempt}/{max_retries} failed ({type(e).__name__}), retrying..."
+                    )
+                    try:
+                        await self._session.kill()
+                    except Exception:
+                        pass
+                    self._session = None
+                    await asyncio.sleep(3 * attempt)
+                else:
+                    raise
+
+    async def _enable_clipboard(self, agent=None) -> None:
+        """Let the site's Copy buttons work headless. A headless page never has
+        focus, and navigator.clipboard.writeText() rejects on an unfocused document
+        ("Document is not focused"), so every copy failed and the recorder never
+        saw a clipboard_write — 8 tasks could not be passed. Grant clipboard access
+        browser-wide and emulate focus on the current tab; re-applied every step
+        (on_step_start) so a tab the agent opens later is covered too."""
+        if not self._session:
+            return
+        try:
+            cdp = await self._session.get_or_create_cdp_session()
+            if agent is None:
+                await cdp.cdp_client.send.Browser.grantPermissions(
+                    params={"permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
+            await cdp.cdp_client.send.Emulation.setFocusEmulationEnabled(
+                params={"enabled": True}, session_id=cdp.session_id)
+        except Exception as e:
+            print(f"    [BrowserUseAgent] clipboard/focus setup failed: {type(e).__name__}: {e}")
+
+    async def setup(self, server_url: str) -> None:
+        self._server_url = server_url
+        await self._start_session()
+        page = await self._session.get_current_page()
+        # Explicitly reset this task's session (clears any overlay/login residue)
+        # before starting — session-scoped, so parallel evals don't interfere.
+        try:
+            from urllib.parse import urlparse
+            o = urlparse(server_url)
+            await page.goto(f"{o.scheme}://{o.netloc}/_reset_data")
+        except Exception:
+            pass
+        await page.goto(server_url)
+        await asyncio.sleep(2)
+
+    async def restart_session(self) -> None:
+        old_dir = None
+        if self._session:
+            try:
+                old_dir = getattr(self._session.browser_profile, "user_data_dir", None)
+            except Exception:
+                pass
+            try:
+                await self._session.kill()
+            except Exception:
+                pass
+            self._session = None
+        if old_dir:
+            shutil.rmtree(str(old_dir), ignore_errors=True)
+
+        await self._start_session()
+        page = await self._session.get_current_page()
+        await page.goto(self._server_url)
+        await asyncio.sleep(2)
+
+    async def run(self, task: str, server_url: str, task_dir: Path) -> AgentResult:
+        from browser_use import Agent, Tools
+
+        instruction = (
+            f"You are interacting with a web application at {server_url}. "
+            f"Your task: {task}"
+        )
+
+        agent = Agent(
+            task=instruction,
+            llm=self.llm,
+            browser_session=self._session,
+            use_vision=self.use_vision,
+            use_judge=False,  # our verify_task is authoritative; skip browser-use's self-judge LLM call
+            save_conversation_path=str(task_dir / "conversations"),
+            max_steps=self.max_steps,
+            # no upload_file shortcut: a file is chosen in MiniWeb's picker, which opens when the
+            # file control is clicked
+            tools=Tools(exclude_actions=["upload_file"]),
+        )
+
+        timed_out = False
+        t0 = time.time()
+        try:
+            history = await asyncio.wait_for(agent.run(on_step_start=self._enable_clipboard), timeout=self.timeout)
+        except asyncio.TimeoutError:
+            timed_out = True
+            history = agent.history
+        elapsed = time.time() - t0
+
+        # Save trajectory
+        history.save_to_file(task_dir / "history.json")
+        screenshots_dst = task_dir / "screenshots"
+        for step_idx, path_str in enumerate(history.screenshot_paths()):
+            if path_str and Path(path_str).exists():
+                screenshots_dst.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path_str, screenshots_dst / f"step_{step_idx}.png")
+
+        if timed_out:
+            raise asyncio.TimeoutError()
+
+        return AgentResult(
+            elapsed=round(elapsed, 1),
+            steps=len(history.history),
+            is_done=history.is_done(),
+            final_result=history.final_result(),
+            errors=history.errors(),
+        )
+
+    async def teardown(self) -> None:
+        user_data_dir = None
+        if self._session:
+            try:
+                user_data_dir = getattr(self._session.browser_profile, "user_data_dir", None)
+            except Exception:
+                pass
+            try:
+                await self._session.kill()
+            except Exception:
+                pass
+            self._session = None
+        if user_data_dir:
+            shutil.rmtree(str(user_data_dir), ignore_errors=True)
+
+
+# ── Mock agent (no LLM, no browser) ─────────────────────────────────────────
+
+class _TextExtractor(HTMLParser):
+    """Minimal HTML→text extractor."""
+
+    def __init__(self):
+        super().__init__()
+        self._pieces: list[str] = []
+        self._skip = False
+
+    def handle_starttag(self, tag, attrs):
+        self._skip = tag in ("script", "style", "noscript")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript"):
+            self._skip = False
+
+    def handle_data(self, data):
+        if not self._skip:
+            self._pieces.append(data)
+
+    def get_text(self) -> str:
+        return " ".join(self._pieces)
+
+
+def _html_to_text(html: str) -> str:
+    parser = _TextExtractor()
+    parser.feed(html)
+    return parser.get_text()
+
+
+def _fetch(url: str, timeout: int = 10) -> str:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+class MockAgent:
+    """Pipeline-validation agent. No LLM, no browser.
+
+    For each task it:
+      1. GETs the site index page
+      2. Follows obvious links (categories, search, detail pages) based on
+         keywords in the instruction
+      3. Extracts visible text and returns a best-guess answer
+
+    This won't produce high pass rates but exercises the full eval pipeline
+    (server management, task loading, verification, result aggregation)
+    without any API calls or browser processes.
+    """
+
+    def __init__(self, *, use_vision=False, max_steps=20,
+                 timeout=180, headless=True, available_file_paths=None):
+        self._server_url: str | None = None
+        self.timeout = timeout
+        self.max_steps = max_steps
+
+    async def setup(self, server_url: str) -> None:
+        self._server_url = server_url
+        # Verify the server is reachable
+        _fetch(server_url)
+
+    async def run(self, task: str, server_url: str, task_dir: Path) -> AgentResult:
+        t0 = time.time()
+        trajectory = []
+        answer = None
+
+        try:
+            # Step 1: fetch the site index
+            index_html = _fetch(server_url)
+            index_text = _html_to_text(index_html)
+            trajectory.append({"action": "navigate", "url": server_url})
+
+            # Step 2: try to find relevant links from the instruction
+            instruction_lower = task.lower()
+
+            # Extract all <a href="..."> links from the page
+            links = re.findall(r'href="([^"]*)"', index_html)
+            # Normalise relative links
+            links = [
+                l if l.startswith("http") else server_url.rstrip("/") + "/" + l.lstrip("/")
+                for l in links if not l.startswith("#") and not l.startswith("javascript")
+            ]
+
+            # Try keyword matching to pick a relevant link
+            visited = {server_url}
+            pages_text = [index_text]
+
+            keywords = re.findall(r'\b[a-z]{4,}\b', instruction_lower)
+            # Remove common stop words
+            stop = {"that", "this", "with", "from", "have", "what", "your",
+                    "navigate", "page", "using", "many", "listed", "find",
+                    "click", "search", "filter", "sort", "select", "open",
+                    "look", "check", "view", "show", "display", "which",
+                    "does", "total", "number", "count", "name", "after",
+                    "before", "into", "then", "also", "each", "when", "more",
+                    "most", "about", "been", "would", "could", "should"}
+            keywords = [k for k in keywords if k not in stop][:5]
+
+            steps = 1
+            for link in links[:20]:
+                if steps >= self.max_steps:
+                    break
+                link_lower = link.lower()
+                if any(kw in link_lower for kw in keywords) and link not in visited:
+                    visited.add(link)
+                    page_html = _fetch(link)
+                    if page_html:
+                        page_text = _html_to_text(page_html)
+                        pages_text.append(page_text)
+                        trajectory.append({"action": "navigate", "url": link})
+                        steps += 1
+
+                        # Extract sub-links and follow one level deeper
+                        sub_links = re.findall(r'href="([^"]*)"', page_html)
+                        for sl in sub_links[:5]:
+                            if steps >= self.max_steps:
+                                break
+                            full = sl if sl.startswith("http") else server_url.rstrip("/") + "/" + sl.lstrip("/")
+                            if full not in visited and any(kw in full.lower() for kw in keywords):
+                                visited.add(full)
+                                sub_html = _fetch(full)
+                                if sub_html:
+                                    pages_text.append(_html_to_text(sub_html))
+                                    trajectory.append({"action": "navigate", "url": full})
+                                    steps += 1
+
+            # Step 3: try to extract a plausible answer
+            all_text = "\n".join(pages_text)
+
+            # Look for numbers if the task asks "how many"
+            if "how many" in instruction_lower or "count" in instruction_lower:
+                # Try to find a count from the page
+                numbers = re.findall(r'\b(\d+)\b', all_text)
+                if numbers:
+                    answer = numbers[0]
+
+            if answer is None:
+                # Return first 200 chars of extracted text as a generic answer
+                answer = all_text[:200].strip() or "done"
+
+            # Save trajectory
+            with open(task_dir / "trajectory.json", "w") as f:
+                json.dump(trajectory, f, indent=2)
+
+        except Exception as e:
+            return AgentResult(
+                elapsed=round(time.time() - t0, 1),
+                steps=0,
+                is_done=False,
+                final_result=None,
+                errors=[str(e)],
+            )
+
+        elapsed = round(time.time() - t0, 1)
+        return AgentResult(
+            elapsed=elapsed,
+            steps=len(trajectory),
+            is_done=True,
+            final_result=answer,
+            errors=[],
+        )
+
+    async def teardown(self) -> None:
+        pass
+
+
+# ── Shared-API LLM (drop-in for browser-use) ────────────────────────────────
+
+class ChatLLM:
+    """browser-use BaseChatModel backed by the shared model-routing helper.
+
+    Implements the ainvoke() protocol so browser-use Agent can use it as its
+    LLM. Each call goes through app.llm.call_llm, which routes the model
+    name to its provider (Groq / OpenAI / Gemini). model="auto" uses the
+    default model (LLM_MODEL env or app.llm.DEFAULT_MODEL).
+    """
+
+    _verified_api_keys: bool = True  # keys are resolved by app.llm
+
+    def __init__(self, model: str = "auto", timeout: int = 120):
+        self.model = model
+        self._timeout = timeout
+
+    @property
+    def provider(self) -> str:
+        return "miniweb-llm"
+
+    @property
+    def name(self) -> str:
+        return self.model
+
+    @property
+    def model_name(self) -> str:
+        return self.model
+
+    @staticmethod
+    def _serialize_messages(messages) -> str:
+        """Convert browser-use message objects into a single text prompt."""
+        parts = []
+        for msg in messages:
+            role = getattr(msg, "role", "user")
+            content = getattr(msg, "content", "")
+            if isinstance(content, list):
+                # Multi-part content (text + images) — extract text parts
+                text_parts = []
+                for part in content:
+                    if hasattr(part, "text"):
+                        text_parts.append(part.text)
+                    elif isinstance(part, dict) and "text" in part:
+                        text_parts.append(part["text"])
+                content = "\n".join(text_parts)
+            if content:
+                parts.append(f"[{role.upper()}]\n{content}")
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """Strip markdown code fences from the LLM response."""
+        text = text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        # Also handle trailing fence
+        if "```" in text:
+            text = text.split("```")[0]
+        return text.strip()
+
+    async def ainvoke(self, messages, output_format=None, **kwargs):
+        from browser_use.llm.views import ChatInvokeCompletion, ChatInvokeUsage
+        from browser_use.llm.exceptions import ModelProviderError
+
+        prompt_text = self._serialize_messages(messages)
+
+        if output_format is not None:
+            schema = output_format.model_json_schema()
+            prompt_text += (
+                "\n\n---\nYou MUST respond with ONLY valid JSON (no markdown, no explanation) "
+                "matching this schema:\n"
+                + json.dumps(schema, indent=2)
+            )
+
+        try:
+            import sys as _sys
+            _root = str(pathlib.Path(__file__).resolve().parents[2])   # src/
+            if _root not in _sys.path:
+                _sys.path.insert(0, _root)
+            from miniweb.app.llm import call_llm
+            text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    call_llm, prompt_text,
+                    None,                       # system (already serialized)
+                    4000,                       # max_tokens
+                    0.3,                        # temperature
+                    output_format is not None,  # json_mode
+                    None if self.model == "auto" else self.model,
+                ),
+                timeout=self._timeout,
+            )
+            if not text:
+                raise ModelProviderError(
+                    message=f"LLM call failed (model={self.model})",
+                    model=self.model,
+                )
+        except asyncio.TimeoutError:
+            raise ModelProviderError(
+                message=f"LLM call timed out after {self._timeout}s",
+                model=self.model,
+            )
+
+        usage = ChatInvokeUsage(
+            prompt_tokens=0, completion_tokens=0, total_tokens=0,
+            prompt_cached_tokens=None, prompt_image_tokens=None,
+            prompt_cache_creation_tokens=None,
+        )
+
+        if output_format is None:
+            return ChatInvokeCompletion(
+                completion=text, usage=usage, stop_reason="end_turn",
+            )
+
+        # Structured output: parse JSON into Pydantic model
+        json_text = self._extract_json(text)
+        try:
+            parsed = output_format.model_validate_json(json_text)
+        except Exception:
+            # Retry: sometimes there's extra text around the JSON
+            # Try to find the outermost { }
+            start = json_text.find("{")
+            end = json_text.rfind("}")
+            if start >= 0 and end > start:
+                json_text = json_text[start:end + 1]
+                parsed = output_format.model_validate_json(json_text)
+            else:
+                raise ModelProviderError(
+                    message=f"Failed to parse JSON from LLM response: {text[:200]}",
+                    model=self.model,
+                )
+
+        return ChatInvokeCompletion(
+            completion=parsed, usage=usage, stop_reason="end_turn",
+        )
+
+
+# ── unified agent factory (replaces the per-runner AGENT_FACTORIES) ───────────
+
+def build_browser_llm(model: str, *, native: bool = False):
+    """LLM object for the browser agent.
+
+    Default: ChatLLM — routes every call through helpers.llm.LLMClient, so it
+    works with any configured provider (incl. Vertex Gemini and Ollama) and its
+    tokens land in LLMClient.GLOBAL. It serializes messages to text, so it drives
+    the agent from the text DOM.
+
+    native=True builds browser-use's provider-native class instead (needs that
+    provider's own API key in env) — use it when you want true vision/multimodal.
+    """
+    if native:
+        from helpers.llm import resolve_provider
+        paths = {
+            "openai": "browser_use.llm.openai.chat:ChatOpenAI",
+            "gemini": "browser_use.llm.google.chat:ChatGoogle",
+            "anthropic": "browser_use.llm.anthropic.chat:ChatAnthropic",
+            "ollama": "browser_use.llm.ollama.chat:ChatOllama",
+            "groq": "browser_use.llm.groq.chat:ChatGroq",
+        }
+        cp = paths.get(resolve_provider(model))
+        if cp:
+            mod, cls = cp.split(":")
+            LLM = getattr(__import__(mod, fromlist=[cls]), cls)
+            name = model.split("/", 1)[-1] if resolve_provider(model) == "ollama" else model
+            return LLM(model=name)
+    return ChatLLM(model)
+
+
+# Friendly shorthands the older runners accepted, mapped to real model ids.
+MODEL_ALIASES = {
+    "gemini-flash": "gemini-3.5-flash", "gemini-pro": "gemini-2.5-pro",
+    "gpt": "gpt-4o", "gpt-5.4": "gpt-5", "gpt-5.5": "gpt-5",
+    "llm": "auto", "groq": "llama-3.3-70b-versatile", "groq-70b": "llama-3.3-70b-versatile",
+}
+
+
+def build_agent(model: str, *, native_llm: bool = False, harness: str = "browser-use", **opts):
+    """Construct a browser-use agent runner for a model name (or an alias, or "mock").
+
+    opts: use_vision, max_steps, timeout, headless, available_file_paths.
+    """
+    if model == "mock":
+        return MockAgent(**opts)
+    model = MODEL_ALIASES.get(model, model)
+    if harness not in ("browser-use", "auto"):
+        raise ValueError(f"harness {harness!r} is gone — only browser-use is supported")
+    return BrowserUseAgent(build_browser_llm(model, native=native_llm), **opts)

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mod queue — r/{{ subreddit }} — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+    <style>
+        .mq-head { display:flex; align-items:center; gap:12px; }
+        .mq-head .badge { background:#d93a00; color:#fff; border-radius:12px; padding:2px 10px; font-size:.8rem; font-weight:800; }
+        .mq-tabs { display:flex; gap:6px; margin-top:12px; }
+        .mq-tabs a { padding:5px 12px; border-radius:16px; font-size:.8rem; font-weight:700; color:var(--muted); background:var(--chip); text-decoration:none; }
+        .mq-tabs a.active { background:var(--blue); color:#fff; }
+        .report { border-left:3px solid var(--line2); }
+        .report.pending { border-left-color:#d93a00; }
+        .report.resolved { border-left-color:#46a758; }
+        .report.dismissed { border-left-color:var(--muted); }
+        .rp-meta { font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .rp-reason { display:inline-block; background:var(--chip); border-radius:12px; padding:1px 9px; font-weight:800; font-size:.72rem; color:var(--ink); text-transform:capitalize; }
+        .rp-title { font-weight:700; font-size:1rem; margin:6px 0 2px; }
+        .rp-body { font-size:.86rem; color:#333; line-height:1.5; white-space:pre-wrap; }
+        .rp-flags { display:flex; gap:6px; margin:8px 0; }
+        .flag { font-size:.7rem; font-weight:800; border-radius:10px; padding:2px 8px; }
+        .flag.removed { background:#fde2dd; color:#a4260a; }
+        .flag.locked { background:#fdeecd; color:#8a5a00; }
+        .flag.sticky { background:#dff0e0; color:#2a7d3a; }
+        .flag.status { background:var(--chip); color:var(--muted); }
+        .rp-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+        .rp-actions button { border:none; border-radius:16px; padding:6px 13px; font-size:.78rem; font-weight:700; cursor:pointer; }
+        .btn-remove { background:#fde2dd; color:#a4260a; }
+        .btn-lock { background:#fdeecd; color:#8a5a00; }
+        .btn-pin { background:#dff0e0; color:#2a7d3a; }
+        .btn-resolve { background:var(--blue); color:#fff; }
+        .btn-dismiss { background:var(--chip); color:var(--ink); }
+    </style>
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <div class="postcard mq-head">
+                <span class="av md" style="background:{{ community.color }};">{{ subreddit[0]|upper }}</span>
+                <div>
+                    <div style="font-size:1.2rem;font-weight:800;">r/{{ subreddit }} — Mod queue</div>
+                    <div style="font-size:.8rem;color:var(--muted);">{{ total_count }} report(s) total</div>
+                </div>
+                <span class="badge" style="margin-left:auto;">{{ pending_count }} pending</span>
+            </div>
+
+            <div class="mq-tabs">
+                <a class="{{ 'active' if status == 'pending' }}" href="{{ url_for('forums.mod_queue', subreddit_name=subreddit, status='pending') }}">Pending</a>
+                <a class="{{ 'active' if status == 'resolved' }}" href="{{ url_for('forums.mod_queue', subreddit_name=subreddit, status='resolved') }}">Resolved</a>
+                <a class="{{ 'active' if status == 'dismissed' }}" href="{{ url_for('forums.mod_queue', subreddit_name=subreddit, status='dismissed') }}">Dismissed</a>
+                <a class="{{ 'active' if status == 'all' }}" href="{{ url_for('forums.mod_queue', subreddit_name=subreddit, status='all') }}">All</a>
+            </div>
+
+            {% for r in reports %}
+            <div class="postcard report {{ r.status }}" id="report-{{ r.id }}">
+                <div class="rp-meta">
+                    <span class="av sm" style="background:{{ r._color }};">{{ r.reporter_username[0]|upper }}</span>
+                    <span>u/{{ r.reporter_username }} reported this {{ r.target_type }}</span>
+                    <span>· {{ format_time_ago(r.created_utc) }}</span>
+                    <span class="rp-reason">{{ r.reason }}</span>
+                </div>
+
+                {% if r.target_type == 'comment' %}
+                <div class="rp-title">Comment by u/{{ r._target_author }}</div>
+                {% else %}
+                <div class="rp-title">
+                    {% if r._target_post_id %}
+                    <a href="{{ url_for('forums.post_detail', post_id=r._target_post_id) }}" style="color:inherit;">{{ r._target_title or '(untitled post)' }}</a>
+                    {% else %}{{ r._target_title or '(untitled post)' }}{% endif %}
+                    {% if r._target_author %}<span style="font-weight:400;color:var(--muted);font-size:.8rem;"> · u/{{ r._target_author }}</span>{% endif %}
+                </div>
+                {% endif %}
+                {% if r._target_text %}<div class="rp-body">{{ r._target_text }}</div>{% endif %}
+                {% if r.description %}<div class="rp-body" style="margin-top:6px;color:var(--muted);">Note: {{ r.description }}</div>{% endif %}
+
+                <div class="rp-flags">
+                    {% if r._target_removed %}<span class="flag removed">REMOVED</span>{% endif %}
+                    {% if r._target_locked %}<span class="flag locked">LOCKED</span>{% endif %}
+                    {% if r._target_sticky %}<span class="flag sticky">PINNED</span>{% endif %}
+                    {% if r.status != 'pending' %}<span class="flag status">{{ r.status|upper }}{% if r.resolved_by %} by u/{{ r.resolved_by }}{% endif %}</span>{% endif %}
+                </div>
+
+                {% if r.target_type == 'post' and r._target_post_id %}
+                <div class="rp-actions" data-post="{{ r._target_post_id }}" data-report="{{ r.id }}">
+                    <button class="btn-remove" onclick="modAction(this, 'remove', {{ 'true' if r._target_removed else 'false' }})">{{ 'Restore' if r._target_removed else 'Remove' }}</button>
+                    <button class="btn-lock" onclick="modAction(this, 'lock', {{ 'true' if r._target_locked else 'false' }})">{{ 'Unlock' if r._target_locked else 'Lock' }}</button>
+                    <button class="btn-pin" onclick="modAction(this, 'pin', {{ 'true' if r._target_sticky else 'false' }})">{{ 'Unpin' if r._target_sticky else 'Pin' }}</button>
+                    {% if r.status == 'pending' %}
+                    <button class="btn-resolve" onclick="resolveReport(this, 'resolved')">Resolve</button>
+                    <button class="btn-dismiss" onclick="resolveReport(this, 'dismissed')">Dismiss</button>
+                    {% endif %}
+                </div>
+                {% elif r.status == 'pending' %}
+                <div class="rp-actions" data-report="{{ r.id }}">
+                    <button class="btn-resolve" onclick="resolveReport(this, 'resolved')">Resolve</button>
+                    <button class="btn-dismiss" onclick="resolveReport(this, 'dismissed')">Dismiss</button>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="rd-empty" style="padding:24px;">No {{ status if status != 'all' else '' }} reports in this queue.</div>
+            {% endfor %}
+        </main>
+
+        <div class="rd-right"></div>
+    </div>
+
+    <script>
+        const BASE = '{{ url_for("forums.index") }}';
+
+        function modAction(btn, kind, isOn) {
+            const wrap = btn.closest('.rp-actions');
+            const postId = wrap.getAttribute('data-post');
+            let url, body;
+            if (kind === 'remove') {
+                url = `${BASE}api/mod/posts/${postId}/remove`;
+                body = {action: isOn ? 'restore' : 'remove'};
+            } else if (kind === 'lock') {
+                url = `${BASE}api/mod/posts/${postId}/lock`;
+                body = {locked: !isOn};
+            } else {
+                url = `${BASE}api/mod/posts/${postId}/pin`;
+                body = {sticky: !isOn};
+            }
+            btn.disabled = true;
+            fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+                .then(r => r.json()).then(() => location.reload())
+                .catch(() => { btn.disabled = false; });
+        }
+
+        function resolveReport(btn, status) {
+            const wrap = btn.closest('.rp-actions');
+            const reportId = wrap.getAttribute('data-report');
+            btn.disabled = true;
+            fetch(`${BASE}api/mod/reports/${reportId}/resolve`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: status})
+            }).then(r => r.json()).then(() => location.reload())
+              .catch(() => { btn.disabled = false; });
+        }
+    </script>
+</body>
+</html>

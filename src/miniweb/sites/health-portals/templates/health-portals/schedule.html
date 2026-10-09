@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Appointment - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'appointments' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="main">
+        <div class="breadcrumb">
+            <a href="{{ url_for('health-portals.appointments_page') }}">Appointments</a> &rsaquo; Schedule New
+        </div>
+
+        <div class="form-card">
+            <h2>Schedule an Appointment</h2>
+            <p class="subtitle">Fill out the form below to request an appointment</p>
+
+            <div class="success" id="success-msg">Appointment scheduled successfully! You will receive a confirmation.</div>
+
+            <form id="schedule-form">
+                <div class="form-group">
+                    <label for="provider_id">Provider</label>
+                    <select name="provider_id" id="provider_id" required>
+                        <option value="">Select a provider</option>
+                        {% for p in providers %}
+                        <option value="{{ p.id }}">{{ p.full_name }} - {{ p.specialty }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">Preferred Date</label>
+                        <input type="date" name="date" id="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Preferred Time</label>
+                        <input type="time" name="time" id="time" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="type">Visit Type</label>
+                        <select name="type" id="type">
+                            <option value="office_visit">Office Visit</option>
+                            <option value="lab_work">Lab Work</option>
+                            <option value="vaccination">Vaccination</option>
+                            <option value="physical_therapy">Physical Therapy</option>
+                            <option value="telehealth">Telehealth</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="category">Reason for Visit</label>
+                        <input type="text" name="category" id="category" placeholder="e.g., Annual Physical, Follow-up" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Additional Notes</label>
+                    <textarea name="notes" id="notes" rows="3" placeholder="Describe your symptoms or reason for visit..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-submit">Request Appointment</button>
+            </form>
+        </div>
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+
+    <script>
+        document.getElementById('schedule-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = {
+                provider_id: parseInt(document.getElementById('provider_id').value),
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value,
+                type: document.getElementById('type').value,
+                category: document.getElementById('category').value,
+                notes: document.getElementById('notes').value,
+            };
+            fetch('{{ url_for("health-portals.api_appointments_create") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data),
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.id) {
+                    document.getElementById('success-msg').style.display = 'block';
+                    this.reset();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

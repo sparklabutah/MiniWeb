@@ -1,0 +1,67 @@
+{% extends "music/base.html" %}
+{% set active = 'library' %}
+{% block title %}Your Library — SoundWave{% endblock %}
+{% block content %}
+{% set art_note %}<svg viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>{% endset %}
+
+<h1 class="page-h">Your Library</h1>
+
+<div class="pills">
+    <a href="{{ url_for('music.library_page', tab='tracks') }}" class="pill {% if tab == 'tracks' %}active{% endif %}">Liked Songs ({{ liked_tracks|length }})</a>
+    <a href="{{ url_for('music.library_page', tab='albums') }}" class="pill {% if tab == 'albums' %}active{% endif %}">Saved Albums ({{ liked_albums|length }})</a>
+    <a href="{{ url_for('music.library_page', tab='artists') }}" class="pill {% if tab == 'artists' %}active{% endif %}">Following ({{ followed_artists|length }})</a>
+</div>
+
+{% if tab == 'tracks' %}
+    {% if liked_tracks %}
+    <ul class="tracks">
+        {% for track in liked_tracks %}
+        <li class="trow">
+            <span class="tnum">{{ loop.index }}</span>
+            <div class="tart" style="background: {{ track.album_cover_color }};">{{ art_note }}</div>
+            <div class="tinfo">
+                <div class="ttitle"><a href="{{ url_for('music.track_detail', track_id=track.id) }}">{{ track.title }}</a></div>
+                <div class="tartist"><a href="{{ url_for('music.artist_detail', artist_id=track.artist_id) }}">{{ track.artist_name }}</a> &middot; {{ track.album_title }}</div>
+            </div>
+            <button class="tplay" title="Play" onclick="MusicPlayer.play('track', {{ track.id }})">&#9654;</button>
+            <span class="tdur">{{ track.duration_formatted }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">No liked songs yet. Start exploring and like tracks to build your collection.</div>
+    {% endif %}
+
+{% elif tab == 'albums' %}
+    {% if liked_albums %}
+    <div class="grid">
+        {% for album in liked_albums %}
+        <a href="{{ url_for('music.album_detail', album_id=album.id) }}" class="card">
+            <div class="art" style="background: {{ album.cover_color }};">{{ art_note }}
+                <button class="play-fab" title="Play" onclick="event.preventDefault();event.stopPropagation();MusicPlayer.play('album', {{ album.id }})">&#9654;</button>
+            </div>
+            <div class="nm">{{ album.title }}</div>
+            <div class="mt">{{ album.artist_name }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No saved albums yet.</div>
+    {% endif %}
+
+{% elif tab == 'artists' %}
+    {% if followed_artists %}
+    <div class="grid">
+        {% for artist in followed_artists %}
+        <a href="{{ url_for('music.artist_detail', artist_id=artist.id) }}" class="card artist">
+            <div class="art" style="background: linear-gradient(135deg, #1db954, #191414);">{{ art_note }}</div>
+            <div class="nm">{{ artist.name }}</div>
+            <div class="mt">{{ artist.genre }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">You are not following any artists yet.</div>
+    {% endif %}
+{% endif %}
+{% endblock %}

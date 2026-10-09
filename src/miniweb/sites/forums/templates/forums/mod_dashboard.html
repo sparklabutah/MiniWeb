@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderation — ForumHub</title>
+    <link rel="stylesheet" href="/static/reddit.css">
+    <style>
+        .mod-card { display:flex; align-items:center; gap:14px; }
+        .mod-card .badge { margin-left:auto; background:#d93a00; color:#fff; border-radius:12px;
+            padding:2px 10px; font-size:.8rem; font-weight:800; }
+        .mod-card .badge.zero { background:var(--chip); color:var(--muted); }
+    </style>
+</head>
+<body>
+    {% include "forums/_topbar.html" %}
+
+    <div class="rd-shell">
+        {% include "forums/_leftnav.html" %}
+
+        <main class="rd-feed">
+            <div class="postcard">
+                <div style="font-size:1.3rem;font-weight:800;">Moderation</div>
+                <div style="font-size:.85rem;color:var(--muted);margin-top:4px;">
+                    Communities you moderate. Open a queue to review reports and take action.
+                </div>
+            </div>
+
+            {% for c in communities %}
+            <a class="postcard mod-card" href="{{ url_for('forums.mod_queue', subreddit_name=c.name) }}">
+                <span class="av md" style="background:{{ c.color }};">{{ c.name[0]|upper }}</span>
+                <div>
+                    <b>r/{{ c.name }}</b>
+                    <div style="font-size:.78rem;color:var(--muted);">{{ c.total }} report(s) total</div>
+                </div>
+                <span class="badge {{ 'zero' if not c.pending }}">{{ c.pending }} pending</span>
+            </a>
+            {% else %}
+            <div class="rd-empty">You don't moderate any communities yet.</div>
+            {% endfor %}
+        </main>
+
+        <div class="rd-right"></div>
+    </div>
+</body>
+</html>

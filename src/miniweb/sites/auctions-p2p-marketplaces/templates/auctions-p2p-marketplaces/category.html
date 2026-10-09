@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} - BidMarket</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .topbar { background: #1a1a2e; color: #fff; padding: .4rem 2rem; font-size: .8rem; }
+        .topbar a { color: #ccc; text-decoration: none; margin-right: .8rem; }
+        .nav-cats { background: #0f3460; padding: .5rem 2rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .nav-cats a { color: #ddd; text-decoration: none; font-size: .85rem; padding: .3rem .7rem; border-radius: .2rem; }
+        .nav-cats a:hover, .nav-cats a.active { background: #e94560; color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h1 { color: #1a1a2e; margin-bottom: .5rem; }
+        .sort-bar { margin: 1rem 0; }
+        .sort-bar select { padding: .4rem .6rem; border: 1px solid #ddd; border-radius: .3rem; }
+        .count { font-size: .9rem; color: #888; margin-bottom: 1rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+        .card { background: #fff; border-radius: .4rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+        .card-img { height: 140px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: .85rem; padding: 1rem; text-align: center; overflow: hidden; position: relative; }
+        .card-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+        .card-body { padding: .8rem; }
+        .card-title a { color: #1a1a2e; text-decoration: none; font-weight: 600; font-size: .9rem; }
+        .card-price { font-size: 1.1rem; font-weight: 700; color: #e94560; margin: .3rem 0; }
+        .card-meta { font-size: .78rem; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">BidMarket Home</a>
+        <a href="/">MiniWeb</a>
+    </div>
+    <div class="nav-cats">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">All</a>
+        {% for c in categories %}
+        <a href="{{ url_for('auctions-p2p-marketplaces.category_page', cat_name=c) }}" class="{{ 'active' if category == c }}">{{ c }}</a>
+        {% endfor %}
+    </div>
+    <div class="container">
+        <h1>{{ category }}</h1>
+        <div class="count">{{ products|length }} listings in {{ category }}</div>
+        <div class="sort-bar">
+            <label>Sort by:
+                <select onchange="window.location.href='{{ url_for('auctions-p2p-marketplaces.category_page', cat_name=category) }}?sort='+this.value">
+                    <option value="ending_soon" {{ 'selected' if sort == 'ending_soon' }}>Ending Soon</option>
+                    <option value="price_low" {{ 'selected' if sort == 'price_low' }}>Price: Low to High</option>
+                    <option value="price_high" {{ 'selected' if sort == 'price_high' }}>Price: High to Low</option>
+                    <option value="most_bids" {{ 'selected' if sort == 'most_bids' }}>Most Bids</option>
+                </select>
+            </label>
+        </div>
+        <div class="grid">
+            {% for p in products %}
+            <div class="card">
+                <div class="card-img">{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name[:50] }}">{% else %}{{ p.name[:50] }}{% endif %}</div>
+                <div class="card-body">
+                    <div class="card-title"><a href="{{ url_for('auctions-p2p-marketplaces.listing_detail', listing_id=p.id) }}">{{ p.name }}</a></div>
+                    <div class="card-price">${{ "%.2f"|format(p.current_price) }}</div>
+                    <div class="card-meta">{{ p.num_bids }} bids | {{ p.condition }} | {{ p.status }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

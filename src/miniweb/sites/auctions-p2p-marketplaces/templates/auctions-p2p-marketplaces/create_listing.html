@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Listing - BidMarket</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .topbar { background: #1a1a2e; color: #fff; padding: .4rem 2rem; font-size: .8rem; }
+        .topbar a { color: #ccc; text-decoration: none; margin-right: .8rem; }
+        .container { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+        .form-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+        h1 { color: #1a1a2e; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #555; margin-bottom: .3rem; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: .6rem; border: 1px solid #ddd; border-radius: .3rem; font-size: .9rem; }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .btn-submit { padding: .8rem 2rem; background: #e94560; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; }
+        .btn-submit:hover { background: #c73e55; }
+        .upload-area { border: 2px dashed #ddd; border-radius: .3rem; padding: 2rem; text-align: center; color: #888; cursor: pointer; }
+        .upload-area:hover { border-color: #e94560; }
+        .error { color: #dc3545; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('auctions-p2p-marketplaces.index') }}">BidMarket Home</a>
+        <a href="{{ url_for('auctions-p2p-marketplaces.dashboard') }}">Dashboard</a>
+        <a href="/">MiniWeb</a>
+    </div>
+    <div class="container">
+        <div class="form-card">
+            <h1>Create New Listing</h1>
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form id="listing-form" method="post" action="{{ url_for('auctions-p2p-marketplaces.create_listing_submit') }}">
+                <div class="form-group">
+                    <label for="name">Item Name *</label>
+                    <input type="text" id="name" name="name" placeholder="What are you selling?" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Photos</label>
+                    <div class="upload-area" id="upload-area">
+                        <input type="file" id="file-input" name="file" style="display:none" accept="image/*">
+                        <div>Click or drag photos here</div>
+                        <div style="font-size:.75rem;margin-top:.3rem">JPG, PNG up to 5MB</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" placeholder="Describe your item in detail..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <select id="category" name="category">
+                            {% for c in categories %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="condition">Condition</label>
+                        <select id="condition" name="condition">
+                            <option value="New">New</option>
+                            <option value="Like New">Like New</option>
+                            <option value="Very Good">Very Good</option>
+                            <option value="Good" selected>Good</option>
+                            <option value="Acceptable">Acceptable</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start_price">Starting Price ($)</label>
+                        <input type="number" id="start_price" name="start_price" step="0.01" min="0.01" value="9.99" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="brand">Brand</label>
+                        <input type="text" id="brand" name="brand" placeholder="Brand name">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="shipping">Shipping</label>
+                    <select id="shipping" name="shipping">
+                        <option value="Free Shipping">Free Shipping</option>
+                        <option value="Standard ($4.99)">Standard ($4.99)</option>
+                        <option value="Expedited ($12.99)">Expedited ($12.99)</option>
+                        <option value="Local Pickup">Local Pickup</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-submit">List Item for Auction</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('upload-area').addEventListener('click', function() {
+        document.getElementById('file-input').click();
+    });
+    </script>
+</body>
+</html>

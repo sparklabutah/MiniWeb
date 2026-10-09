@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favorites — PhoneCompare</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a237e; color: #fff; padding: .7rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; margin-left: .8rem; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 2rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; color: #1a237e; }
+        .phone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .phone-card { background: #fff; border: 1px solid #e0e0e0; border-radius: .4rem; padding: 1rem; transition: box-shadow .2s; }
+        .phone-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+        .phone-card h3 { font-size: 1rem; margin-bottom: .3rem; }
+        .phone-card h3 a { color: #1a237e; text-decoration: none; }
+        .phone-card h3 a:hover { text-decoration: underline; }
+        .phone-card .brand { font-size: .85rem; color: #666; margin-bottom: .5rem; }
+        .phone-card .specs { font-size: .8rem; color: #888; line-height: 1.5; }
+        .phone-card .actions { margin-top: .6rem; display: flex; gap: .4rem; }
+        .btn-sm { padding: .3rem .7rem; border: none; border-radius: .25rem; font-size: .8rem; cursor: pointer; font-weight: 600; }
+        .btn-unfav { background: #ffebee; color: #c62828; }
+        .btn-unfav:hover { background: #ffcdd2; }
+        .btn-compare { background: #e8eaf6; color: #1a237e; }
+        .btn-compare:hover { background: #c5cae9; }
+        .empty { text-align: center; color: #999; padding: 3rem; background: #fff; border-radius: .4rem; }
+        .empty a { color: #1a237e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('comparison-aggregators.index') }}">PhoneCompare</a></h1>
+                <div class="header-nav">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Browse</a>
+            <a href="{{ url_for('comparison-aggregators.compare_page') }}">Compare</a>
+            {% if user %}
+            <a href="{{ url_for('comparison-aggregators.favorites_page') }}">Favorites</a>
+            <a href="{{ url_for('comparison-aggregators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('comparison-aggregators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('comparison-aggregators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="container">
+        <h2>Your Favorites ({{ phones|length }})</h2>
+        {% if phones %}
+        <div style="margin-bottom:1rem">
+            <a href="{{ url_for('comparison-aggregators.compare_page', ids=phones|map(attribute='id')|join(',')) }}" style="display:inline-block;padding:.5rem 1.2rem;background:#ff6600;color:#fff;border-radius:.3rem;text-decoration:none;font-weight:600;font-size:.9rem">Compare All Favorites</a>
+        </div>
+        <div class="phone-grid">
+            {% for p in phones %}
+            <div class="phone-card">
+                <h3><a href="{{ url_for('comparison-aggregators.phone_detail', phone_id=p.id) }}">{{ p.name or p.brand }}</a></h3>
+                <div class="brand">{{ p.brand }}</div>
+                <div class="specs">
+                    {% if p.display_size %}Display: {{ p.display_size }}{% endif %}
+                    {% if p.ram %} · RAM: {{ p.ram }}{% endif %}
+                    {% if p.storage %} · Storage: {{ p.storage }}{% endif %}
+                    {% if p.battery_size %} · Battery: {{ p.battery_size }}{% endif %}
+                </div>
+                <div class="actions">
+                    <form method="post" action="{{ url_for('comparison-aggregators.form_toggle_favorite', phone_id=p.id) }}">
+                        <button type="submit" class="btn-sm btn-unfav">Remove</button>
+                    </form>
+                    <form method="post" action="{{ url_for('comparison-aggregators.form_add_compare', phone_id=p.id) }}">
+                        <button type="submit" class="btn-sm btn-compare">Add to Compare</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            No favorites yet. <a href="{{ url_for('comparison-aggregators.index') }}">Browse phones</a> to add some.
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

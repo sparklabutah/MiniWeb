@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Tours - Lakeport Real Estate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6f8; color: #333; }
+        .header { background: #0d47a1; color: #fff; padding: .7rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.4rem; }
+        .header-nav a { color: #bbdefb; text-decoration: none; margin-left: 1rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .nav-bar { background: #1565c0; padding: .4rem 2rem; display: flex; gap: 1rem; }
+        .nav-bar a { color: #e3f2fd; text-decoration: none; font-size: .88rem; padding: .3rem .8rem; border-radius: .25rem; }
+        .nav-bar a:hover, .nav-bar a.active { background: rgba(255,255,255,.15); color: #fff; }
+        .container { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+        .page-title { font-size: 1.3rem; margin-bottom: 1rem; }
+        .tour-list { display: flex; flex-direction: column; gap: .8rem; }
+        .tour-card { background: #fff; border-radius: .5rem; padding: 1rem 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .tour-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; gap: .6rem; }
+        .tour-title a { color: #0d47a1; text-decoration: none; font-weight: 600; }
+        .tour-title a:hover { text-decoration: underline; }
+        .tour-status { font-size: .75rem; padding: .2rem .5rem; border-radius: .2rem; font-weight: 600; text-transform: uppercase; }
+        .status-requested { background: #fef3c7; color: #92400e; }
+        .status-confirmed { background: #dcfce7; color: #166534; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .tour-when { font-size: .9rem; color: #333; margin: .3rem 0; font-weight: 600; }
+        .tour-meta { font-size: .82rem; color: #777; margin: .2rem 0; }
+        .tour-msg { font-size: .85rem; color: #555; margin: .4rem 0; line-height: 1.5; font-style: italic; }
+        .tour-actions { display: flex; gap: .5rem; margin-top: .6rem; }
+        .btn { padding: .4rem .9rem; border: 1px solid #ccc; border-radius: .3rem; background: #fff; cursor: pointer; font-size: .82rem; color: #555; }
+        .btn-confirm { background: #16a34a; color: #fff; border-color: #16a34a; }
+        .btn-confirm:hover { background: #22c55e; }
+        .btn-cancel { background: #fff; color: #991b1b; border-color: #fca5a5; }
+        .btn-cancel:hover { background: #fef2f2; }
+        .empty { text-align: center; color: #999; padding: 3rem; font-size: .9rem; }
+        .empty a { color: #0d47a1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('real-estate-buy-rent.index') }}">Lakeport Real Estate</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('real-estate-buy-rent.saved_page') }}">Saved</a>
+            <a href="{{ url_for('real-estate-buy-rent.tours_page') }}" style="color:#fff">Tours</a>
+            <a href="{{ url_for('real-estate-buy-rent.inquiries_page') }}">Inquiries</a>
+            <a href="{{ url_for('real-estate-buy-rent.logout') }}">Logout ({{ user.name }})</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+    <div class="nav-bar">
+        <a href="{{ url_for('real-estate-buy-rent.index') }}">Home</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">All Listings</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_sale') }}">Buy</a>
+        <a href="{{ url_for('real-estate-buy-rent.listings_page', status='for_rent') }}">Rent</a>
+        <a href="{{ url_for('real-estate-buy-rent.agents_page') }}">Agents</a>
+    </div>
+    <div class="container">
+        <h1 class="page-title">My Tours ({{ tours|length }})</h1>
+        {% if tours %}
+        <div class="tour-list">
+            {% for item in tours %}
+            <div class="tour-card">
+                <div class="tour-header">
+                    <div class="tour-title">
+                        {% if item.listing %}
+                        <a href="{{ url_for('real-estate-buy-rent.listing_detail', listing_id=item.listing.id) }}">{{ item.listing.title }}</a>
+                        {% else %}
+                        <span>Listing unavailable</span>
+                        {% endif %}
+                    </div>
+                    <span class="tour-status status-{{ item.tour.status }}">{{ item.tour.status }}</span>
+                </div>
+                <div class="tour-when">Tour on {{ item.tour.tour_date }} at {{ item.tour.tour_time }}</div>
+                {% if item.listing %}
+                <div class="tour-meta">{{ item.listing.address }}, {{ item.listing.city }}, {{ item.listing.state }}</div>
+                {% endif %}
+                {% if item.agent %}
+                <div class="tour-meta">With {{ item.agent.name }} &middot; {{ item.agent.agency }} &middot; {{ item.agent.phone }}</div>
+                {% endif %}
+                {% if item.tour.message %}
+                <div class="tour-msg">&ldquo;{{ item.tour.message }}&rdquo;</div>
+                {% endif %}
+                <div class="tour-meta">Requested on {{ item.tour.created_date }}{% if item.tour.confirmed_date %} &middot; Confirmed on {{ item.tour.confirmed_date }}{% endif %}</div>
+                {% if item.tour.status == 'requested' %}
+                <div class="tour-actions">
+                    <form method="post" action="{{ url_for('real-estate-buy-rent.confirm_tour', tour_id=item.tour.id) }}">
+                        <button type="submit" class="btn btn-confirm">Confirm Tour</button>
+                    </form>
+                    <form method="post" action="{{ url_for('real-estate-buy-rent.cancel_tour', tour_id=item.tour.id) }}">
+                        <button type="submit" class="btn btn-cancel">Cancel</button>
+                    </form>
+                </div>
+                {% elif item.tour.status == 'confirmed' %}
+                <div class="tour-actions">
+                    <form method="post" action="{{ url_for('real-estate-buy-rent.cancel_tour', tour_id=item.tour.id) }}">
+                        <button type="submit" class="btn btn-cancel">Cancel</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">You haven't scheduled any tours yet. <a href="{{ url_for('real-estate-buy-rent.listings_page') }}">Browse listings</a> and pick a date to tour a home.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

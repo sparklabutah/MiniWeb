@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ template.title }} - DesignFlow</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+        .header { background: #fff; border-bottom: 1px solid #e8e8ef; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; color: #7c3aed; font-weight: 800; letter-spacing: -.5px; }
+        .header-nav { display: flex; align-items: center; gap: 1rem; }
+        .header-nav a { font-size: .9rem; color: #64748b; text-decoration: none; padding: .3rem .6rem; border-radius: .3rem; transition: background .15s; }
+        .header-nav a:hover { background: #f1f0ff; color: #7c3aed; }
+        .header-nav .btn-primary { background: #7c3aed; color: #fff; padding: .4rem 1rem; border-radius: .4rem; }
+        .header-nav .btn-primary:hover { background: #6d28d9; }
+
+        .detail { max-width: 900px; margin: 2rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #94a3b8; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #7c3aed; text-decoration: none; }
+
+        .template-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+        .template-preview { background: #fff; border-radius: .6rem; overflow: hidden; border: 1px solid #e8e8ef; height: 320px; display: flex; align-items: center; justify-content: center; }
+        .preview-bg { width: 100%; height: 100%; }
+        .bg-social-media { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .bg-presentation { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+        .bg-poster { background: linear-gradient(135deg, #f97316, #ef4444); }
+        .bg-logo { background: linear-gradient(135deg, #10b981, #059669); }
+        .bg-business-card { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+        .bg-flyer { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .bg-banner { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+
+        .template-info h2 { font-size: 1.5rem; margin-bottom: .5rem; }
+        .template-info .cat-badge { display: inline-block; background: #f1f0ff; color: #7c3aed; padding: .2rem .6rem; border-radius: .3rem; font-size: .8rem; margin-bottom: .8rem; }
+        .template-info .dims { color: #64748b; font-size: .9rem; margin-bottom: .5rem; }
+        .template-info .uses { color: #94a3b8; font-size: .85rem; margin-bottom: 1rem; }
+        .template-info p { color: #475569; line-height: 1.6; margin-bottom: 1.2rem; }
+        .template-info .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; }
+        .template-info .tag { background: #f1f5f9; color: #64748b; padding: .15rem .5rem; border-radius: .2rem; font-size: .75rem; }
+
+        .actions { display: flex; gap: .8rem; flex-wrap: wrap; }
+        .btn { padding: .6rem 1.2rem; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; text-decoration: none; display: inline-block; text-align: center; }
+        .btn-use { background: #7c3aed; color: #fff; }
+        .btn-use:hover { background: #6d28d9; }
+        .btn-fav { background: #fff; color: #7c3aed; border: 1px solid #7c3aed; }
+        .btn-fav:hover { background: #f1f0ff; }
+
+        .related { margin-top: 2rem; }
+        .related h3 { font-size: 1.1rem; margin-bottom: 1rem; color: #1a1a2e; }
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        .related-card { background: #fff; border-radius: .5rem; border: 1px solid #e8e8ef; overflow: hidden; transition: box-shadow .15s; }
+        .related-card:hover { box-shadow: 0 4px 15px rgba(124,58,237,.1); }
+        .related-card .rp { height: 100px; }
+        .related-card .rb { padding: .6rem .8rem; }
+        .related-card .rb a { font-size: .85rem; color: #1a1a2e; text-decoration: none; }
+        .related-card .rb a:hover { color: #7c3aed; }
+        .related-card .rb .meta { font-size: .75rem; color: #94a3b8; margin-top: .2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('design-creative.index') }}" style="color:inherit;text-decoration:none">DesignFlow</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('design-creative.index') }}">Templates</a>
+            <a href="{{ url_for('design-creative.assets_page') }}">Assets</a>
+            {% if user %}
+            <a href="{{ url_for('design-creative.projects_page') }}">My Projects</a>
+            <a href="{{ url_for('design-creative.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('design-creative.login_page') }}" class="btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="detail">
+        <div class="breadcrumb">
+            <a href="{{ url_for('design-creative.index') }}">Templates</a> /
+            <a href="{{ url_for('design-creative.index', category=template.category) }}">{{ template.category|replace('-', ' ')|title }}</a> /
+            {{ template.title }}
+        </div>
+
+        <div class="template-hero">
+            <div class="template-preview">
+                <div class="preview-bg bg-{{ template.category }}"></div>
+            </div>
+            <div class="template-info">
+                <h2>{{ template.title }}</h2>
+                <span class="cat-badge">{{ template.category|replace('-', ' ')|title }}</span>
+                <div class="dims">Dimensions: {{ template.dimensions }}</div>
+                <div class="uses">{{ template.use_count|int }} uses</div>
+                <p>{{ template.description }}</p>
+                <div class="tags">
+                    {% for tag in template.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                <div class="actions">
+                    {% if user %}
+                    <form method="post" action="{{ url_for('design-creative.form_create_project') }}" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                        <input type="hidden" name="template_id" value="{{ template.id }}">
+                        <input type="text" name="title" placeholder="Design name (optional)" autocomplete="off"
+                               style="padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:.4rem;font-size:.9rem;">
+                        <button type="submit" class="btn btn-use">Use This Template</button>
+                    </form>
+                    <form method="post" action="{{ url_for('design-creative.form_favorite_template', template_id=template.id) }}">
+                        <button type="submit" class="btn btn-fav">
+                            {% if template.id in user.get('favorites', []) %}Unfavorite{% else %}Favorite{% endif %}
+                        </button>
+                    </form>
+                    {% else %}
+                    <a href="{{ url_for('design-creative.login_page') }}" class="btn btn-use">Sign in to use</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Templates</h3>
+            <div class="related-grid">
+                {% for r in related %}
+                <div class="related-card">
+                    <div class="rp">
+                        <div class="preview-bg bg-{{ r.category }}" style="height:100%"></div>
+                    </div>
+                    <div class="rb">
+                        <a href="{{ url_for('design-creative.template_detail', template_id=r.id) }}">{{ r.title }}</a>
+                        <div class="meta">{{ r.dimensions }} | {{ r.use_count }} uses</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

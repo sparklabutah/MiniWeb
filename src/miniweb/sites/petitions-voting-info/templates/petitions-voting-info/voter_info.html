@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Information - Lakeport Civic Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #1b4332, #2d6a4f); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { color: #fff; font-size: 1.4rem; font-weight: 700; }
+        .header h1 span { color: #95d5b2; }
+        .header-nav a { color: #b7e4c7; text-decoration: none; margin-left: 1.2rem; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .btn-login { background: #40916c; color: #fff; padding: .45rem 1rem; border-radius: .3rem; font-weight: 600; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .page-title { font-size: 1.5rem; color: #1b4332; margin-bottom: .5rem; }
+        .page-subtitle { color: #64748b; font-size: .9rem; margin-bottom: 1.5rem; }
+        .info-card { background: #fff; border-radius: .5rem; padding: 1.5rem 2rem; margin-bottom: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .info-card h3 { font-size: 1.1rem; color: #1b4332; margin-bottom: .8rem; border-bottom: 2px solid #d8f3dc; padding-bottom: .3rem; }
+        .info-card p { font-size: .9rem; color: #475569; line-height: 1.6; margin-bottom: .5rem; }
+        .info-card ul { margin: .5rem 0 .5rem 1.2rem; font-size: .9rem; color: #475569; line-height: 1.7; }
+        .info-card .contact-item { margin-bottom: .3rem; font-size: .9rem; }
+        .info-card .contact-item strong { color: #1b4332; }
+        .polling-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .polling-table th { text-align: left; background: #f0fdf4; padding: .6rem .8rem; color: #1b4332; font-weight: 600; border-bottom: 2px solid #d8f3dc; }
+        .polling-table td { padding: .6rem .8rem; border-bottom: 1px solid #f1f5f9; color: #475569; vertical-align: top; }
+        .polling-table tr:hover { background: #f8fafc; }
+        .deadline-card { background: #fef3c7; border: 1px solid #fbbf24; border-radius: .5rem; padding: 1.2rem 1.5rem; margin-bottom: 1.2rem; }
+        .deadline-card h4 { color: #92400e; margin-bottom: .5rem; }
+        .deadline-card .dl-item { font-size: .85rem; color: #78350f; margin-bottom: .3rem; }
+        .deadline-card .dl-item strong { color: #92400e; }
+        .method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: .5rem; }
+        .method-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: .4rem; padding: 1rem; }
+        .method-box h4 { font-size: .95rem; color: #1b4332; margin-bottom: .4rem; }
+        .method-box p { font-size: .85rem; color: #475569; line-height: 1.5; }
+        .method-box ul { margin: .3rem 0 0 1rem; font-size: .85rem; color: #475569; }
+        .user-reg { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: .5rem; padding: 1.5rem; margin-bottom: 1.2rem; }
+        .user-reg h3 { color: #065f46; margin-bottom: .6rem; }
+        .user-reg .field { margin-bottom: .4rem; font-size: .9rem; }
+        .user-reg .field strong { color: #1b4332; min-width: 120px; display: inline-block; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('petitions-voting-info.index') }}" style="color:#fff;text-decoration:none;">Lakeport <span>Civic Hub</span></a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('petitions-voting-info.petitions_list') }}">Petitions</a>
+            <a href="{{ url_for('petitions-voting-info.elections_list') }}">Elections</a>
+            <a href="{{ url_for('petitions-voting-info.voter_info_page') }}">Voter Info</a>
+            {% if logged_in %}
+                <a href="{{ url_for('petitions-voting-info.dashboard') }}">Saved &amp; Following</a>
+                <a href="{{ url_for('petitions-voting-info.logout') }}" class="btn-login">Logout ({{ user.display_name }})</a>
+            {% else %}
+                <a href="{{ url_for('petitions-voting-info.login_page') }}" class="btn-login">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="page-title">Voter Information</h2>
+        <p class="page-subtitle">Everything you need to register, find your polling location, and vote in {{ voter_info.jurisdiction }}.</p>
+
+        {% if logged_in and user %}
+        <div class="user-reg">
+            <h3>Your Voter Registration</h3>
+            <div class="field"><strong>Name:</strong> {{ user.display_name }}</div>
+            <div class="field"><strong>Status:</strong> {{ user.voter_registration_status | title }}</div>
+            <div class="field"><strong>Address:</strong> {{ user.registered_address }}</div>
+            <div class="field"><strong>Precinct:</strong> {{ user.precinct }}</div>
+            <div class="field"><strong>Party:</strong> {{ user.party_affiliation | title }}</div>
+            <div class="field"><strong>Registered:</strong> {{ user.registration_date }}</div>
+        </div>
+        {% endif %}
+
+        <div class="info-card">
+            <h3>Check Your Voter Registration</h3>
+            <p style="margin-bottom:.8rem;">Verify your registration status and find your polling location.</p>
+            <form id="verify-form" style="display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end;">
+                <div>
+                    <label style="font-size:.8rem;font-weight:600;color:#475569;display:block;margin-bottom:.3rem;">Precinct</label>
+                    <select id="verify-precinct" name="precinct" required style="padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
+                        <option value="">Select precinct...</option>
+                        {% for loc in voter_info.polling_locations %}
+                            {% for p in loc.precincts_served %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:.8rem;font-weight:600;color:#475569;display:block;margin-bottom:.3rem;">Username (optional)</label>
+                    <input type="text" id="verify-username" placeholder="e.g., alex_rivera" style="padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
+                </div>
+                <button type="submit" style="background:#40916c;color:#fff;border:none;padding:.45rem 1rem;border-radius:.3rem;cursor:pointer;font-size:.85rem;font-weight:600;">Check Registration</button>
+            </form>
+            <div id="verify-result" style="margin-top:.8rem;font-size:.9rem;"></div>
+            <script>
+            document.getElementById('verify-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                var precinct = document.getElementById('verify-precinct').value;
+                var username = document.getElementById('verify-username').value.trim();
+                if (!precinct) return;
+                var url = '{{ url_for("petitions-voting-info.api_voter_verify") }}?precinct=' + encodeURIComponent(precinct);
+                if (username) url += '&username=' + encodeURIComponent(username);
+                fetch(url).then(function(r){return r.json();}).then(function(d){
+                    var el = document.getElementById('verify-result');
+                    var html = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.4rem;padding:1rem;">';
+                    html += '<p><strong>Precinct:</strong> ' + d.precinct + '</p>';
+                    if (d.has_polling_location && d.polling_locations.length > 0) {
+                        html += '<p><strong>Polling Location:</strong> ' + d.polling_locations[0].name + ' - ' + d.polling_locations[0].address + '</p>';
+                    } else {
+                        html += '<p style="color:#b91c1c;">No polling location found for this precinct.</p>';
+                    }
+                    if (d.user_found !== undefined) {
+                        if (d.user_found) {
+                            html += '<p><strong>Registration Status:</strong> <span style="color:#065f46;font-weight:600;">' + d.registration_status + '</span></p>';
+                            html += '<p><strong>Registered Address:</strong> ' + d.registered_address + '</p>';
+                            html += '<p><strong>Party:</strong> ' + d.party_affiliation + '</p>';
+                        } else {
+                            html += '<p style="color:#b91c1c;">User not found. Please check the username.</p>';
+                        }
+                    }
+                    html += '</div>';
+                    el.innerHTML = html;
+                });
+            });
+            </script>
+        </div>
+
+        {% if voter_info.upcoming_deadlines %}
+        {% for dl in voter_info.upcoming_deadlines %}
+        <div class="deadline-card">
+            <h4>Upcoming Deadlines: {{ dl.election }}</h4>
+            <div class="dl-item"><strong>Election Date:</strong> {{ dl.election_date }}</div>
+            <div class="dl-item"><strong>Online Registration Deadline:</strong> {{ dl.online_registration_deadline }}</div>
+            <div class="dl-item"><strong>Mail Registration Deadline:</strong> {{ dl.mail_registration_deadline }}</div>
+            <div class="dl-item"><strong>Ballots Mailed:</strong> {{ dl.ballot_mailing_begins }}</div>
+            <div class="dl-item"><strong>Ballot Return Deadline:</strong> {{ dl.ballot_return_deadline }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="info-card">
+            <h3>Election Authority</h3>
+            <div class="contact-item"><strong>{{ voter_info.election_authority.name }}</strong></div>
+            <div class="contact-item">{{ voter_info.election_authority.address }}</div>
+            <div class="contact-item">Phone: {{ voter_info.election_authority.phone }}</div>
+            <div class="contact-item">Email: {{ voter_info.election_authority.email }}</div>
+            <div class="contact-item">Hours: {{ voter_info.election_authority.hours }}</div>
+        </div>
+
+        <div class="info-card">
+            <h3>How to Register</h3>
+            <p><strong>Online:</strong> <a href="{{ voter_info.registration_info.online_registration_url }}" style="color:#40916c;">{{ voter_info.registration_info.online_registration_url }}</a></p>
+            <p><strong>In Person:</strong> {{ voter_info.registration_info.registration_deadline_in_person }}</p>
+            <p><strong>Online Deadline:</strong> {{ voter_info.registration_info.registration_deadline_online }}</p>
+            <p><strong>By Mail:</strong> {{ voter_info.registration_info.registration_deadline_mail }}</p>
+            <h4 style="font-size:.9rem;color:#1b4332;margin-top:.8rem;">Required Documents</h4>
+            <ul>
+                {% for doc in voter_info.registration_info.required_documents %}
+                <li>{{ doc }}</li>
+                {% endfor %}
+            </ul>
+            <h4 style="font-size:.9rem;color:#1b4332;margin-top:.8rem;">Eligibility</h4>
+            <ul>
+                {% for req in voter_info.registration_info.eligibility %}
+                <li>{{ req }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <h3>Voting Methods</h3>
+            <div class="method-grid">
+                <div class="method-box">
+                    <h4>Vote by Mail</h4>
+                    <p>{{ voter_info.voting_methods.mail_in_voting.description }}</p>
+                    <ul>
+                        {% for opt in voter_info.voting_methods.mail_in_voting.return_options %}
+                        <li>{{ opt }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="method-box">
+                    <h4>In-Person Voting</h4>
+                    <p>{{ voter_info.voting_methods.in_person_voting.description }}</p>
+                    <p style="margin-top:.3rem;"><strong>Early voting:</strong> {{ voter_info.voting_methods.in_person_voting.early_voting_period }}</p>
+                </div>
+                <div class="method-box">
+                    <h4>Accessible Voting</h4>
+                    <p>{{ voter_info.voting_methods.accessible_voting.description }}</p>
+                    <p style="margin-top:.3rem;">Contact: {{ voter_info.voting_methods.accessible_voting.contact }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <h3>Polling Locations &amp; Drop Boxes</h3>
+            <table class="polling-table">
+                <thead>
+                    <tr>
+                        <th>Location</th>
+                        <th>Address</th>
+                        <th>Precincts</th>
+                        <th>Hours</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loc in voter_info.polling_locations %}
+                    <tr>
+                        <td><strong>{{ loc.name }}</strong><br><span style="font-size:.8rem;color:#94a3b8;">{{ loc.notes }}</span></td>
+                        <td>{{ loc.address }}</td>
+                        <td>{{ loc.precincts_served | join(', ') }}</td>
+                        <td>{{ loc.hours }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if voter_info.ballot_measure_explanations %}
+        <div class="info-card">
+            <h3>Ballot Measure Explanations</h3>
+            {% for bm in voter_info.ballot_measure_explanations %}
+            <div style="margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid #f1f5f9;">
+                <h4 style="font-size:.95rem;color:#1b4332;">{{ bm.title }}</h4>
+                <span class="badge" style="background:{% if bm.status == 'passed' %}#d1fae5;color:#065f46{% else %}#fee2e2;color:#991b1b{% endif %}">{{ bm.status }}</span>
+                <p style="margin-top:.4rem;font-size:.9rem;color:#475569;line-height:1.6;">{{ bm.plain_language_summary }}</p>
+                {% if bm.arguments_for %}
+                <p style="margin-top:.5rem;font-size:.85rem;"><strong style="color:#065f46;">Arguments For:</strong></p>
+                <ul style="font-size:.85rem;color:#475569;">
+                    {% for a in bm.arguments_for %}<li>{{ a }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+                {% if bm.arguments_against %}
+                <p style="margin-top:.4rem;font-size:.85rem;"><strong style="color:#991b1b;">Arguments Against:</strong></p>
+                <ul style="font-size:.85rem;color:#475569;">
+                    {% for a in bm.arguments_against %}<li>{{ a }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div style="text-align:center;margin-top:1.5rem;">
+            <a href="{{ url_for('petitions-voting-info.register_voter_page') }}" style="display:inline-block;background:#40916c;color:#fff;padding:.7rem 2rem;border-radius:.4rem;text-decoration:none;font-weight:600;font-size:1rem;">Register to Vote</a>
+        </div>
+    </div>
+
+    <div class="footer">Lakeport Civic Hub &mdash; {{ voter_info.jurisdiction }}</div>
+</body>
+</html>

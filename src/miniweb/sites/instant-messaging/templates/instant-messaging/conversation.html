@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ conv_name }} - QuickChat</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; color: #e9edef; height: 100vh; overflow: hidden; }
+        .header { background: #202c33; padding: .6rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3942; }
+        .header h1 { font-size: 1.1rem; font-weight: 600; }
+        .header h1 a { color: #e9edef; text-decoration: none; }
+        .header h1 a span { color: #00a884; }
+        nav { background: #202c33; padding: .4rem 1.2rem; display: flex; gap: 1rem; border-bottom: 1px solid #2a3942; }
+        nav a { color: #8696a0; text-decoration: none; font-size: .85rem; font-weight: 500; padding: .3rem .6rem; border-radius: .3rem; transition: all .15s; }
+        nav a:hover { color: #e9edef; background: #2a3942; }
+        nav a.active { color: #00a884; border-bottom: 2px solid #00a884; }
+        .app-container { display: flex; height: calc(100vh - 90px); }
+
+        /* Sidebar */
+        .sidebar { width: 340px; min-width: 280px; background: #111b21; border-right: 1px solid #2a3942; display: flex; flex-direction: column; }
+        .sidebar-header { padding: .6rem .8rem; }
+        .sidebar-search input { width: 100%; padding: .45rem .7rem; background: #202c33; border: none; border-radius: .5rem; color: #e9edef; font-size: .8rem; outline: none; }
+        .sidebar-search input::placeholder { color: #8696a0; }
+        .conv-list { flex: 1; overflow-y: auto; }
+        .conv-list::-webkit-scrollbar { width: 5px; }
+        .conv-list::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+        .conv-item { display: flex; align-items: center; padding: .55rem .8rem; text-decoration: none; color: inherit; border-bottom: 1px solid #222d34; transition: background .12s; }
+        .conv-item:hover { background: #202c33; }
+        .conv-item.active { background: #2a3942; }
+        .conv-avatar-sm { width: 40px; height: 40px; border-radius: 50%; background: #2a3942; display: flex; align-items: center; justify-content: center; font-size: .9rem; font-weight: 600; color: #aebac1; flex-shrink: 0; position: relative; }
+        .conv-avatar-sm.online::after { content: ''; position: absolute; bottom: 1px; right: 1px; width: 8px; height: 8px; background: #00a884; border-radius: 50%; border: 2px solid #111b21; }
+        .conv-meta { flex: 1; margin-left: .6rem; min-width: 0; }
+        .conv-meta-name { font-size: .85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .conv-item.unread .conv-meta-name { font-weight: 700; color: #fff; }
+        .conv-meta-preview { font-size: .75rem; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .conv-item.unread .conv-meta-preview { color: #d1d7db; font-weight: 600; }
+        .conv-meta-time { font-size: .65rem; color: #8696a0; text-align: right; white-space: nowrap; }
+        .conv-item.unread .conv-meta-time { color: #00a884; font-weight: 600; }
+        .unread-dot { width: 10px; height: 10px; background: #00a884; border-radius: 50%; flex-shrink: 0; margin-left: .3rem; }
+        .pin-toggle { background: none; border: none; cursor: pointer; font-size: .85rem; margin-left: .3rem; padding: .15rem; border-radius: .3rem; filter: grayscale(1); opacity: .45; transition: all .15s; flex-shrink: 0; }
+        .pin-toggle:hover { background: #2a3942; opacity: .8; }
+        .pin-toggle.pinned { filter: none; opacity: 1; }
+
+        /* Chat panel */
+        .chat-panel { flex: 1; display: flex; flex-direction: column; background: #0b141a; }
+        .chat-header { background: #202c33; padding: .7rem 1rem; display: flex; align-items: center; gap: .8rem; border-bottom: 1px solid #2a3942; }
+        .chat-avatar { width: 42px; height: 42px; border-radius: 50%; background: #2a3942; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 600; color: #aebac1; position: relative; }
+        .chat-avatar.online::after { content: ''; position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #00a884; border-radius: 50%; border: 2px solid #202c33; }
+        .chat-contact-info { flex: 1; }
+        .chat-contact-name { font-size: 1rem; font-weight: 500; }
+        .chat-contact-status { font-size: .75rem; color: #8696a0; }
+        .chat-contact-status.is-online { color: #00a884; }
+
+        /* Messages area */
+        .messages-area { flex: 1; overflow-y: auto; padding: 1rem 4rem; background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5l5 10h-10z' fill='%23091a18' opacity='.15'/%3E%3C/svg%3E"); }
+        .messages-area::-webkit-scrollbar { width: 6px; }
+        .messages-area::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+        .msg-date-divider { text-align: center; margin: 1rem 0; }
+        .msg-date-divider span { background: #182229; color: #8696a0; font-size: .72rem; padding: .3rem .8rem; border-radius: .5rem; }
+        .msg-row { display: flex; margin-bottom: .25rem; }
+        .msg-row.sent { justify-content: flex-end; }
+        .msg-row.received { justify-content: flex-start; }
+        .msg-bubble { max-width: 65%; padding: .45rem .6rem .2rem .6rem; border-radius: .5rem; position: relative; word-wrap: break-word; }
+        .msg-row.sent .msg-bubble { background: #005c4b; border-top-right-radius: 0; }
+        .msg-row.received .msg-bubble { background: #202c33; border-top-left-radius: 0; }
+        .msg-sender-name { font-size: .7rem; color: #00a884; font-weight: 600; margin-bottom: .15rem; }
+        .msg-text { font-size: .9rem; line-height: 1.4; color: #e9edef; }
+        .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: .3rem; margin-top: .1rem; }
+        .msg-time { font-size: .65rem; color: #8696a0; }
+        .msg-read { font-size: .7rem; }
+        .msg-media { margin: .3rem 0; padding: .4rem; background: #1a2930; border-radius: .4rem; }
+        .msg-media-img { display: block; max-width: 260px; max-height: 300px; width: 100%; border-radius: .35rem; object-fit: cover; }
+        .msg-media-video { display: block; max-width: 260px; max-height: 300px; width: 100%; border-radius: .35rem; background: #000; }
+        .msg-media-caption { font-size: .75rem; color: #8696a0; margin-top: .2rem; }
+        .msg-media-file { font-size: .75rem; color: #53bdeb; margin-top: .25rem; }
+
+        /* Pagination controls for the message thread */
+        .msg-pager { text-align: center; margin: .6rem 0 1rem; }
+        .msg-pager a { display: inline-block; background: #202c33; color: #00a884; text-decoration: none; padding: .4rem .9rem; border-radius: .5rem; font-size: .78rem; font-weight: 600; }
+        .msg-pager a:hover { background: #2a3942; }
+        .msg-pager .msg-pager-note { color: #8696a0; font-size: .72rem; margin-top: .3rem; }
+
+        /* Input area */
+        .input-area { background: #202c33; padding: .6rem 1rem; display: flex; align-items: center; gap: .6rem; border-top: 1px solid #2a3942; }
+        .input-area input { flex: 1; padding: .6rem 1rem; background: #2a3942; border: none; border-radius: .5rem; color: #e9edef; font-size: .9rem; outline: none; }
+        .input-area input::placeholder { color: #8696a0; }
+        .send-btn { background: #00a884; color: #fff; border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+        .send-btn:hover { background: #00c897; }
+
+        .badge-group-sm { background: #2a3942; color: #8696a0; font-size: .6rem; padding: .05rem .3rem; border-radius: .4rem; margin-left: .3rem; }
+
+        /* Message actions */
+        .msg-act { background: none; border: none; color: #8696a0; font-size: .7rem; cursor: pointer; padding: 0; margin-left: .3rem; }
+        .msg-act:hover { color: #e9edef; }
+        .msg-act.starred { color: #f4b400; }
+        .msg-act.reported { color: #f15c6d; }
+        .msg-inline-form { display: none; margin-top: .3rem; gap: .3rem; align-items: center; }
+        .msg-inline-form.open { display: flex; }
+        .msg-inline-form input { flex: 1; padding: .3rem .5rem; background: #111b21; border: 1px solid #2a3942; border-radius: .3rem; color: #e9edef; font-size: .78rem; outline: none; min-width: 140px; }
+        .msg-inline-form button { background: #00a884; color: #fff; border: none; padding: .3rem .6rem; border-radius: .3rem; font-size: .72rem; cursor: pointer; }
+        .msg-inline-form button.cancel { background: #2a3942; color: #8696a0; }
+        .attach-btn { color: #8696a0; font-size: 1.2rem; cursor: pointer; padding: .3rem; }
+        .attach-btn:hover { color: #e9edef; }
+        .join-link { background: #2a3942; color: #00a884; text-decoration: none; padding: .4rem .8rem; border-radius: .3rem; font-size: .8rem; margin-left: .5rem; }
+        .join-link:hover { background: #374045; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .messages-area { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('instant-messaging.index') }}">Quick<span>Chat</span></a></h1>
+        <span style="color:#8696a0;font-size:.8rem;">{{ users_map[current_user_id].display_name }}</span>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('instant-messaging.index') }}" class="active">Chats</a>
+        <a href="{{ url_for('instant-messaging.contacts_page') }}">Contacts</a>
+    </nav>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-search">
+                    <input type="text" id="sidebarSearch" placeholder="Search chats..." oninput="filterSidebar()">
+                </div>
+            </div>
+            <div class="conv-list" id="convList">
+                {% for c in conversations %}
+                <a href="{{ url_for('instant-messaging.conversation_page', conv_id=c.id) }}"
+                   class="conv-item {% if c.id == active_conv_id %}active{% endif %} {% if c.unread_count is defined and c.unread_count > 0 %}unread{% endif %}"
+                   data-name="{{ c.display_name|lower }}">
+                    <div class="conv-avatar-sm {% if c.status == 'online' %}online{% endif %}">
+                        {{ c.display_name[0] }}
+                    </div>
+                    <div class="conv-meta">
+                        <div class="conv-meta-name">
+                            {{ c.display_name }}
+                            {% if c.type == 'group' %}<span class="badge-group-sm">GRP</span>{% endif %}
+                        </div>
+                        <div class="conv-meta-preview">{{ c.last_text }}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                        <div class="conv-meta-time">{{ c.last_time }}</div>
+                        {% if c.unread_count is defined and c.unread_count > 0 %}
+                        <div class="unread-dot"></div>
+                        {% endif %}
+                    </div>
+                    <button class="pin-toggle {% if c.pinned_count|default(0) > 0 %}pinned{% endif %}" data-url="{{ url_for('instant-messaging.api_pin_conversation', conv_id=c.id) }}" title="{% if c.pinned_count|default(0) > 0 %}Unpin conversation{% else %}Pin conversation{% endif %}">&#128204;</button>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Chat panel -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <div class="chat-avatar {% if conv_status == 'online' %}online{% endif %}">
+                    {{ conv_name[0] }}
+                </div>
+                <div class="chat-contact-info">
+                    <div class="chat-contact-name">{{ conv_name }}</div>
+                    <div class="chat-contact-status {% if conv_status == 'online' %}is-online{% endif %}">
+                        {% if conversation.type == 'group' %}
+                            {{ conversation.participant_names | join(', ') }}
+                        {% elif conv_status == 'online' %}
+                            online
+                        {% else %}
+                            {{ conv_about }}
+                        {% endif %}
+                    </div>
+                </div>
+                <button onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var _b=this;setTimeout(function(){_b.textContent='Share'},2000)" style="margin-left:auto;background:#2a3942;color:#8696a0;border:none;padding:.4rem .8rem;border-radius:.3rem;font-size:.8rem;cursor:pointer;">Share</button>
+                {% if conversation.type == 'group' %}
+                <a class="join-link" href="{{ url_for('instant-messaging.join_group_link', conv_id=conversation.id) }}" title="Join this group via invite link">Join Group</a>
+                {% endif %}
+            </div>
+
+            <div class="messages-area" id="messagesArea">
+                {% if has_older %}
+                <div class="msg-pager" id="olderPager">
+                    <a href="{{ url_for('instant-messaging.conversation_page', conv_id=conversation.id, page=page + 1) }}">&#8593; Load older messages</a>
+                    <div class="msg-pager-note">Showing {{ messages|length }} of {{ total_messages }} messages (page {{ page }})</div>
+                </div>
+                {% endif %}
+                {% set prev_date = namespace(val='') %}
+                {% for msg in messages %}
+                    {% set msg_date = msg.time_display.split(',')[0] if ',' in msg.time_display else msg.time_display %}
+                    {% if msg_date != prev_date.val %}
+                        <div class="msg-date-divider"><span>{{ msg_date }}</span></div>
+                        {% set prev_date.val = msg_date %}
+                    {% endif %}
+                    <div class="msg-row {% if msg.is_current_user %}sent{% else %}received{% endif %}">
+                        <div class="msg-bubble">
+                            {% if conversation.type == 'group' and not msg.is_current_user %}
+                                <div class="msg-sender-name">{{ msg.sender_name }}</div>
+                            {% endif %}
+                            {% if msg.media %}
+                                <div class="msg-media">
+                                    {% if msg.media.render_kind == 'video' and msg.media.render_is_real %}
+                                        <video class="msg-media-video" src="{{ msg.media.render_src }}" controls preload="metadata"></video>
+                                    {% elif msg.media.render_kind in ('image', 'video') %}
+                                        <img class="msg-media-img" src="{{ msg.media.render_src }}" alt="{{ msg.media.file_name }}" loading="lazy">
+                                    {% else %}
+                                        <img class="msg-media-img msg-media-file-thumb" src="{{ msg.media.render_src }}" alt="{{ msg.media.file_name }}" loading="lazy">
+                                    {% endif %}
+                                    <div class="msg-media-file">&#128206; {{ msg.media.file_name }}</div>
+                                    {% if msg.media.caption %}
+                                        <div class="msg-media-caption">{{ msg.media.caption }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            <div class="msg-text">{{ msg.text }}</div>
+                            <div class="msg-meta">
+                                <span class="msg-time">{{ msg.time_display.split(', ')[-1] if ', ' in msg.time_display else msg.time_display }}</span>
+                                <button class="msg-act im-star-btn {% if msg.starred %}starred{% endif %}" data-url="{{ url_for('instant-messaging.api_star_message', msg_id=msg.id) }}" title="Star message">{% if msg.starred %}&#9733;{% else %}&#9734;{% endif %}</button>
+                                <button class="msg-act im-report-btn {% if msg.reported %}reported{% endif %}" data-msg="{{ msg.id }}" title="Report message">&#9873;</button>
+                                {% if msg.is_current_user %}
+                                    <button class="msg-act im-edit-btn" data-msg="{{ msg.id }}" title="Edit message">&#9998;</button>
+                                    <span class="msg-read" style="color:{% if msg.read %}#53bdeb{% else %}#8696a0{% endif %}">&#10003;&#10003;</span>
+                                    <button class="im-msg-delete-btn" data-url="{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id=msg.id) }}" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete message">&#10005;</button>
+                                {% endif %}
+                            </div>
+                            {% if msg.is_current_user %}
+                            <form class="msg-inline-form im-edit-form" id="edit-form-{{ msg.id }}" data-url="{{ url_for('instant-messaging.api_edit_message', msg_id=msg.id) }}">
+                                <input type="text" name="text" value="{{ msg.text }}" required>
+                                <button type="submit">Save</button>
+                                <button type="button" class="cancel">Cancel</button>
+                            </form>
+                            {% endif %}
+                            <form class="msg-inline-form im-report-form" id="report-form-{{ msg.id }}" data-url="{{ url_for('instant-messaging.api_report_message', msg_id=msg.id) }}">
+                                <input type="text" name="reason" placeholder="Reason for report" required>
+                                <button type="submit">Report</button>
+                                <button type="button" class="cancel">Cancel</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+                {% if has_newer %}
+                <div class="msg-pager" id="newerPager">
+                    <a href="{{ url_for('instant-messaging.conversation_page', conv_id=conversation.id, page=page - 1) }}">&#8595; Newer messages</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="input-area">
+                <label class="attach-btn" for="attachInput" title="Attach a file">&#128206;</label>
+                <input type="file" id="attachInput" style="display:none" onchange="uploadAttachment(this)">
+                <input type="text" id="messageInput" placeholder="Type a message" onkeydown="if(event.key==='Enter')sendMessage()">
+                <button class="send-btn" onclick="sendMessage()" title="Send">&#10148;</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function filterSidebar() {
+            const q = document.getElementById('sidebarSearch').value.toLowerCase();
+            document.querySelectorAll('.conv-item').forEach(item => {
+                const name = item.getAttribute('data-name') || '';
+                item.style.display = name.includes(q) ? '' : 'none';
+            });
+        }
+
+        function scrollToBottom() {
+            const area = document.getElementById('messagesArea');
+            area.scrollTop = area.scrollHeight;
+        }
+        scrollToBottom();
+
+        // follow_by_toggle: pin/unpin a conversation from the sidebar
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.pin-toggle');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var pinned = d.pinned_count > 0;
+                    btn.classList.toggle('pinned', pinned);
+                    btn.title = pinned ? 'Unpin conversation' : 'Pin conversation';
+                });
+        });
+
+        // URL templates so freshly-sent messages get the same working action
+        // buttons (star / report / edit / delete) as server-rendered ones.
+        var STAR_URL_T   = "{{ url_for('instant-messaging.api_star_message', msg_id='__MID__') }}";
+        var DEL_URL_T    = "{{ url_for('instant-messaging.form_delete_message', conv_id=conversation.id, msg_id='__MID__') }}";
+        var EDIT_URL_T   = "{{ url_for('instant-messaging.api_edit_message', msg_id='__MID__') }}";
+        var REPORT_URL_T = "{{ url_for('instant-messaging.api_report_message', msg_id='__MID__') }}";
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+
+            fetch('{{ url_for("instant-messaging.api_send_message", conv_id=conversation.id) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            })
+            .then(r => r.json())
+            .then(msg => {
+                const area = document.getElementById('messagesArea');
+                const row = document.createElement('div');
+                row.className = 'msg-row sent';
+                const now = new Date();
+                const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const mid = msg.id;
+                const safe = escapeHtml(msg.text);
+                row.innerHTML =
+                    '<div class="msg-bubble">' +
+                        '<div class="msg-text">' + safe + '</div>' +
+                        '<div class="msg-meta">' +
+                            '<span class="msg-time">' + time + '</span>' +
+                            '<button class="msg-act im-star-btn" data-url="' + STAR_URL_T.replace('__MID__', mid) + '" title="Star message">&#9734;</button>' +
+                            '<button class="msg-act im-report-btn" data-msg="' + mid + '" title="Report message">&#9873;</button>' +
+                            '<button class="msg-act im-edit-btn" data-msg="' + mid + '" title="Edit message">&#9998;</button>' +
+                            '<span class="msg-read" style="color:#8696a0">&#10003;&#10003;</span>' +
+                            '<button class="im-msg-delete-btn" data-url="' + DEL_URL_T.replace('__MID__', mid) + '" style="background:none;border:none;color:#8696a0;font-size:.65rem;cursor:pointer;padding:0;margin-left:.3rem;" title="Delete message">&#10005;</button>' +
+                        '</div>' +
+                        '<form class="msg-inline-form im-edit-form" id="edit-form-' + mid + '" data-url="' + EDIT_URL_T.replace('__MID__', mid) + '"><input type="text" name="text" required><button type="submit">Save</button><button type="button" class="cancel">Cancel</button></form>' +
+                        '<form class="msg-inline-form im-report-form" id="report-form-' + mid + '" data-url="' + REPORT_URL_T.replace('__MID__', mid) + '"><input type="text" name="reason" placeholder="Reason for report" required><button type="submit">Report</button><button type="button" class="cancel">Cancel</button></form>' +
+                    '</div>';
+                // set edit input value via JS so quotes in the text can't break the markup
+                row.querySelector('.im-edit-form input[name="text"]').value = msg.text;
+                area.appendChild(row);
+                scrollToBottom();
+            })
+            .catch(err => console.error('Send failed:', err));
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.im-msg-delete-btn');
+            if (!btn) return;
+            btn.textContent = '...';
+            btn.disabled = true;
+            fetch(btn.getAttribute('data-url'), {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() { btn.innerHTML = '&#10005;'; btn.disabled = false; });
+        });
+
+        // upload_by_upload: send a media attachment to this conversation
+        function uploadAttachment(input) {
+            if (!input.files.length) return;
+            var fd = new FormData();
+            fd.append('file', input.files[0]);
+            fetch('{{ url_for("instant-messaging.api_upload_media", conv_id=conversation.id) }}', { method: 'POST', body: fd })
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { window.location.reload(); })
+                .catch(function() { alert('Upload failed'); input.value = ''; });
+        }
+
+        // save_by_toggle: star/unstar a message
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.im-star-btn');
+            if (!btn) return;
+            fetch(btn.getAttribute('data-url'), { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    btn.classList.toggle('starred', d.starred);
+                    btn.innerHTML = d.starred ? '&#9733;' : '&#9734;';
+                });
+        });
+
+        // edit_by_form / report_by_form: toggle inline forms
+        document.addEventListener('click', function(e) {
+            var editBtn = e.target.closest('.im-edit-btn');
+            if (editBtn) {
+                document.getElementById('edit-form-' + editBtn.getAttribute('data-msg')).classList.toggle('open');
+                return;
+            }
+            var reportBtn = e.target.closest('.im-report-btn');
+            if (reportBtn) {
+                document.getElementById('report-form-' + reportBtn.getAttribute('data-msg')).classList.toggle('open');
+                return;
+            }
+            var cancelBtn = e.target.closest('.msg-inline-form button.cancel');
+            if (cancelBtn) cancelBtn.closest('.msg-inline-form').classList.remove('open');
+        });
+
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            if (form.classList.contains('im-edit-form')) {
+                e.preventDefault();
+                var text = form.querySelector('input[name="text"]').value.trim();
+                if (!text) return;
+                fetch(form.getAttribute('data-url'), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.error) { alert(d.error); return; }
+                    form.closest('.msg-bubble').querySelector('.msg-text').textContent = d.new_text;
+                    form.classList.remove('open');
+                });
+            } else if (form.classList.contains('im-report-form')) {
+                e.preventDefault();
+                var reason = form.querySelector('input[name="reason"]').value.trim();
+                if (!reason) return;
+                fetch(form.getAttribute('data-url'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason })
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.error) { alert(d.error); return; }
+                    form.classList.remove('open');
+                    var bubble = form.closest('.msg-bubble');
+                    var rbtn = bubble.querySelector('.im-report-btn');
+                    if (rbtn) rbtn.classList.add('reported');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

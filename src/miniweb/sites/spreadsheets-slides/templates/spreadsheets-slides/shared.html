@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared with Me - SheetDeck</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .header-left a { color: #0f9d58; text-decoration: none; font-size: 1.2rem; font-weight: 500; }
+        .header-left h1 { font-size: 1rem; font-weight: 400; color: #5f6368; }
+        .header-right { font-size: 0.85rem; color: #5f6368; }
+        .header-right a { color: #0f9d58; text-decoration: none; margin-left: 1rem; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+        .file-list { list-style: none; }
+        .file-item { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .file-item:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .file-item a { text-decoration: none; color: inherit; flex: 1; }
+        .file-title { font-size: 0.9rem; font-weight: 500; }
+        .file-meta { font-size: 0.78rem; color: #80868b; margin-top: 0.2rem; }
+        .file-type { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 500; }
+        .file-type.spreadsheet { background: #e6f4ea; color: #0f9d58; }
+        .file-type.presentation { background: #fef7e0; color: #f9ab00; }
+        .empty { text-align: center; padding: 3rem 1rem; color: #80868b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="{{ url_for('spreadsheets-slides.index') }}">SheetDeck</a>
+            <h1>Shared with Me</h1>
+        </div>
+        <div class="header-right">
+            {% if user %}
+            <span>{{ user.name }}</span>
+            <a href="{{ url_for('spreadsheets-slides.logout') }}">Sign Out</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        {% if files %}
+        <ul class="file-list">
+            {% for f in files %}
+            <li class="file-item">
+                {% if f.file_type == 'spreadsheet' %}
+                <a href="{{ url_for('spreadsheets-slides.spreadsheet_view', sid=f.id) }}">
+                {% else %}
+                <a href="{{ url_for('spreadsheets-slides.presentation_view', pid=f.id) }}">
+                {% endif %}
+                    <div class="file-title">{{ f.title }}</div>
+                    <div class="file-meta">
+                        <span class="file-type {{ f.file_type }}">{{ f.file_type|capitalize }}</span>
+                        Owner: {{ user_map.get(f.owner_id, {}).get('name', 'Unknown') }}
+                        | Updated: {{ f.updated_at[:10] if f.updated_at else '' }}
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty">
+            <h3>No shared files</h3>
+            <p>Files shared with you will appear here.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

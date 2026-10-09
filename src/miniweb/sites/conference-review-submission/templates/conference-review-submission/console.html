@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Console | PeerPortal</title>
+    {% include 'conference-review-submission/_style.html' %}
+    <style>
+        .console-header { padding: 26px 0 0; }
+        .console-title { font-size: 24px; font-weight: 500; margin-bottom: 2px; }
+        .user-info { font-size: 13px; color: #777; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .expertise-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+        .tag { background: #f0f0f0; color: #555; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .count-badge { background: #777; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; margin-left: 4px; }
+        .empty-msg { color: #999; font-size: 13px; padding: 16px 0; font-style: italic; }
+        .submit-form { max-width: 640px; display: flex; flex-direction: column; gap: 12px; }
+    </style>
+</head>
+<body>
+    {% include 'conference-review-submission/_nav.html' %}
+
+    <div class="or-container console-header">
+        <div class="console-title">{{ user.name }} <span style="font-size:15px;color:#8c8c8c;font-weight:400;">&mdash; Console</span></div>
+        <div class="user-info">
+            <span>{{ user.email }}</span>
+            {% if user.role == 'reviewer' %}
+            <span class="label label-info">Reviewer</span>
+            {% elif user.role == 'author' %}
+            <span class="label label-primary">Author</span>
+            {% elif user.role == 'chair' %}
+            <span class="label label-warning">Program Chair</span>
+            {% elif user.role == 'admin' %}
+            <span class="label label-warning">Admin</span>
+            {% endif %}
+        </div>
+        {% set expertise = [] %}
+        {% if user.expertise %}
+            {% if user.expertise is string %}
+                {% set expertise = user.expertise | tojson | fromjson if user.expertise.startswith('[') else [user.expertise] %}
+            {% else %}
+                {% set expertise = user.expertise %}
+            {% endif %}
+        {% endif %}
+        {% if expertise %}
+        <div class="expertise-tags">
+            {% for tag in expertise %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="nav-tabs">
+            <a href="#pending-reviews" class="console-tab active" onclick="return showTab(event, 'pending-reviews')">Pending Reviews{% if pending_tasks %}<span class="count-badge">{{ pending_tasks|length }}</span>{% endif %}</a>
+            <a href="#completed-reviews" class="console-tab" onclick="return showTab(event, 'completed-reviews')">Completed Reviews{% if completed_tasks %}<span class="count-badge">{{ completed_tasks|length }}</span>{% endif %}</a>
+            <a href="#your-submissions" class="console-tab" onclick="return showTab(event, 'your-submissions')">Your Submissions{% if your_submissions %}<span class="count-badge">{{ your_submissions|length }}</span>{% endif %}</a>
+            <a href="#submit-paper" class="console-tab" onclick="return showTab(event, 'submit-paper')">Submit a Paper</a>
+            <a href="#venue-roles" class="console-tab" onclick="return showTab(event, 'venue-roles')">Venues &amp; Roles</a>
+        </div>
+    </div>
+
+    <div class="or-container" style="padding-bottom:64px;">
+        <!-- Pending Review Tasks -->
+        <div class="tab-pane active" id="pane-pending-reviews">
+            {% if pending_tasks %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:170px;">Review due</th><th style="width:110px;">Status</th><th style="width:130px;"></th></tr></thead>
+                <tbody>
+                {% for paper in pending_tasks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.venue_name or paper.conference or paper.venue_id }}</td>
+                    <td><strong>{{ paper.review_deadline or '—' }}</strong>{% if paper.review_deadline %} <span style="color:#8c8c8c;">(AoE)</span>{% endif %}</td>
+                    <td><span class="label label-warning">Pending</span></td>
+                    <td><a href="{{ url_for('conference-review-submission.review_form', paper_id=paper.id) }}" class="btn btn-primary btn-sm">Write Review</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">No pending review tasks.</div>
+            {% endif %}
+        </div>
+
+        <!-- Completed Reviews -->
+        <div class="tab-pane" id="pane-completed-reviews">
+            {% if completed_tasks %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th>Your Review</th><th style="width:110px;">Status</th><th style="width:80px;"></th></tr></thead>
+                <tbody>
+                {% for paper in completed_tasks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td style="color:#8c8c8c;">
+                        {% if paper.user_review %}Rating: {{ paper.user_review.recommendation }}, Confidence: {{ paper.user_review.confidence }}{% endif %}
+                    </td>
+                    <td><span class="label label-success">Reviewed</span></td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-default btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">No completed reviews.</div>
+            {% endif %}
+        </div>
+
+        <!-- Your Submissions -->
+        <div class="tab-pane" id="pane-your-submissions">
+            {% if your_submissions %}
+            <table class="table table-hover">
+                <thead><tr><th style="width:40px;">#</th><th>Paper</th><th>Venue</th><th style="width:110px;">Status</th><th style="width:80px;"></th></tr></thead>
+                <tbody>
+                {% for paper in your_submissions %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}">{{ paper.title }}</a></td>
+                    <td style="color:#8c8c8c;">{{ paper.conference or paper.venue_id }}</td>
+                    <td>
+                        {% if paper.accepted %}
+                        <span class="label label-success">Accepted</span>
+                        {% else %}
+                        <span class="label label-info">Submitted</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('conference-review-submission.paper_detail', paper_id=paper.id) }}" class="btn btn-default btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">No submissions.</div>
+            {% endif %}
+        </div>
+
+        <!-- Submit a Paper -->
+        <div class="tab-pane" id="pane-submit-paper">
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('conference-review-submission.form_upload_paper') }}" class="submit-form">
+                <div>
+                    <label class="control-label" for="paper-title">Title</label>
+                    <input type="text" class="form-control" id="paper-title" name="title" placeholder="Paper title" required>
+                </div>
+                <div>
+                    <label class="control-label" for="paper-venue">Venue</label>
+                    <select class="form-control" id="paper-venue" name="venue_id" required>
+                        <option value="">Select a venue&hellip;</option>
+                        {% for v in submit_venues %}
+                        <option value="{{ v.id }}">{{ v.name }}{% if v.status == 'under_review' %} (open){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="control-label" for="paper-track">Track</label>
+                    <select class="form-control" id="paper-track" name="track">
+                        <option value="Main Track">Main Track</option>
+                        <option value="Workshop">Workshop</option>
+                        <option value="Findings">Findings</option>
+                        <option value="Demo">Demo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="control-label" for="paper-authors">Co-authors (comma-separated, optional)</label>
+                    <input type="text" class="form-control" id="paper-authors" name="authors" placeholder="You are added automatically">
+                </div>
+                <div>
+                    <label class="control-label" for="paper-abstract">Abstract</label>
+                    <textarea class="form-control" id="paper-abstract" name="abstract" rows="4" placeholder="Paper abstract" style="resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label class="control-label">Manuscript</label>
+                    <input type="file" name="file" accept=".pdf,.doc,.docx,.tex" style="font-size:12px;">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Submit Paper</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Venue Participation -->
+        <div class="tab-pane" id="pane-venue-roles">
+            {% if active_venues %}
+            <table class="table table-hover">
+                <thead><tr><th>Venue</th><th></th><th style="width:130px;">Role</th></tr></thead>
+                <tbody>
+                {% for av in active_venues %}
+                <tr>
+                    <td><a href="{{ url_for('conference-review-submission.venue_detail', venue_id=av.venue.id) }}">{{ av.venue.name }}</a></td>
+                    <td style="color:#8c8c8c;">{{ av.venue.full_name }}</td>
+                    <td>
+                        {% if av.role == 'reviewer' %}
+                        <span class="label label-info">Reviewer</span>
+                        {% elif av.role == 'author' %}
+                        <span class="label label-primary">Author</span>
+                        {% elif av.role == 'chair' %}
+                        <span class="label label-warning">Chair</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-msg">Not participating in any venues.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% include 'conference-review-submission/_footer.html' %}
+
+    <script>
+    function showTab(e, name) {
+        if (e) e.preventDefault();
+        document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
+        document.querySelectorAll('.console-tab').forEach(function (t) { t.classList.remove('active'); });
+        var pane = document.getElementById('pane-' + name);
+        if (pane) pane.classList.add('active');
+        var tab = document.querySelector('.console-tab[href="#' + name + '"]');
+        if (tab) tab.classList.add('active');
+        history.replaceState(null, '', '#' + name);
+        return false;
+    }
+    // Deep-link support: /console#submit-paper opens that tab directly.
+    if (location.hash) showTab(null, location.hash.slice(1));
+    </script>
+</body>
+</html>

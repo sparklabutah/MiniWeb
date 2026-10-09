@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Form 1040 - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+    <style>
+    /* Styled to read like the official 1040 income section */
+    .f1040 { max-width: 780px; margin: 0 auto; }
+    .f1040-head { border: 1.5px solid #111827; padding: 12px 16px; margin-bottom: 0; }
+    .f1040-head .formno { font-weight: 700; font-size: 1.05rem; }
+    .f1040-head .subtitle { color: #374151; font-size: .85rem; }
+    .f1040-body { border: 1.5px solid #111827; border-top: none; padding: 16px; }
+    .line-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .line-table td { padding: 5px 6px; vertical-align: middle; border-bottom: 1px solid #e5e7eb; }
+    .line-table td.ln { width: 42px; font-weight: 700; color: #111827; }
+    .line-table td.amt { width: 170px; text-align: right; }
+    .line-table td.amt input { width: 150px; text-align: right; padding: 4px 6px; border: 1px solid #9ca3af; }
+    .line-total td { border-top: 2px solid #111827; font-weight: 700; }
+    .line-total td.amt input { border: 2px solid #111827; }
+    .status-row label { margin-right: 14px; font-weight: 400; }
+    .hint { color: #6b7280; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    {% set active_nav = 'filings' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+      <form class="f1040" method="POST" action="{{ url_for('tax-filing-dmv-permits.file_1040_submit') }}">
+        <div class="f1040-head">
+            <div class="formno">Form 1040 &middot; U.S. Individual Income Tax Return</div>
+            <div class="subtitle">Tax year <input type="number" name="tax_year" value="{{ default_year }}" style="width:80px"> &nbsp; Department of Revenue &mdash; Lakeport</div>
+        </div>
+        <div class="f1040-body">
+            <div class="form-row">
+                <div class="form-group"><label>Your first name and middle initial / last name</label>
+                    <input type="text" name="taxpayer_name" value="{{ user.display_name }}" required></div>
+                <div class="form-group"><label>Social security number</label>
+                    <input type="text" name="ssn" placeholder="___-__-____"></div>
+            </div>
+
+            <div class="form-group status-row">
+                <label style="font-weight:700;display:block;margin-bottom:4px">Filing Status &mdash; check only one</label>
+                <label><input type="radio" name="filing_status" value="single" checked> Single</label>
+                <label><input type="radio" name="filing_status" value="married_jointly"> Married filing jointly</label>
+                <label><input type="radio" name="filing_status" value="married_separately"> Married filing separately</label>
+                <label><input type="radio" name="filing_status" value="head_of_household"> Head of household</label>
+                <label><input type="radio" name="filing_status" value="qualifying_surviving_spouse"> Qualifying surviving spouse</label>
+            </div>
+
+            <h3 style="margin:14px 0 0">Income</h3>
+            <table class="line-table">
+                <tr><td class="ln">1</td><td>Wages, salaries, tips (Form W-2, box 1)</td>
+                    <td class="amt"><input type="text" name="line_1" inputmode="decimal"></td></tr>
+                <tr><td class="ln">2b</td><td>Taxable interest</td>
+                    <td class="amt"><input type="text" name="line_2b" inputmode="decimal"></td></tr>
+                <tr><td class="ln">3b</td><td>Ordinary dividends</td>
+                    <td class="amt"><input type="text" name="line_3b" inputmode="decimal"></td></tr>
+                <tr><td class="ln">4b</td><td>IRA distributions &mdash; taxable amount</td>
+                    <td class="amt"><input type="text" name="line_4b" inputmode="decimal"></td></tr>
+                <tr><td class="ln">5b</td><td>Pensions and annuities &mdash; taxable amount</td>
+                    <td class="amt"><input type="text" name="line_5b" inputmode="decimal"></td></tr>
+                <tr><td class="ln">6</td><td>Social security benefits &mdash; taxable amount</td>
+                    <td class="amt"><input type="text" name="line_6" inputmode="decimal"></td></tr>
+                <tr><td class="ln">7</td><td>Capital gain or (loss)</td>
+                    <td class="amt"><input type="text" name="line_7" inputmode="decimal"></td></tr>
+                <tr><td class="ln">8</td><td>Additional income from Schedule 1, line 10</td>
+                    <td class="amt"><input type="text" name="line_8" inputmode="decimal"></td></tr>
+                <tr class="line-total"><td class="ln">9</td>
+                    <td>Total income. <span class="hint">Add lines 1, 2b, 3b, 4b, 5b, 6, 7, and 8.</span></td>
+                    <td class="amt"><input type="text" name="line_9" inputmode="decimal"></td></tr>
+            </table>
+
+            <h3 style="margin:14px 0 0">Payments</h3>
+            <table class="line-table">
+                <tr><td class="ln">25</td><td>Federal income tax withheld (Form W-2, box 2)</td>
+                    <td class="amt"><input type="text" name="line_25" inputmode="decimal"></td></tr>
+            </table>
+            <p class="hint" style="margin-top:6px">Your tax owed is figured from your total income and filing status
+            (standard deduction + brackets). If your withholding exceeds the tax owed, the difference is refunded;
+            otherwise a balance is due. Check status later under <em>Where's My Refund?</em></p>
+
+            <button type="submit" class="submit-btn" style="margin-top:16px">File Return</button>
+            <p class="hint" style="margin-top:6px">A confirmation with your filing ID is shown after you file.</p>
+        </div>
+      </form>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Records - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'records' %}
+    {% include "health-portals/_masthead.html" %}
+
+    <div class="main">
+        <div class="page-header">
+            <h2>Medical Records</h2>
+            <p>View your visit summaries, lab results, and clinical notes</p>
+        </div>
+
+        <div class="search-panel">
+            <form id="record-search-form">
+                <input type="text" id="record-search-input" name="q" placeholder="Search records and messages by keyword...">
+                <button type="submit">Search</button>
+            </form>
+            <form id="record-semantic-form">
+                <input type="text" id="record-semantic-input" name="q" placeholder="Ask in your own words, e.g. &quot;knee pain after physical therapy&quot;...">
+                <button type="submit">Smart Search</button>
+            </form>
+            <div class="search-results" id="record-search-results"></div>
+        </div>
+
+        {% if records %}
+            {% for record in records %}
+            <div class="record-card">
+                <div class="record-info">
+                    <div class="title">
+                        <a href="{{ url_for('health-portals.record_detail', record_id=record.id) }}">{{ record.record_type|replace('_', ' ')|title }}</a>
+                        <span class="badge badge-{{ record.record_type }}">{{ record.record_type|replace('_', ' ')|title }}</span>
+                    </div>
+                    <div class="meta">{{ record.date }} &mdash; {{ record.provider_name }}</div>
+                    <div class="summary">{{ record.summary[:150] }}{% if record.summary|length > 150 %}...{% endif %}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No medical records found.</div>
+        {% endif %}
+    </div>
+
+    {% include "health-portals/_footer.html" %}
+
+    <script>
+    (function() {
+        var resultsEl = document.getElementById('record-search-results');
+        var recordBase = '{{ url_for("health-portals.record_detail", record_id=999999) }}'.replace('999999', '');
+        var messageBase = '{{ url_for("health-portals.message_detail", msg_id=999999) }}'.replace('999999', '');
+
+        function renderResults(items, emptyMsg) {
+            resultsEl.innerHTML = '';
+            if (!items.length) {
+                var div = document.createElement('div');
+                div.className = 'no-results';
+                div.textContent = emptyMsg;
+                resultsEl.appendChild(div);
+                return;
+            }
+            items.forEach(function(entry) {
+                var rec = entry.item || entry;
+                var type = entry.type || 'record';
+                var div = document.createElement('div');
+                div.className = 'result-item';
+                var a = document.createElement('a');
+                if (type === 'message') {
+                    a.href = messageBase + rec.id;
+                    a.textContent = rec.subject || 'Message #' + rec.id;
+                } else {
+                    a.href = recordBase + rec.id;
+                    a.textContent = (rec.record_type || 'record').replace(/_/g, ' ');
+                }
+                var meta = document.createElement('div');
+                meta.className = 'result-meta';
+                meta.textContent = (rec.date || '') + (rec.summary ? ' — ' + String(rec.summary).slice(0, 120) : (rec.body ? ' — ' + String(rec.body).slice(0, 120) : ''));
+                div.appendChild(a);
+                div.appendChild(meta);
+                resultsEl.appendChild(div);
+            });
+        }
+
+        document.getElementById('record-search-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var q = document.getElementById('record-search-input').value.trim();
+            if (!q) return;
+            fetch('{{ url_for("health-portals.api_search") }}?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(items) { renderResults(items, 'No results found for "' + q + '".'); });
+        });
+
+        document.getElementById('record-semantic-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var q = document.getElementById('record-semantic-input').value.trim();
+            if (!q) return;
+            fetch('{{ url_for("health-portals.api_search_semantic") }}?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(items) { renderResults(items, 'No matching records found for "' + q + '".'); });
+        });
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Report - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .score-banner { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+        .score-info h3 { font-size: 1.1rem; margin-bottom: .2rem; }
+        .score-stats { display: flex; gap: 1.8rem; margin-top: .8rem; flex-wrap: wrap; }
+        .score-stat .num { font-size: 1.3rem; font-weight: 700; color: var(--ink); }
+        .score-stat .lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+        .breach-card { border: 1px solid #f3c6c0; background: #fdf4f3; border-radius: .45rem; padding: 1rem 1.2rem; margin-bottom: .8rem; }
+        .breach-card:last-child { margin-bottom: 0; }
+        .breach-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .45rem; }
+        .breach-title { font-weight: 600; color: var(--ink); }
+        .breach-details { font-size: .82rem; color: var(--muted); margin-bottom: .5rem; }
+        .breach-rec { font-size: .84rem; color: var(--text); background: #fff; border: 1px solid var(--border); padding: .55rem .75rem; border-radius: .3rem; line-height: 1.45; }
+        .pw-item { display: flex; align-items: center; gap: .7rem; padding: .55rem .2rem; border-top: 1px solid var(--border); }
+        .pw-item:first-of-type { border-top: 0; }
+        .pw-title { flex: 1; font-size: .9rem; color: var(--ink); }
+        .pw-reason { font-size: .8rem; color: var(--muted); flex: 2; }
+        .pw-strength { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+        .meter-track { flex: 1; height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; }
+        .meter-fill { height: 100%; background: var(--good); border-radius: 4px; }
+        .twofa-bar { display: flex; align-items: center; gap: .7rem; margin-bottom: .7rem; }
+        .twofa-pct { font-size: .9rem; font-weight: 700; color: var(--good); flex-shrink: 0; }
+        .mini-row { display: flex; align-items: center; gap: .7rem; padding: .45rem .2rem; border-top: 1px solid var(--border); font-size: .85rem; }
+        .mini-row:first-of-type { border-top: 0; }
+        .subhead { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 1.1rem 0 .5rem; }
+        .vh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+        .vh-card { background: #f7f8fa; border: 1px solid var(--border); border-radius: .4rem; padding: 1rem 1.2rem; }
+        .vh-card h4 { font-size: .95rem; margin-bottom: .35rem; }
+        .vh-meta { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
+        .vh-issues { list-style: none; }
+        .vh-issues li { font-size: .8rem; color: var(--text); padding: .15rem 0; }
+        .vh-issues li::before { content: "\2022 "; color: var(--faint); }
+        .rec-item { display: flex; align-items: flex-start; gap: .7rem; padding: .55rem .2rem; border-top: 1px solid var(--border); }
+        .rec-item:first-of-type { border-top: 0; }
+        .rec-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: .35rem; }
+        .rec-critical { background: var(--bad); } .rec-high { background: var(--warn); }
+        .rec-medium { background: var(--blue); } .rec-low { background: var(--faint); }
+        .rec-text { flex: 1; font-size: .88rem; color: var(--text); }
+        .rec-link { font-size: .8rem; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'security' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'security' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <h2>Security Report</h2>
+                <a href="{{ url_for('password-managers.index') }}" class="back-link">&larr; Back to Vault</a>
+            </div>
+            {% if report.report_generated_at %}
+            <p class="muted" style="margin-top:-.6rem;">Report generated: {{ report.report_generated_at[:16]|replace('T', ' ') }} UTC &middot; {{ report.user_name }}</p>
+            {% endif %}
+
+            <!-- Overall Score -->
+            <div class="card card-pad score-banner">
+                <div class="score-circle {% if report.overall_score >= 80 %}score-good{% elif report.overall_score >= 60 %}score-fair{% else %}score-poor{% endif %}">{{ report.overall_score }}</div>
+                <div class="score-info">
+                    <h3>Overall: {{ report.overall_rating }}</h3>
+                    <p class="muted">Your password security posture across all vaults.</p>
+                    {% if report.summary %}
+                    <div class="score-stats">
+                        <div class="score-stat"><div class="num">{{ report.summary.total_entries }}</div><div class="lbl">Items</div></div>
+                        <div class="score-stat"><div class="num">{{ report.summary.login_entries }}</div><div class="lbl">Logins</div></div>
+                        <div class="score-stat"><div class="num">{{ report.summary.secure_note_entries }}</div><div class="lbl">Secure Notes</div></div>
+                        <div class="score-stat"><div class="num">{{ report.summary.total_vaults }}</div><div class="lbl">Vaults</div></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Breach Alerts -->
+            {% if report.breach_alerts %}
+            <div class="card card-pad" id="breach" style="scroll-margin-top:80px;">
+                <div class="card-title">Breach Alerts</div>
+                {% for alert in report.breach_alerts %}
+                <div class="breach-card">
+                    <div class="breach-head">
+                        <span class="pill bad">{{ alert.severity }}</span>
+                        <span class="breach-title">{{ alert.entry_title }} &mdash; {{ alert.breach_source }}</span>
+                    </div>
+                    <div class="breach-details">
+                        Detected: {{ alert.detected_at[:10] }} &middot; Breach date: {{ alert.breach_date }} &middot;
+                        Email exposed: {{ alert.email_exposed }} &middot;
+                        Data: {{ alert.data_exposed|join(', ') }}
+                    </div>
+                    <div class="breach-rec">{{ alert.recommendation }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Reused Passwords -->
+            {% if report.reused_passwords and report.reused_passwords.count %}
+            <div class="card card-pad" id="reused" style="scroll-margin-top:80px;">
+                <div class="card-title">Reused Passwords</div>
+                <p class="muted" style="margin-bottom:.9rem;">
+                    {{ report.reused_passwords.count }} entr{{ 'ies' if report.reused_passwords.count != 1 else 'y' }}
+                    across {{ report.reused_passwords.group_count }} group{{ 's' if report.reused_passwords.group_count != 1 }}
+                    share a password with another entry. Reused passwords let one breach unlock several accounts.
+                </p>
+                {% for grp in report.reused_passwords.groups %}
+                <div class="mini-row">
+                    <span class="pill warn">{{ grp.count }}&times; reused</span>
+                    <span>
+                        {% for it in grp.entries %}
+                        <a href="{{ url_for('password-managers.entry_detail', entry_id=it.entry_id) }}">{{ it.title }}</a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Password Strength -->
+            {% if report.password_strength %}
+            <div class="card card-pad" id="weak" style="scroll-margin-top:80px;">
+                <div class="card-title">Password Strength</div>
+                <div class="stats-grid">
+                    <div class="card stat-card"><div class="stat-value"><span class="strength-dot strength-excellent"></span> {{ report.password_strength.excellent }}</div><div class="stat-label">Excellent</div></div>
+                    <div class="card stat-card"><div class="stat-value"><span class="strength-dot strength-strong"></span> {{ report.password_strength.strong }}</div><div class="stat-label">Strong</div></div>
+                    <div class="card stat-card"><div class="stat-value"><span class="strength-dot strength-fair"></span> {{ report.password_strength.fair }}</div><div class="stat-label">Fair</div></div>
+                    <div class="card stat-card"><div class="stat-value"><span class="strength-dot strength-weak"></span> {{ report.password_strength.weak }}</div><div class="stat-label">Weak</div></div>
+                </div>
+
+                {% if report.password_strength.breakdown %}
+                <div class="subhead">Passwords Needing Attention</div>
+                {% for pw in report.password_strength.breakdown %}
+                <div class="pw-item">
+                    <span class="strength-dot strength-{{ pw.strength }}"></span>
+                    <span class="pw-strength" style="color: {% if pw.strength == 'weak' %}var(--bad){% elif pw.strength == 'fair' %}var(--warn){% else %}var(--muted){% endif %};">{{ pw.strength }}</span>
+                    <span class="pw-title"><a href="{{ url_for('password-managers.entry_detail', entry_id=pw.entry_id) }}">{{ pw.title }}</a></span>
+                    <span class="pw-reason">{{ pw.reason }}</span>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Two-Factor Coverage -->
+            {% if report.two_factor_coverage %}
+            <div class="card card-pad">
+                <div class="card-title">Two-Factor Authentication</div>
+                <div class="twofa-bar">
+                    <div class="meter-track">
+                        <div class="meter-fill" style="width: {{ report.two_factor_coverage.coverage_percentage }}%;"></div>
+                    </div>
+                    <span class="twofa-pct">{{ report.two_factor_coverage.coverage_percentage }}%</span>
+                </div>
+                <p class="muted">
+                    {{ report.two_factor_coverage.entries_with_2fa_enabled }} of {{ report.two_factor_coverage.entries_with_2fa_available }} eligible entries have 2FA enabled.
+                </p>
+
+                {% if report.two_factor_coverage.missing_2fa %}
+                <div class="subhead">Missing 2FA</div>
+                {% for item in report.two_factor_coverage.missing_2fa %}
+                <div class="mini-row">
+                    <span class="pill {% if item.risk == 'high' %}bad{% elif item.risk == 'medium' %}warn{% else %}good{% endif %}">{{ item.risk }}</span>
+                    <span><a href="{{ url_for('password-managers.entry_detail', entry_id=item.entry_id) }}">{{ item.title }}</a></span>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Password Age -->
+            {% if report.password_age and report.password_age.older_than_1_year %}
+            <div class="card card-pad">
+                <div class="card-title">Aging Passwords</div>
+                <p class="muted" style="margin-bottom:.9rem;">{{ report.password_age.recommendation }}</p>
+                {% for item in report.password_age.older_than_1_year %}
+                <div class="mini-row">
+                    <span class="pw-title"><a href="{{ url_for('password-managers.entry_detail', entry_id=item.entry_id) }}">{{ item.title }}</a></span>
+                    <span style="font-weight:600;color:var(--warn);">{{ item.age_days }} days old</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Vault Health -->
+            {% if report.vault_health %}
+            <div class="card card-pad">
+                <div class="card-title">Vault Health</div>
+                <div class="vh-grid">
+                    {% for vh in report.vault_health %}
+                    <div class="vh-card">
+                        <h4>{{ vh.vault_name }}</h4>
+                        <div class="vh-meta">{{ vh.entries }} entries &middot; Avg strength: {{ vh.avg_strength_score }}/5</div>
+                        <ul class="vh-issues">
+                            {% for issue in vh.issues %}
+                            <li>{{ issue }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recommendations -->
+            {% if report.recommendations %}
+            <div class="card card-pad">
+                <div class="card-title">Recommendations</div>
+                {% for rec in report.recommendations %}
+                <div class="rec-item">
+                    <div class="rec-dot rec-{{ rec.priority }}"></div>
+                    <div class="rec-text">{{ rec.action }}</div>
+                    {% if rec.entry_id %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=rec.entry_id) }}" class="rec-link">View entry &rarr;</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Appointments - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'appointments' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h2>My Appointments</h2>
+            <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}" class="submit-btn" style="text-decoration:none;padding:8px 16px">Book an Appointment</a>
+        </div>
+        <p style="color:#6b7280">Scheduled appointments for {{ user.display_name }}.</p>
+
+        {% if appointments %}
+        <table>
+            <thead>
+                <tr><th>Appointment ID</th><th>Service</th><th>Date</th><th>Time</th><th>Location</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for a in appointments %}
+                <tr>
+                    <td>{{ a.appointment_id }}</td>
+                    <td>{{ a.service }}</td>
+                    <td>{{ a.date }}</td>
+                    <td>{{ a.time_slot }}</td>
+                    <td>{{ a.location }}</td>
+                    <td><span class="badge badge-{{ a.status }}">{{ a.status|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="detail-card"><p>You have no appointments booked.
+            <a href="{{ url_for('tax-filing-dmv-permits.appointments_page') }}">Book a DMV appointment</a> to get started.</p></div>
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

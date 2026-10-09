@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'messages' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <a href="{{ url_for('health-portals.messages_page') }}" class="back">&larr; Back to Messages</a>
+        <div class="msg-card">
+            <h2>{{ message.subject }}</h2>
+            <div class="msg-meta">From: {{ thread[0].sender_name if thread else 'Unknown' }} &mdash; {{ message.date[:10] }}</div>
+        </div>
+        {% for m in thread %}
+        <div class="thread-msg">
+            <div class="sender">{{ m.sender_name }}</div>
+            <div class="date">{{ m.date }}</div>
+            <div class="body">{{ m.body }}</div>
+        </div>
+        {% endfor %}
+        <a href="{{ url_for('health-portals.compose_page', reply_to=message.id, thread_id=message.thread_id, subject='RE: ' + message.subject) }}" class="reply-btn">Reply</a>
+    </div>
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

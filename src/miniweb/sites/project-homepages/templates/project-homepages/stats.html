@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats - {{ project.short_title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafbfc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #1e3a5f, #2d5a87); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; }
+        .header h1 a span { color: #7dd3fc; }
+        .header-right a { color: #cbd5e1; text-decoration: none; font-size: .85rem; }
+        .header-right a:hover { color: #fff; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1e3a5f; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0f4ff; }
+        nav a.active { font-weight: 700; background: #dbeafe; }
+        .nav-dropdown { position: relative; }
+        .nav-dropdown select { padding: .3rem .5rem; font-size: .85rem; border: 1px solid #cbd5e1; border-radius: .3rem; background: #fff; color: #1e3a5f; cursor: pointer; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        .page-title { font-size: 1.4rem; color: #1e3a5f; margin-bottom: .3rem; }
+        .page-sub { color: #64748b; font-size: .9rem; margin-bottom: 2rem; }
+        .section { margin-bottom: 2.5rem; }
+        .section h3 { font-size: 1.15rem; color: #1e3a5f; margin-bottom: .8rem; border-bottom: 2px solid #dbeafe; padding-bottom: .4rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; overflow: hidden; }
+        th { background: #f1f5f9; text-align: left; padding: .8rem 1rem; font-size: .82rem; color: #475569; font-weight: 600; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+        td { padding: .7rem 1rem; font-size: .9rem; color: #1e293b; border-bottom: 1px solid #f1f5f9; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
+        .metric-value { font-weight: 700; color: #059669; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('project-homepages.index') }}"><span>Flow</span>Net</a></h1>
+        <div class="header-right">
+            <a href="/">&larr; MiniWeb</a>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('project-homepages.index') }}">Home</a>
+        <a href="{{ url_for('project-homepages.paper_page') }}">Paper</a>
+        <a href="{{ url_for('project-homepages.team_page') }}">Team</a>
+        <a href="{{ url_for('project-homepages.resources_page') }}">Resources</a>
+        <a href="{{ url_for('project-homepages.updates_page') }}">Updates</a>
+        <a href="{{ url_for('project-homepages.stats_page') }}" class="active">Stats</a>
+        <div class="nav-dropdown">
+            <select id="section-nav" onchange="if(this.value)window.location=this.value">
+                <option value="">Go to section...</option>
+                {% for sec in sections_list %}
+                <option value="{{ url_for('project-homepages.section_page', section_key=sec.key) }}">{{ sec.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a href="{{ url_for('project-homepages.login_page') }}">{% if user %}{{ user.username }}{% else %}Sign In{% endif %}</a>
+    </nav>
+
+    <div class="container">
+        <h2 class="page-title">Project Statistics</h2>
+        <p class="page-sub">Overview and metrics for the {{ project.short_title }} project</p>
+
+        <div class="section">
+            <h3>Project Overview</h3>
+            <table id="overview-table">
+                <thead>
+                    <tr><th>Property</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Title</td><td>{{ project.title }}</td></tr>
+                    <tr><td>Short Title</td><td>{{ project.short_title }}</td></tr>
+                    <tr><td>Venue</td><td>{{ project.venue }}</td></tr>
+                    <tr><td>Year</td><td>{{ project.year }}</td></tr>
+                    <tr><td>Status</td><td style="text-transform:capitalize;">{{ project.status }}</td></tr>
+                    <tr><td>DOI</td><td>{{ project.doi }}</td></tr>
+                    <tr><td>arXiv ID</td><td>{{ project.arxiv_id }}</td></tr>
+                    <tr><td>Date Submitted</td><td>{{ project.date_submitted }}</td></tr>
+                    <tr><td>Date Accepted</td><td>{{ project.date_accepted }}</td></tr>
+                    <tr><td>Date Published</td><td>{{ project.date_published }}</td></tr>
+                    <tr><td>Keywords</td><td>{{ project.keywords | join(', ') }}</td></tr>
+                    <tr><td>Team Members</td><td>{{ team | length }}</td></tr>
+                    <tr><td>Resources</td><td>{{ resources | length }}</td></tr>
+                    <tr><td>Updates</td><td>{{ updates | length }}</td></tr>
+                    <tr><td>GitHub Stars</td><td>{{ code.stars }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>Key Metrics</h3>
+            <table id="metrics-table">
+                <thead>
+                    <tr><th>Metric</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    {% for mk, mv in metrics.items() %}
+                    <tr><td>{{ mk | replace('_', ' ') | title }}</td><td class="metric-value">{{ mv }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>Team Members</h3>
+            <table id="team-table">
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Role</th><th>Department</th><th>Affiliation</th><th>Email</th></tr>
+                </thead>
+                <tbody>
+                    {% for m in team %}
+                    <tr>
+                        <td>{{ m.id }}</td>
+                        <td>{{ m.full_name }}</td>
+                        <td style="text-transform:capitalize;">{{ m.role }}</td>
+                        <td>{{ m.department }}</td>
+                        <td>{{ m.affiliation }}</td>
+                        <td>{{ m.email }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>Resources by Type</h3>
+            <table id="resource-type-table">
+                <thead>
+                    <tr><th>Resource Type</th><th>Count</th></tr>
+                </thead>
+                <tbody>
+                    {% for rt, rc in type_counts.items() | sort %}
+                    <tr><td>{{ rt | replace('_', ' ') | title }}</td><td>{{ rc }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>All Resources</h3>
+            <table id="resources-table">
+                <thead>
+                    <tr><th>ID</th><th>Title</th><th>Type</th><th>Format</th><th>Size (MB)</th><th>Date Added</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in resources %}
+                    <tr>
+                        <td>{{ r.id }}</td>
+                        <td>{{ r.title }}</td>
+                        <td>{{ r.type | replace('_', ' ') }}</td>
+                        <td>{{ r.format }}</td>
+                        <td>{{ r.size_mb if r.size_mb else 'N/A' }}</td>
+                        <td>{{ r.date_added }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        &copy; {{ project.year }} {{ project.authors[0].affiliation }} &middot; {{ project.short_title }} Project
+    </div>
+</body>
+</html>

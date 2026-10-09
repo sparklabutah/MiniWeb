@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make Payment - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'payments' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div class="form-card">
+            <h2>Make a Payment</h2>
+            <div id="success-msg" class="success-msg"></div>
+            <form id="pay-form" onsubmit="return submitPayment(event)">
+                <div class="form-group"><label for="pay_type">Payment For</label>
+                    <select id="pay_type"><option value="income_tax">Income Tax</option><option value="property_tax">Property Tax</option><option value="vehicle_registration">Vehicle Registration</option><option value="permit_fee">Permit Fee</option><option value="business_tax">Business Tax</option></select>
+                </div>
+                <div class="form-group"><label for="amount">Amount ($)</label><input type="number" id="amount" step="0.01" required placeholder="0.00"></div>
+                <div class="form-group"><label for="method">Payment Method</label>
+                    <select id="method"><option value="credit_card">Credit Card</option><option value="ach_debit">ACH Debit</option><option value="check">Check</option></select>
+                </div>
+                <div class="form-group"><label for="card_last_four">Card/Account Last 4</label><input type="text" id="card_last_four" maxlength="4" placeholder="1234"></div>
+                <button type="submit" class="submit-btn green">Submit Payment</button>
+            </form>
+        </div>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+
+    <script>
+    function submitPayment(e) {
+        e.preventDefault();
+        var method = document.getElementById('method').value;
+        var data = {
+            user_id: {{ user.id }}, payer_name: '{{ user.display_name }}',
+            type: document.getElementById('pay_type').value,
+            amount: parseFloat(document.getElementById('amount').value),
+            method: method,
+            card_last_four: document.getElementById('card_last_four').value,
+            account_last_four: document.getElementById('card_last_four').value,
+            account_type: method === 'credit_card' ? 'credit' : 'checking',
+        };
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/payments', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var msg = document.getElementById('success-msg');
+            msg.style.display = 'block';
+            msg.textContent = 'Payment confirmed! Confirmation: ' + d.confirmation_number;
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

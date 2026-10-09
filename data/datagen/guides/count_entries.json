@@ -1,0 +1,44 @@
+{
+ "macro": "count_entries",
+ "summary": "Count and return the total number of matching entries displayed in a list, table, or grid on the page.",
+ "preconditions": [
+  "A webpage containing a list, table, or grid of entries is fully loaded on the screen."
+ ],
+ "steps": [
+  "Scan the page to locate the main container holding the list, table, or grid of entries.",
+  "If a specific condition or filter is required, locate and apply the corresponding filter controls (e.g., dropdowns, text search, checkboxes) and wait for the list to update.",
+  "Look near the top or bottom of the list for a status label or summary text indicating the total count (e.g., 'Showing 1-10 of 150', 'Total: 42 items').",
+  "If a summary text is present and accurate to the condition, record this number as the final count.",
+  "If no summary text is available, manually count the visible entries matching the criteria from top to bottom.",
+  "If the entries span multiple pages and no global total is displayed, navigate through each page using the pagination controls, counting the entries on each page to calculate the cumulative total."
+ ],
+ "variants": [
+  {
+   "when": "A 'Select All' checkbox is available at the top of the list",
+   "do": "Click the 'Select All' checkbox and look for a temporary banner or tooltip that displays the total number of selected items (e.g., 'All 125 items selected'), then deselect them."
+  },
+  {
+   "when": "The page uses infinite scroll instead of pagination",
+   "do": "Scroll down to the bottom of the container repeatedly until no more new items load, then count the total visible entries."
+  }
+ ],
+ "watch_for": [
+  "A loading spinner or dimmed list indicating that filters are being applied or new pages are loading.",
+  "The summary text updating its numbers after a filter is applied."
+ ],
+ "completion_signal": "The final count of matching entries has been identified and recorded.",
+ "pitfalls": [
+  "Counting table header rows, empty placeholder rows, or footer elements as actual entries.",
+  "Only counting the visible entries on the first page when additional pages of entries exist.",
+  "Counting duplicate entries if the list fails to refresh properly after applying a filter."
+ ],
+ "_provenance": {
+  "model": "gemini-3.5-flash",
+  "created": "2026-09-27",
+  "train_sites_only": true,
+  "source": "registry",
+  "n_demos": 0,
+  "sources": [],
+  "frames": 0
+ }
+}

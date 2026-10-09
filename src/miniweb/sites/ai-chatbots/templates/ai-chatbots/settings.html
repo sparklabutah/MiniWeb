@@ -1,0 +1,192 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}Settings - AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>Settings</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-container" style="max-width:600px;">
+    <h2>Preferences</h2>
+
+    <form id="settings-form" method="post" action="{{ url_for('ai-chatbots.form_save_settings') }}">
+        <div class="dropdown-group">
+            <label for="default_bot">Default Bot</label>
+            <select id="default_bot" name="default_bot">
+                {% for b in bots %}
+                <option value="{{ b }}" {% if user.preferences.default_bot == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="dropdown-group">
+            <label for="theme">Theme</label>
+            <select id="theme" name="theme">
+                <option value="dark" {% if user.preferences.theme == 'dark' %}selected{% endif %}>Dark</option>
+                <option value="light" {% if user.preferences.theme == 'light' %}selected{% endif %}>Light</option>
+            </select>
+        </div>
+
+        <div class="dropdown-group">
+            <label for="font_size">Font Size</label>
+            <select id="font_size" name="font_size">
+                <option value="small" {% if user.preferences.font_size == 'small' %}selected{% endif %}>Small</option>
+                <option value="medium" {% if user.preferences.font_size == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="large" {% if user.preferences.font_size == 'large' %}selected{% endif %}>Large</option>
+            </select>
+        </div>
+
+        <div class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="notifications" name="notifications" {% if user.preferences.notifications %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Enable Notifications</span>
+        </div>
+
+        <div class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="save_history" name="save_history" {% if user.preferences.save_history %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Save Chat History</span>
+        </div>
+
+        <div style="margin-top:16px;">
+            <h3 style="font-size:15px; margin-bottom:12px;">Subscription Plan</h3>
+            <div class="radio-group">
+                <label><input type="radio" name="subscription" value="free" {% if user.subscription == 'free' %}checked{% endif %}> Free Plan</label>
+                <label><input type="radio" name="subscription" value="pro" {% if user.subscription == 'pro' %}checked{% endif %}> Pro Plan</label>
+                <label><input type="radio" name="subscription" value="enterprise" {% if user.subscription == 'enterprise' %}checked{% endif %}> Enterprise Plan</label>
+            </div>
+        </div>
+
+        <button type="submit" class="form-btn">Save Settings</button>
+    </form>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Export Data</h3>
+        <div class="dropdown-group">
+            <label for="export_type">Export Type</label>
+            <select id="export_type">
+                <option value="conversations">My Conversations</option>
+                <option value="knowledge">Knowledge Base</option>
+                <option value="prompts">Prompts Library</option>
+            </select>
+        </div>
+        <div class="dropdown-group">
+            <label for="export_format">Format</label>
+            <select id="export_format">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+            </select>
+        </div>
+        <button class="btn-small btn-primary" onclick="exportData()">Export</button>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Upload Document to Knowledge Base</h3>
+        <form id="upload-form" method="post" action="{{ url_for('ai-chatbots.form_upload') }}">
+            <div class="form-group">
+                <label for="upload_topic">Topic</label>
+                <input type="text" id="upload_topic" name="topic" placeholder="Document topic">
+            </div>
+            <div class="form-group">
+                <label for="upload_category">Category</label>
+                <input type="text" id="upload_category" name="category" placeholder="e.g., programming, ai, data">
+            </div>
+            <div class="form-group">
+                <label for="upload_content">Content</label>
+                <textarea id="upload_content" name="content" rows="4" placeholder="Enter document content..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="upload_keywords">Keywords (comma-separated)</label>
+                <input type="text" id="upload_keywords" name="keywords" placeholder="e.g., docker, container, devops">
+            </div>
+            <button type="submit" class="btn-small btn-primary">Upload</button>
+        </form>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Import File to Knowledge Base</h3>
+        <p style="font-size:13px; color:#8e8ea0; margin-bottom:12px;">Upload a text file (.txt, .md, .csv, .json) to import its contents as a knowledge base document.</p>
+        <form id="kb-file-upload-form">
+            <div class="form-group">
+                <label for="kb_file">File</label>
+                <input type="file" id="kb_file" name="file" accept=".txt,.md,.csv,.json,text/plain" required>
+            </div>
+            <div class="form-group">
+                <label for="kb_file_topic">Topic (optional, defaults to filename)</label>
+                <input type="text" id="kb_file_topic" name="topic" placeholder="Document topic">
+            </div>
+            <div class="form-group">
+                <label for="kb_file_category">Category</label>
+                <input type="text" id="kb_file_category" name="category" placeholder="uploaded">
+            </div>
+            <button type="submit" class="btn-small btn-primary">Upload File</button>
+            <span id="kb-upload-status" style="font-size:13px; color:#8e8ea0; margin-left:8px;"></span>
+        </form>
+        <script>
+        document.getElementById('kb-file-upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fileInput = document.getElementById('kb_file');
+            var status = document.getElementById('kb-upload-status');
+            if (!fileInput.files.length) return;
+            var fd = new FormData();
+            fd.append('file', fileInput.files[0]);
+            var topic = document.getElementById('kb_file_topic').value.trim();
+            if (topic) fd.append('topic', topic);
+            var category = document.getElementById('kb_file_category').value.trim();
+            fd.append('category', category || 'uploaded');
+            status.textContent = 'Uploading...';
+            fetch('{{ url_for("ai-chatbots.api_upload") }}', { method: 'POST', body: fd })
+                .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+                .then(function(data) {
+                    status.textContent = 'Uploaded "' + data.topic + '" (entry #' + data.id + ')';
+                    status.style.color = '#19c37d';
+                    fileInput.value = '';
+                })
+                .catch(function() {
+                    status.textContent = 'Upload failed';
+                    status.style.color = '#ef4444';
+                });
+        });
+        </script>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid #565869; padding-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:12px; color:#ef4444;">Danger Zone</h3>
+        <p style="font-size:13px; color:#8e8ea0; margin-bottom:12px;">Delete all your conversations. This cannot be undone.</p>
+        <button class="btn-small btn-danger" id="delete-all-convos-btn">Delete All Conversations</button>
+        <script>
+        document.getElementById('delete-all-convos-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+            fetch('{{ url_for("ai-chatbots.form_delete_all_conversations") }}', {method: 'POST'})
+                .then(function(r) { return r.ok ? r : Promise.reject(); })
+                .then(function() { btn.textContent = 'Done!'; window.location.reload(); })
+                .catch(function() { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = 'Delete All Conversations'; btn.disabled = false; }, 2000); });
+        });
+        </script>
+    </div>
+</div>
+
+<script>
+var userId = {{ user.id|tojson }};
+var baseUrl = {{ url_for('ai-chatbots.index')|tojson }};
+
+function exportData() {
+    var type = document.getElementById('export_type').value;
+    var fmt = document.getElementById('export_format').value;
+    var url = baseUrl + 'api/export?type=' + type + '&format=' + fmt;
+    if (type === 'conversations') url += '&user_id=' + userId;
+    var btn = document.querySelector('[onclick="exportData()"]');
+    btn.textContent = 'Exporting...';
+    setTimeout(function(){ btn.textContent = 'Export'; }, 2000);
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

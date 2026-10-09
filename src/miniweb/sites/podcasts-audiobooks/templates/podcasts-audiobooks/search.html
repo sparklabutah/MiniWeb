@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search{% if q %}: {{ q }}{% endif %} - SoundShelf</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f1a; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; }
+        a { color: #8b5cf6; text-decoration: none; }
+        a:hover { color: #a78bfa; }
+
+        .top-bar { background: #1a1a2e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #2d2d44; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #8b5cf6; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+        .search-bar { margin-bottom: 1.5rem; }
+        .search-bar form { display: flex; gap: .5rem; }
+        .search-bar input { flex: 1; padding: .6rem 1rem; border: 1px solid #2d2d44; border-radius: .5rem; background: #1a1a2e; color: #e0e0e0; font-size: .95rem; }
+        .search-bar input:focus { border-color: #8b5cf6; outline: none; }
+        .search-bar button { background: #8b5cf6; color: #fff; border: none; padding: .6rem 1.2rem; border-radius: .5rem; cursor: pointer; font-size: .95rem; font-weight: 600; }
+        .search-bar button:hover { background: #7c3aed; }
+
+        .result-count { font-size: .85rem; color: #888; margin-bottom: 1.5rem; }
+
+        .section-title { font-size: 1.1rem; color: #f0f0f0; margin: 1.5rem 0 .8rem; }
+
+        .result-list { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1rem; }
+        .result-item { background: #1a1a2e; border-radius: .5rem; padding: .8rem 1rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; transition: border-color .2s; }
+        .result-item:hover { border-color: #8b5cf6; }
+        .result-item .r-info { flex: 1; }
+        .result-item .r-info h4 { font-size: .9rem; color: #f0f0f0; margin-bottom: .1rem; }
+        .result-item .r-info .r-sub { font-size: .8rem; color: #888; }
+        .result-item .r-info .r-desc { font-size: .75rem; color: #666; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: .2rem; }
+        .result-item .r-badge { font-size: .7rem; background: #2d2d44; color: #8b5cf6; padding: .15rem .5rem; border-radius: .3rem; margin-left: 1rem; white-space: nowrap; }
+
+        .no-results { text-align: center; color: #666; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('podcasts-audiobooks.index') }}" class="logo">SoundShelf</a>
+        <div class="nav-links">
+            <a href="{{ url_for('podcasts-audiobooks.index') }}">Discover</a>
+            <a href="{{ url_for('podcasts-audiobooks.podcasts_list') }}">Podcasts</a>
+            <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}">Audiobooks</a>
+            {% if user %}
+            <a href="{{ url_for('podcasts-audiobooks.library_page') }}">Library</a>
+            {% else %}
+            <a href="{{ url_for('podcasts-audiobooks.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="search-bar">
+            <form action="{{ url_for('podcasts-audiobooks.search_page') }}" method="get">
+                <input type="text" name="q" value="{{ q }}" placeholder="Search podcasts, audiobooks, episodes..." autofocus autocomplete="off">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        {% if q %}
+        {% set total = results.podcasts|length + results.audiobooks|length + results.episodes|length %}
+        <div class="result-count">{{ total }} results for "{{ q }}"</div>
+
+        {% if total == 0 %}
+        <div class="no-results">No results found. Try a different search term.</div>
+        {% endif %}
+
+        {% if results.podcasts %}
+        <h3 class="section-title">Podcasts ({{ results.podcasts|length }})</h3>
+        <div class="result-list">
+            {% for p in results.podcasts %}
+            <a href="{{ url_for('podcasts-audiobooks.podcast_detail', podcast_id=p.id) }}" class="result-item" style="text-decoration:none;color:inherit;">
+                <div class="r-info">
+                    <h4>{{ p.title }}</h4>
+                    <div class="r-sub">{{ p.host }} &middot; {{ p.rating }}/5</div>
+                    <div class="r-desc">{{ p.description }}</div>
+                </div>
+                <span class="r-badge">{{ p.category }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.audiobooks %}
+        <h3 class="section-title">Audiobooks ({{ results.audiobooks|length }})</h3>
+        <div class="result-list">
+            {% for a in results.audiobooks %}
+            <a href="{{ url_for('podcasts-audiobooks.audiobook_detail', audiobook_id=a.id) }}" class="result-item" style="text-decoration:none;color:inherit;">
+                <div class="r-info">
+                    <h4>{{ a.title }}</h4>
+                    <div class="r-sub">{{ a.author }} &middot; Narrated by {{ a.narrator }} &middot; ${{ "%.2f"|format(a.price) }}</div>
+                    <div class="r-desc">{{ a.description }}</div>
+                </div>
+                <span class="r-badge">{{ a.genre }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if results.episodes %}
+        <h3 class="section-title">Episodes ({{ results.episodes|length }})</h3>
+        <div class="result-list">
+            {% for e in results.episodes %}
+            <a href="{{ url_for('podcasts-audiobooks.episode_detail', episode_id=e.id) }}" class="result-item" style="text-decoration:none;color:inherit;">
+                <div class="r-info">
+                    <h4>{{ e.title }}</h4>
+                    <div class="r-sub">{{ e._podcast.title if e._podcast else '' }} &middot; {{ e.duration_minutes }} min &middot; {{ e.publish_date }}</div>
+                    <div class="r-desc">{{ e.description }}</div>
+                </div>
+                <span class="r-badge">Episode</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="no-results">Enter a search term to find podcasts, audiobooks, and episodes.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

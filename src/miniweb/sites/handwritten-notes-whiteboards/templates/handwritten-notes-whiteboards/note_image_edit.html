@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit image - {{ note.title }} - NoteCanvas</title>
+    <style>
+        :root {
+            --amber: #f59e0b; --amber-dark: #d97706; --amber-light: #fef3c7;
+            --amber-50: #fffbeb; --text-primary: #1c1917; --text-secondary: #57534e;
+            --text-muted: #a8a29e; --bg-page: #fafaf9; --bg-card: #ffffff;
+            --border: #e7e5e4; --border-light: #f5f5f4; --radius: .5rem;
+            --radius-lg: .75rem; --shadow-md: 0 4px 12px rgba(0,0,0,.07);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-page); color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; line-height: 1.5; }
+        a { color: var(--amber-dark); text-decoration: none; }
+
+        .top-bar { background: var(--bg-card); padding: .5rem 1rem; display: flex;
+            align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 200; }
+        .back-btn { display: inline-flex; align-items: center; gap: .3rem; font-size: .85rem;
+            font-weight: 500; color: var(--text-secondary); padding: .3rem .6rem; border-radius: var(--radius); }
+        .back-btn:hover { background: var(--border-light); color: var(--text-primary); }
+        .back-btn svg { width: 16px; height: 16px; }
+
+        .editor-wrap { display: flex; gap: 1.25rem; padding: 1.25rem; flex-wrap: wrap; align-items: flex-start; }
+        .canvas-col { flex: 1 1 380px; min-width: 300px; }
+        .tools-col { flex: 0 0 320px; }
+
+        .image-stage { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+            padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: .6rem; }
+        .image-stage img { max-width: 100%; max-height: 60vh; border-radius: var(--radius);
+            border: 1px solid var(--border-light); display: block; }
+        .image-meta { font-size: .75rem; color: var(--text-muted); }
+
+        .panel { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; }
+        .panel h2 { font-size: .95rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border);
+            background: var(--amber-50); color: var(--amber-dark); }
+
+        .tool { padding: .85rem 1rem; border-bottom: 1px solid var(--border-light); }
+        .tool:last-child { border-bottom: none; }
+        .tool-title { font-size: .82rem; font-weight: 700; color: var(--text-primary);
+            margin-bottom: .55rem; display: flex; align-items: center; gap: .4rem; }
+        .tool-title svg { width: 15px; height: 15px; fill: var(--amber-dark); }
+        .field-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .55rem; }
+        .field { display: flex; flex-direction: column; gap: .2rem; flex: 1 1 60px; }
+        .field label { font-size: .68rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+        .field input[type=number] { width: 100%; padding: .35rem .45rem; font-size: .82rem;
+            border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; }
+        .field input:focus { outline: none; border-color: var(--amber); }
+        .range-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .55rem; }
+        .range-row input[type=range] { flex: 1; accent-color: var(--amber); }
+        .range-val { font-size: .8rem; font-weight: 600; color: var(--amber-dark); min-width: 34px; text-align: right; }
+        .apply-btn { width: 100%; padding: .45rem; font-size: .82rem; font-weight: 600;
+            background: var(--amber); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; }
+        .apply-btn:hover { background: var(--amber-dark); }
+
+        .status { margin: 0 1rem 1rem; font-size: .78rem; padding: .5rem .7rem;
+            border-radius: var(--radius); display: none; }
+        .status.ok { display: block; color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .status.err { display: block; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('handwritten-notes-whiteboards.note_detail', note_id=note.id) }}" class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Back to note
+        </a>
+        <strong style="font-size:.9rem;">Edit image &mdash; {{ note.title }}</strong>
+    </div>
+
+    <div class="editor-wrap">
+        <!-- Preview -->
+        <div class="canvas-col">
+            <div class="image-stage">
+                <img id="note-image" src="{{ image_url }}" alt="{{ note.title }} image"
+                     data-base="{{ image_url }}">
+                <div class="image-meta" id="image-meta">Loading dimensions&hellip;</div>
+            </div>
+        </div>
+
+        <!-- Tools -->
+        <div class="tools-col">
+            <div class="panel">
+                <h2>Image tools</h2>
+
+                <!-- Crop -->
+                <div class="tool">
+                    <div class="tool-title">
+                        <svg viewBox="0 0 24 24"><path d="M7 17V1H5v4H1v2h4v10a2 2 0 002 2h10v4h2v-4h4v-2H7zM17 15h2V7a2 2 0 00-2-2H9v2h8v8z"/></svg>
+                        Crop
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label>X</label><input type="number" id="crop-x" value="0" min="0"></div>
+                        <div class="field"><label>Y</label><input type="number" id="crop-y" value="0" min="0"></div>
+                        <div class="field"><label>W</label><input type="number" id="crop-w" value="200" min="1"></div>
+                        <div class="field"><label>H</label><input type="number" id="crop-h" value="150" min="1"></div>
+                    </div>
+                    <button class="apply-btn" data-op="crop">Apply crop</button>
+                </div>
+
+                <!-- Resize -->
+                <div class="tool">
+                    <div class="tool-title">
+                        <svg viewBox="0 0 24 24"><path d="M3 3h8v2H5v6H3V3zm18 18h-8v-2h6v-6h2v8z"/></svg>
+                        Resize
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label>Width</label><input type="number" id="resize-w" value="320" min="1"></div>
+                        <div class="field"><label>Height</label><input type="number" id="resize-h" value="240" min="1"></div>
+                    </div>
+                    <button class="apply-btn" data-op="resize">Apply resize</button>
+                </div>
+
+                <!-- Contrast -->
+                <div class="tool">
+                    <div class="tool-title">
+                        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18V4a8 8 0 010 16z"/></svg>
+                        Contrast
+                    </div>
+                    <div class="range-row">
+                        <input type="range" id="contrast-value" min="0" max="2" step="0.05" value="1">
+                        <span class="range-val" id="contrast-val">1.00</span>
+                    </div>
+                    <button class="apply-btn" data-op="contrast">Apply contrast</button>
+                </div>
+
+                <!-- Vibrance -->
+                <div class="tool">
+                    <div class="tool-title">
+                        <svg viewBox="0 0 24 24"><path d="M12 3c-4 5-6 8-6 11a6 6 0 0012 0c0-3-2-6-6-11z"/></svg>
+                        Vibrance
+                    </div>
+                    <div class="range-row">
+                        <input type="range" id="vibrance-value" min="0" max="2" step="0.05" value="1">
+                        <span class="range-val" id="vibrance-val">1.00</span>
+                    </div>
+                    <button class="apply-btn" data-op="vibrance">Apply vibrance</button>
+                </div>
+
+                <div class="status" id="status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var noteId = {{ note.id }};
+        var img = document.getElementById('note-image');
+        var meta = document.getElementById('image-meta');
+        var statusEl = document.getElementById('status');
+        var endpoint = '{{ url_for("handwritten-notes-whiteboards.note_image_edit_submit", note_id=note.id) }}';
+
+        function updateMeta() {
+            if (img.naturalWidth) {
+                meta.textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+            }
+        }
+        img.addEventListener('load', updateMeta);
+        updateMeta();
+
+        // Live range value labels
+        ['contrast', 'vibrance'].forEach(function (op) {
+            var r = document.getElementById(op + '-value');
+            var out = document.getElementById(op + '-val');
+            r.addEventListener('input', function () { out.textContent = parseFloat(r.value).toFixed(2); });
+        });
+
+        function num(id) { var v = document.getElementById(id).value; return v === '' ? null : Number(v); }
+
+        function paramsFor(op) {
+            if (op === 'crop') return { x: num('crop-x'), y: num('crop-y'), w: num('crop-w'), h: num('crop-h') };
+            if (op === 'resize') return { w: num('resize-w'), h: num('resize-h') };
+            if (op === 'contrast') return { value: num('contrast-value') };
+            if (op === 'vibrance') return { value: num('vibrance-value') };
+            return {};
+        }
+
+        function show(ok, text) {
+            statusEl.className = 'status ' + (ok ? 'ok' : 'err');
+            statusEl.textContent = text;
+        }
+
+        document.querySelectorAll('.apply-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var op = btn.getAttribute('data-op');
+                // op leads the JSON body so it survives recorder body truncation.
+                var body = Object.assign({ op: op }, paramsFor(op));
+                btn.disabled = true;
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    btn.disabled = false;
+                    if (res.ok) {
+                        show(true, 'Applied ' + op + ' ✓ (edit #' + res.d.edit_count + ')');
+                        // Refresh preview with cache-buster
+                        img.src = res.d.image + '?t=' + Date.now();
+                    } else {
+                        show(false, res.d.error || 'Edit failed');
+                    }
+                })
+                .catch(function () { btn.disabled = false; show(false, 'Network error'); });
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Following - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
+    <style>
+        .sub-list { display: flex; flex-direction: column; gap: .7rem; max-width: 760px; }
+        .sub-card { background: var(--surface); border-radius: .5rem; padding: .9rem 1.1rem; display: flex; align-items: center; gap: 1rem; }
+        .sub-card:hover { background: var(--surface-2); }
+        .sub-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .sub-info { flex: 1; min-width: 0; }
+        .sub-info .name a { font-weight: 700; font-size: .92rem; color: var(--text); }
+        .sub-info .name a:hover { color: var(--purple-2); }
+        .sub-info .meta { font-size: .8rem; color: var(--text-alt); margin-top: .15rem; }
+    </style>
+</head>
+<body>
+    {% set active_nav = 'following' %}
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <main class="tw-main">
+            <div class="tw-content">
+                <div class="tw-page-head">
+                    <h1>Your Subscriptions <span style="color:var(--text-dim);font-weight:500;font-size:1rem;">({{ subscriptions|length }})</span></h1>
+                </div>
+
+                {% if subscriptions %}
+                <div class="sub-list">
+                    {% for sub in subscriptions %}
+                    {% set channel = user_map.get(sub.channel_id) %}
+                    <div class="sub-card">
+                        <span class="sub-av" style="background: {{ channel.avatar_color if channel else '#9147ff' }};">{{ channel.display_name[0]|upper if channel else '?' }}</span>
+                        <div class="sub-info">
+                            <div class="name"><a href="{{ url_for('live.channel_page', user_id=sub.channel_id) }}">{{ channel.display_name if channel else 'Unknown' }}</a></div>
+                            <div class="meta">
+                                {{ sub.tier | replace('_', ' ') | title }} &middot; {{ sub.months_subscribed }} months &middot; ${{ sub.monthly_price_usd }}/mo{% if sub.is_gift %} &middot; Gift{% endif %}
+                            </div>
+                        </div>
+                        <a class="tw-btn-2 tw-btn-sm" href="{{ url_for('live.channel_page', user_id=sub.channel_id) }}">View</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tw-empty"><p>You don't have any active subscriptions yet. <a href="{{ url_for('live.index') }}" style="color:var(--purple-2);">Browse channels &rarr;</a></p></div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

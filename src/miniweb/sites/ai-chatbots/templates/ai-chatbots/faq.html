@@ -1,0 +1,33 @@
+{% extends "ai-chatbots/base.html" %}
+{% block title %}FAQ - AI Chatbots Hub{% endblock %}
+
+{% block topbar %}
+<div class="top-bar">
+    <h1>Frequently Asked Questions</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p>Find answers to common questions about the AI Chatbots platform</p>
+</div>
+
+<form class="search-bar" method="GET" action="{{ url_for('ai-chatbots.faq_page') }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search FAQ...">
+    <button type="submit">Search</button>
+</form>
+
+<div style="max-width:1000px;margin:0 auto;">
+    {% for entry in entries %}
+    <div class="card" style="margin-bottom:12px;">
+        <h3>{{ entry.question }}</h3>
+        {% if entry.category %}<span class="category-badge">{{ entry.category }}</span>{% endif %}
+        <p style="margin-top:8px;">{{ entry.answer }}</p>
+    </div>
+    {% endfor %}
+
+    {% if not entries %}
+    <p style="text-align:center; color:#8e8ea0; margin-top:40px;">No FAQ entries found{% if q %} matching "{{ q }}"{% endif %}.</p>
+    {% endif %}
+</div>
+{% endblock %}

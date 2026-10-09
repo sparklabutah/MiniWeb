@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Lakeport Transit Authority</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #1a237e; color: white; padding: 16px 24px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .nav { background: #283593; padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+        .nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 12px 16px; font-size: 14px; white-space: nowrap; border-bottom: 3px solid transparent; }
+        .nav a:hover, .nav a.active { color: white; border-bottom-color: #ffca28; }
+        .container { max-width: 480px; margin: 0 auto; padding: 48px 24px; }
+        .login-card { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .login-card h2 { font-size: 22px; margin-bottom: 8px; color: #1a237e; }
+        .login-card .desc { font-size: 14px; color: #666; margin-bottom: 24px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; font-weight: 600; }
+        .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .btn { width: 100%; background: #1a237e; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; margin-top: 8px; }
+        .btn:hover { background: #283593; }
+        .error { background: #fce4ec; color: #c62828; padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+        .success { background: #e8f5e9; color: #2e7d32; padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lakeport Transit Authority</h1>
+        <div class="subtitle">Public Transit for Lakeport and the Region</div>
+    </div>
+    <div class="nav">
+        <a href="{{ url_for('transit-directions.index') }}">Home</a>
+        <a href="{{ url_for('transit-directions.routes_list') }}">Routes</a>
+        <a href="{{ url_for('transit-directions.stops_list') }}">Stops</a>
+        <a href="{{ url_for('transit-directions.trip_planner') }}">Trip Planner</a>
+        <a href="{{ url_for('transit-directions.fares_page') }}">Fares</a>
+        <a href="{{ url_for('transit-directions.login') }}" class="active">Sign In</a>
+    </div>
+
+    <div class="container">
+        <div class="login-card">
+            {% if success is defined and success %}
+            <div class="success">Welcome back, {{ user_name }}! You are now signed in.</div>
+            <p style="font-size: 14px; color: #666;">You can now <a href="{{ url_for('transit-directions.trip_planner') }}" style="color:#1a237e;">view your saved trips</a>.</p>
+            {% else %}
+            <h2>Sign In</h2>
+            <p class="desc">Sign in to access your saved trips and transit pass information.</p>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('transit-directions.login') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn">Sign In</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Lakeport Tribune</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f4f4f4; color: #222; font-family: Georgia, 'Times New Roman', serif; line-height: 1.6; }
+        a { color: #1a5276; text-decoration: none; }
+        a:hover { color: #0d3b5e; text-decoration: underline; }
+        .site-header { background: #1a1a2e; color: #fff; }
+        .header-brand { text-align: center; padding: 1.2rem 1rem .8rem; border-bottom: 3px double #444; }
+        .header-brand h1 { font-size: 2rem; letter-spacing: 2px; color: #fff; }
+        .header-brand h1 a { color: #fff; text-decoration: none; }
+        .container { max-width: 480px; margin: 3rem auto; padding: 0 1rem; }
+        .form-box { background: #fff; border-radius: .4rem; padding: 2rem 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .form-box h2 { font-size: 1.5rem; color: #1a1a2e; margin-bottom: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .95rem; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .form-group input:focus { outline: none; border-color: #e74c3c; }
+        .newsletter-prefs { margin-bottom: 1.2rem; padding: .9rem 1rem; background: #f9f9f9; border: 1px solid #eee; border-radius: .3rem; }
+        .newsletter-prefs .prefs-title { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: .6rem; }
+        .newsletter-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: .35rem 0; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #555; }
+        .toggle-btn { border: 1px solid #ccc; background: #eee; color: #888; border-radius: 1rem; padding: .2rem .9rem; font-size: .75rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .toggle-btn[aria-pressed="true"] { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+        .btn-submit { display: block; width: 100%; padding: .7rem; background: #e74c3c; color: #fff; border: none; border-radius: .3rem; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .btn-submit:hover { background: #c0392b; }
+        .error-msg { background: #fce4e4; color: #c0392b; padding: .6rem .8rem; border-radius: .3rem; margin-bottom: 1rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; }
+        .form-footer { text-align: center; margin-top: 1.2rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .85rem; color: #888; }
+        .form-footer a { color: #e74c3c; font-weight: 600; }
+        .site-footer { background: #1a1a2e; color: #888; padding: 2rem 1.5rem; margin-top: 3rem; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: .8rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-brand">
+            <h1><a href="{{ url_for('news.index') }}">Lakeport Tribune</a></h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="form-box">
+            <h2>Create an Account</h2>
+            {% if error %}
+            <div class="error-msg">{{ error }}</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('news.register_submit') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="display_name">Display Name</label>
+                    <input type="text" id="display_name" name="display_name">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="newsletter-prefs">
+                    <div class="prefs-title">Newsletter Preferences</div>
+                    <div class="newsletter-toggle-row">
+                        <span>Daily Digest</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_daily_digest">Off</button>
+                    </div>
+                    <div class="newsletter-toggle-row">
+                        <span>Breaking News Alerts</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_breaking_news">Off</button>
+                    </div>
+                    <div class="newsletter-toggle-row">
+                        <span>Weekly Roundup</span>
+                        <button type="button" class="toggle-btn" aria-pressed="false" data-target="newsletter_weekly_roundup">Off</button>
+                    </div>
+                    <input type="hidden" name="newsletter_daily_digest" id="newsletter_daily_digest" value="">
+                    <input type="hidden" name="newsletter_breaking_news" id="newsletter_breaking_news" value="">
+                    <input type="hidden" name="newsletter_weekly_roundup" id="newsletter_weekly_roundup" value="">
+                </div>
+                <button type="submit" class="btn-submit">Register</button>
+            </form>
+            <div class="form-footer">
+                Already have an account? <a href="{{ url_for('news.login_page') }}">Sign In</a>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <p>&copy; Lakeport Tribune</p>
+    </footer>
+
+    <script>
+    document.querySelectorAll('.toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var on = btn.getAttribute('aria-pressed') === 'true';
+            btn.setAttribute('aria-pressed', on ? 'false' : 'true');
+            btn.textContent = on ? 'Off' : 'On';
+            document.getElementById(btn.dataset.target).value = on ? '' : 'on';
+        });
+    });
+    </script>
+</body>
+</html>

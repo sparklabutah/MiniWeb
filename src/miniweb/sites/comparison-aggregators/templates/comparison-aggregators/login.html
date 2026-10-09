@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — PhoneCompare</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: #1a237e; color: #fff; padding: .7rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header-nav a { color: #bbdefb; margin-left: .8rem; text-decoration: none; font-size: .85rem; }
+        .header-nav a:hover { color: #fff; }
+
+        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 50px); padding: 2rem 1rem; }
+        .login-card { background: #fff; width: 100%; max-width: 380px; border-radius: .5rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); overflow: hidden; }
+        .login-header { background: #1a237e; padding: 1.5rem; text-align: center; }
+        .login-header h2 { color: #fff; font-size: 1.2rem; }
+        .login-header p { color: #bbdefb; font-size: .8rem; margin-top: .3rem; }
+
+        .login-body { padding: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: .8rem; color: #666; font-weight: 600; margin-bottom: .3rem; }
+        .form-group input { width: 100%; padding: .55rem .8rem; border: 1px solid #ccc; border-radius: .3rem; font-size: .9rem; }
+        .form-group input:focus { outline: none; border-color: #1a237e; box-shadow: 0 0 0 2px rgba(26,35,126,.1); }
+
+        .error-msg { background: #ffebee; color: #c62828; padding: .5rem .8rem; border-radius: .3rem; font-size: .8rem; margin-bottom: 1rem; border-left: 3px solid #c62828; }
+
+        .btn-login { width: 100%; padding: .6rem; background: #ff6600; color: #fff; border: none; border-radius: .3rem; font-size: .9rem; font-weight: 700; cursor: pointer; }
+        .btn-login:hover { background: #e55b00; }
+
+        .login-footer { text-align: center; padding: .8rem 1.5rem 1.5rem; font-size: .8rem; color: #999; }
+        .login-footer a { color: #1a237e; text-decoration: none; }
+        .login-footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('comparison-aggregators.index') }}">PhoneCompare</a></h1>
+                <div class="header-nav">
+            <a href="{{ url_for('comparison-aggregators.index') }}">Browse</a>
+            <a href="{{ url_for('comparison-aggregators.compare_page') }}">Compare</a>
+            {% if user %}
+            <a href="{{ url_for('comparison-aggregators.favorites_page') }}">Favorites</a>
+            <a href="{{ url_for('comparison-aggregators.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('comparison-aggregators.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('comparison-aggregators.login_page') }}">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <h2>Sign In</h2>
+                <p>Access your favorites and comparisons</p>
+            </div>
+            <div class="login-body">
+                {% if error %}
+                <div class="error-msg">{{ error }}</div>
+                {% endif %}
+                <form method="post" action="{{ url_for('comparison-aggregators.login_submit') }}">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                    </div>
+                    <button class="btn-login" type="submit">Sign In</button>
+                </form>
+            </div>
+            <div class="login-footer">
+                <a href="{{ url_for('comparison-aggregators.index') }}">Back to phone listings</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

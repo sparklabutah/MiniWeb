@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; color: #cdd6f4; text-decoration: none; }
+        .nav-bar .spacer { flex: 1; }
+        .content { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+        .user-card { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1.5rem; margin-bottom: 2rem; }
+        .user-card h2 { font-family: monospace; margin-bottom: .5rem; }
+        .user-card .email { color: #a6adc8; font-size: .9rem; }
+        .user-card .stats { display: flex; gap: 2rem; margin-top: 1rem; }
+        .user-card .stat { text-align: center; }
+        .user-card .stat-val { font-size: 1.5rem; font-weight: bold; color: #89b4fa; }
+        .user-card .stat-label { font-size: .8rem; color: #6c7086; }
+        .section { margin-bottom: 2rem; }
+        .section h3 { font-size: 1.1rem; color: #a6adc8; margin-bottom: 1rem; border-bottom: 1px solid #313244; padding-bottom: .5rem; }
+        .saved-list { display: flex; flex-direction: column; gap: .5rem; }
+        .saved-item { background: #181825; border: 1px solid #313244; padding: .8rem 1rem; border-radius: .3rem; display: flex; justify-content: space-between; align-items: center; }
+        .saved-item:hover { border-color: #89b4fa; }
+        .saved-item .actions { display: flex; gap: .5rem; }
+        .saved-item .actions a, .saved-item .actions button { font-size: .8rem; padding: .25rem .6rem; background: #313244; border: none; border-radius: .25rem; color: #89b4fa; cursor: pointer; text-decoration: none; }
+        .saved-item .actions button:hover, .saved-item .actions a:hover { background: #45475a; }
+        .history-list { display: flex; flex-direction: column; gap: .5rem; }
+        .history-item { background: #181825; border: 1px solid #313244; padding: .8rem 1rem; border-radius: .3rem; }
+        .history-item pre { font-family: monospace; font-size: .8rem; color: #a6adc8; white-space: pre-wrap; max-height: 60px; overflow: hidden; }
+        .history-item .result { font-size: .8rem; margin-top: .3rem; }
+        .result-ok { color: #a6e3a1; }
+        .result-err { color: #f38ba8; }
+        .empty { color: #6c7086; font-style: italic; padding: 1rem; text-align: center; }
+        .settings-summary { background: #181825; border: 1px solid #313244; border-radius: .5rem; padding: 1rem 1.2rem; }
+        .settings-summary table { width: 100%; font-size: .9rem; }
+        .settings-summary td { padding: .3rem .5rem; }
+        .settings-summary td:first-child { color: #a6adc8; font-weight: 600; width: 140px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&gt;_ CodeRunner</h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+        <a href="{{ url_for('code-editor-execution.upload_page') }}">Upload Snippet</a>
+        <a href="{{ url_for('code-editor-execution.export_page') }}">Export</a>
+        <span class="spacer"></span>
+        <a href="{{ url_for('code-editor-execution.settings_page') }}">Settings</a>
+        <a href="{{ url_for('code-editor-execution.logout') }}">Logout</a>
+    </div>
+
+    <div class="content">
+        <div class="user-card">
+            <h2>{{ user.name }}</h2>
+            <div class="email">{{ user.email }} / @{{ user.username }}</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-val">{{ user.get('saved_snippets', [])|length }}</div>
+                    <div class="stat-label">Saved Snippets</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-val">{{ user.get('execution_history', [])|length }}</div>
+                    <div class="stat-label">Executions</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Editor Settings</h3>
+            <div class="settings-summary">
+                <table>
+                    <tr><td>Font Size</td><td>{{ settings.get('font_size', 'default (14)') }}</td></tr>
+                    <tr><td>Tab Size</td><td>{{ settings.get('tab_size', 'default (4)') }}</td></tr>
+                    <tr><td>Theme</td><td>{{ settings.get('theme', 'default (dark)') }}</td></tr>
+                </table>
+                <div style="margin-top:.8rem"><a href="{{ url_for('code-editor-execution.settings_page') }}">Change Settings</a></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Saved Snippets</h3>
+            {% if saved_snippets %}
+            <div class="saved-list">
+                {% for s in saved_snippets %}
+                <div class="saved-item">
+                    <div>
+                        <a href="{{ url_for('code-editor-execution.snippet_detail', snippet_id=s.id) }}">{{ s.title }}</a>
+                        <span style="color:#6c7086;font-size:.8rem"> -- {{ s.category }} / {{ s.difficulty }}</span>
+                    </div>
+                    <div class="actions">
+                        <a href="{{ url_for('code-editor-execution.editor', snippet_id=s.id) }}">Run</a>
+                        <form method="post" action="{{ url_for('code-editor-execution.form_unsave_snippet', snippet_id=s.id) }}" style="display:inline">
+                            <button type="submit">Remove</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">No saved snippets yet. Browse the gallery and save some!</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Recent Execution History</h3>
+            {% if user.get('execution_history', []) %}
+            <div class="history-list">
+                {% for h in user.get('execution_history', [])[-10:]|reverse %}
+                <div class="history-item">
+                    <pre>{{ h.code[:200] }}</pre>
+                    <div class="result {% if h.returncode == 0 %}result-ok{% else %}result-err{% endif %}">
+                        {% if h.returncode == 0 %}Success{% else %}Error (code {{ h.returncode }}){% endif %}
+                        {% if h.stdout %} -- {{ h.stdout[:80] }}{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">No execution history yet. Run some code!</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

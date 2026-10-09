@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MiniWeb — Verifier Builder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+.top-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: .5rem 1rem; display: flex; align-items: center; gap: 1rem; }
+.top-bar h1 { font-size: 1rem; font-weight: 700; }
+.top-bar a { color: #2563eb; font-size: .85rem; text-decoration: none; }
+.container { display: flex; height: calc(100vh - 45px); }
+.sidebar { width: 320px; background: #fff; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: .8rem; }
+.main { min-width: 0; flex: 1; overflow-y: auto; padding: 1rem; }
+
+.task-card { padding: .5rem; border: 1px solid #e2e8f0; border-radius: .35rem; margin-bottom: .4rem; cursor: pointer; font-size: .78rem; }
+.task-card:hover { background: #f1f5f9; }
+.task-card.active { border-color: #2563eb; background: #eff6ff; }
+.task-card .tc-id { font-weight: 600; color: #2563eb; }
+.task-card .tc-inst { color: #475569; margin-top: .2rem; }
+.task-card .tc-meta { color: #94a3b8; font-size: .68rem; margin-top: .15rem; }
+
+.section { background: #fff; border: 1px solid #e2e8f0; border-radius: .4rem; padding: .8rem; margin-bottom: .8rem; }
+.section h3 { font-size: .9rem; margin-bottom: .4rem; }
+.section .hint { font-size: .78rem; color: #64748b; margin-bottom: .5rem; }
+label { display: block; font-size: .75rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: .2rem; margin-top: .5rem; }
+.mono { font-family: monospace; font-size: .75rem; background: #f1f5f9; padding: .3rem .5rem; border-radius: .25rem; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+.badge { display: inline-block; font-size: .65rem; padding: .1rem .4rem; border-radius: 1rem; font-weight: 600; }
+.badge-pass { background: #dcfce7; color: #166534; }
+.badge-fail { background: #fef2f2; color: #991b1b; }
+.badge-pending { background: #fef3c7; color: #92400e; }
+
+.traj-entry { font-size: .72rem; padding: .15rem .3rem; border-left: 2px solid #e2e8f0; margin: .1rem 0 .1rem .5rem; }
+.traj-entry.action { border-left-color: #2563eb; }
+.traj-entry.network { border-left-color: #16a34a; font-family: monospace; color: #64748b; }
+.traj-entry .method { font-weight: 700; }
+.traj-entry .status-ok { color: #16a34a; } .traj-entry .status-err { color: #ef4444; }
+
+.btn { padding: .4rem .8rem; border-radius: .3rem; border: none; cursor: pointer; font-size: .8rem; font-weight: 500; }
+.btn-primary { background: #2563eb; color: #fff; } .btn-primary:hover { background: #1d4ed8; }
+/* readable verifier tree (shared look with Verifier Review) */
+.tv-macro { background:#fff; border:1px solid #e2e8f0; border-radius:.4rem; margin-bottom:.5rem; overflow:hidden; }
+.tv-macro > .mhead { display:flex; align-items:center; gap:.5rem; padding:.4rem .6rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
+.tv-macro > .mhead .mname { font-weight:700; font-family:monospace; font-size:.82rem; }
+.tv-macro > .mbody { padding:.5rem .6rem; display:flex; gap:.7rem; align-items:stretch; }
+.tv-body-tree { flex:1 1 50%; min-width:0; }
+.tv-fb { flex:1 1 50%; min-width:0; border-left:1px dashed #e2e8f0; padding-left:.6rem; display:flex; flex-direction:column; }
+.tv-fb label { margin-top:0; font-size:.6rem; }
+.tv-fb textarea { width:100%; flex:1; min-height:80px; border:1px solid #cbd5e1; border-radius:.25rem; padding:.35rem; font-size:.74rem; font-family:inherit; resize:vertical; }
+.tv-fb .fbrow { display:flex; align-items:center; gap:.4rem; margin-top:.25rem; }
+.tv-fb .fbst { font-size:.62rem; color:#94a3b8; }
+.tv-group { border-left:2px solid #cbd5e1; padding-left:.6rem; margin:.2rem 0 .2rem .15rem; }
+.tv-group.or { border-left-color:#f59e0b; } .tv-group.and { border-left-color:#3b82f6; }
+.tv-glbl { font-size:.6rem; text-transform:uppercase; font-weight:700; letter-spacing:.04em; }
+.tv-group.or > .tv-glbl { color:#b45309; } .tv-group.and > .tv-glbl { color:#1d4ed8; }
+.tv-leaf { font-size:.78rem; padding:.15rem 0; line-height:1.4; }
+.tv-leaf .lt { display:inline-block; min-width:84px; font-size:.58rem; text-transform:uppercase; font-weight:700; color:#64748b; }
+.tv-leaf code { background:#f1f5f9; padding:.04rem .28rem; border-radius:.2rem; font-size:.74rem; }
+.tv-any { color:#94a3b8; font-style:italic; }
+.tv-raw { margin-top:.35rem; } .tv-raw summary { font-size:.66rem; color:#94a3b8; cursor:pointer; }
+.tv-raw textarea { width:100%; font-family:monospace; font-size:.7rem; border:1px solid #cbd5e1; border-radius:.25rem; padding:.35rem; min-height:110px; margin-top:.25rem; }
+.quality-pills { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.3rem; }
+.quality-pill { border-radius:.3rem; padding:.15rem .35rem; background:#e2e8f0; color:#334155; font-size:.65rem; }
+.quality-pill[data-state="needs_repair"], .quality-pill[data-state="suggest_delete"], .quality-pill[data-state="fail"] { background:#fee2e2; color:#991b1b; }
+.quality-pill[data-state="stale"], .quality-pill[data-state="unreviewed"] { background:#fef3c7; color:#92400e; }
+.quality-pill.rerecorded-pill { background:#ede9fe; color:#5b21b6; }
+.quality-pill[data-state="repaired"], .quality-pill[data-state="keep"], .quality-pill[data-state="pass"] { background:#e0f2fe; color:#075985; }
+.quality-filter { width:100%;padding:.3rem;margin-top:.3rem;border:1px solid #cbd5e1;border-radius:.25rem;background:white;font-size:.74rem; }
+#quality-panel p, #quality-panel li { font-size:.78rem; line-height:1.5; }
+#quality-panel ul { padding-left:1.2rem; margin:.3rem 0; }
+#quality-panel table { width:100%; border-collapse:collapse; font-size:.75rem; margin:.5rem 0; }
+#quality-panel th, #quality-panel td { text-align:left; padding:.3rem; border-bottom:1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+    <h1>Verifier Builder</h1>
+    <a href="/annotate/">← Annotator</a>
+    <a href="/annotate/review">Review</a>
+    <a href="/annotate/task-review">Task Review</a>
+    <span style="flex:1"></span>
+    <span style="font-size:.75rem;color:#94a3b8">{{ tasks|length }} tasks available</span>
+</div>
+
+<div class="container">
+    <div class="sidebar">
+        <div style="margin-bottom:.5rem">
+            <select id="annotator-filter" onchange="setAnnotatorFilter(this.value)" style="width:100%;padding:.3rem .4rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem;margin-bottom:.3rem;background:#fff">
+                <option value="">All annotators ({{ tasks|length }})</option>
+                {% for ann, cnt in annotator_counts %}
+                <option value="{{ ann }}">{{ ann }} ({{ cnt }})</option>
+                {% endfor %}
+            </select>
+            <input type="text" id="task-search" placeholder="Search tasks..." style="width:100%;padding:.3rem .5rem;border:1px solid #e2e8f0;border-radius:.25rem;font-size:.78rem" oninput="filterTasks(this.value)">
+            <div id="tag-filter-row" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.3rem">
+                <button onclick="toggleSortOrder()" id="sort-order-btn"
+                    title="Toggle task sort order"
+                    style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #93c5fd;background:#eff6ff;color:#2563eb">
+                    {{ '↓ Newest' if sort == 'newest' else '↑ Oldest' }}
+                </button>
+                <button class="tagf active" data-tagf="" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#1e293b;color:#fff">All</button>
+                <button class="tagf" data-tagf="verified" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #86efac;border-radius:.6rem;cursor:pointer;background:#f0fdf4;color:#16a34a">&#10003; Human verified</button>
+                <button class="tagf" data-tagf="stale" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #fdba74;border-radius:.6rem;cursor:pointer;background:#fff7ed;color:#ea580c">Stale</button>
+                <button class="tagf" data-tagf="untagged" onclick="setTagFilter(this)" style="font-size:.62rem;padding:.1rem .45rem;border:1px solid #cbd5e1;border-radius:.6rem;cursor:pointer;background:#f8fafc;color:#64748b">Human unreviewed</button>
+            </div>
+        </div>
+        <select id="ai-filter" class="quality-filter" aria-label="AI review filter" onchange="filterTasks(document.getElementById('task-search').value)">
+            <option value="">All AI recommendations</option>
+            {% for value, label in [('unreviewed','Not reviewed'),('keep','Keep candidate'),('repaired','Repaired'),('needs_repair','Needs repair'),('suggest_delete','Deletion suggested'),('stale','Review outdated')] %}
+            <option value="{{ value }}">{{ label }} ({{ tasks|selectattr('quality.ai', 'equalto', value)|list|length }})</option>
+            {% endfor %}
+        </select>
+        <select id="evidence-filter" class="quality-filter" aria-label="Evidence filter" onchange="filterTasks(document.getElementById('task-search').value)">
+            <option value="">All validation evidence</option>
+            <option value="attention">Needs attention</option><option value="unrun">Fresh walk not tested</option>
+            <option value="pass">Saved fresh walk passed</option><option value="fail">Saved fresh walk failed</option>
+            <option value="stale">Fresh-walk result outdated</option>
+        </select>
+        <p style="font-size:.65rem;color:#64748b;margin:.3rem 0">AI recommendations and test results do not grant human approval.</p>
+        <div id="task-search-empty" style="font-size:.75rem;color:#94a3b8"></div>
+        <div id="task-list">
+            {% for t in tasks %}
+            {% set t_tag = t.review_tag.tag if t.review_tag else '' %}
+            {% set t_sites = t.sites|join(' ') if t.sites else '' %}
+            <div class="task-card{% if task and t.task_id == task.task_id %} active{% endif %}"
+                 data-tag="{{ t_tag }}" data-ai="{{ t.quality.ai }}" data-walk="{{ t.quality.walk }}" data-attention="{{ 'yes' if t.quality.attention else 'no' }}"
+                 data-annotator="{{ t.annotator|default('') }}"
+                 data-search="{{ (t.task_id ~ ' ' ~ (t.annotator|default('')) ~ ' ' ~ (t.instruction|default('')) ~ ' ' ~ t_sites ~ ' ' ~ (t.macros|join(' ') if t.macros else '') ~ ' ' ~ t_tag ~ ' ' ~ t.quality.ai_label ~ ' ' ~ t.quality.review.get('note', ''))|lower }}"
+                 onclick="location.href='/annotate/verify?task_id={{ t.task_id }}&annotator={{ t.annotator|default('') }}&sort={{ sort }}'">
+                <div class="tc-id">{{ t.task_id }}
+                    {% if t_tag == 'verified' %}<span class="verified-pill" data-by="{{ t.review_tag.by|default('') }}" data-at="{{ t.review_tag.at|default('') }}" style="font-size:.58rem;background:#dcfce7;color:#16a34a;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#10003; human verified</span>
+                    {% elif t_tag == 'stale' %}<span style="font-size:.58rem;background:#ffedd5;color:#ea580c;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">stale</span>{% endif %}
+                    {% if t.has_feedback %}<span style="font-size:.58rem;background:#ede9fe;color:#7c3aed;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">&#9998; feedback</span>{% endif %}
+                    {% if not t.has_verifier %}<span style="font-size:.58rem;background:#f1f5f9;color:#94a3b8;padding:.05rem .3rem;border-radius:.5rem;font-weight:700">no verifier</span>{% endif %}
+                </div>
+                <div class="quality-pills"><span class="quality-pill ai-pill" data-state="{{ t.quality.ai }}">AI: {{ t.quality.ai_label }}</span><span class="quality-pill walk-pill" data-state="{{ t.quality.walk }}"{% if t.quality.walk_by %} title="Fresh walk recorded by {{ t.quality.walk_by.by }} on {{ (t.quality.walk_by.at or '')[:10] }}"{% endif %}>{{ 'AI walk' if t.quality.walk_by and t.quality.walk_by.ai else 'Walk' }}: {{ {'unrun':'not tested','pass':'passed','fail':'failed','stale':'outdated'}[t.quality.walk] }}</span>{% if t.quality.rerecorded %}<span class="quality-pill rerecorded-pill" title="Original recording re-recorded by {{ t.quality.rerecorded.by or 'unknown' }} at {{ t.quality.rerecorded.at }}">&#8634; re-recorded</span>{% endif %}</div>
+                <div class="tc-inst">{{ t.instruction[:80] if t.instruction else '(no instruction)' }}{{ '...' if t.instruction and t.instruction|length > 80 }}</div>
+                <div class="tc-meta">{{ t.annotator|default('?') }} · {{ (t.sites[0].id if t.sites[0] is mapping else t.sites[0]) if t.sites else '?' }} · {{ t.trajectory_actions|default(0) }} actions</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="main">
+        {% if not task %}
+        <div class="section">
+            <h3>Select a task from the sidebar</h3>
+            <p class="hint">Pick a completed annotation task to build verifiers for it.</p>
+        </div>
+        {% else %}
+        <div class="section" id="quality-panel" aria-label="AI review and validation evidence"></div>
+        <!-- Task info -->
+        <div class="section">
+            <div style="display:flex;align-items:center;gap:.6rem">
+                <h3 style="flex:1;margin:0">{{ task.task_id }}</h3>
+                {% set cur_tag = task.review_tag.tag if task.review_tag else '' %}
+                <button onclick="setReviewTag('verified')" id="tag-verified-btn" title="Human editorial decision; separate from verifier validation"
+                    style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #86efac;{{ 'background:#16a34a;color:#fff' if cur_tag == 'verified' else 'background:#f0fdf4;color:#16a34a' }}">
+                    &#10003; Human verified
+                </button>
+                <span id="verified-meta" style="font-size:.68rem;color:#16a34a;white-space:nowrap;"></span>
+                <button onclick="setReviewTag('stale')" id="tag-stale-btn" title="Mark as stale: outdated against current site/data"
+                    style="padding:.25rem .7rem;font-size:.72rem;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap;border:1px solid #fdba74;{{ 'background:#ea580c;color:#fff' if cur_tag == 'stale' else 'background:#fff7ed;color:#ea580c' }}">
+                    &#9888; Stale
+                </button>
+                <span style="width:1px;height:18px;background:#e2e8f0"></span>
+                <button onclick="rerecordTask()"
+                    style="padding:.25rem .7rem;font-size:.72rem;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
+                    &#8634; Re-record
+                </button>
+                <button onclick="deleteTask()"
+                    style="padding:.25rem .7rem;font-size:.72rem;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:.25rem;cursor:pointer;font-weight:600;white-space:nowrap">
+                    &#128465; Delete
+                </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <label style="margin:0">Instruction <span style="font-weight:400;text-transform:none;color:#94a3b8">— edit inline; saves automatically</span></label>
+                <span id="instr-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            <textarea id="instruction-original" rows="4"
+                style="width:100%;font-size:.85rem;line-height:1.4;padding:.4rem .5rem;border:1px solid #cbd5e1;border-radius:.3rem;margin-bottom:.5rem;font-family:inherit"
+                oninput="document.getElementById('instr-status').textContent=''"
+                onchange="saveInstruction('{{ task.task_id }}', '{{ task.annotator|default('anonymous') }}', this.value)"
+            >{{ task.instruction }}</textarea>
+
+            <div style="display:flex;gap:1rem;flex-wrap:wrap">
+                <div>
+                    <label>Sites</label>
+                    <span>{% for s in task.sites %}{{ s.id if s is mapping else s }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                </div>
+                <div>
+                    <label>Macros</label>
+                    <span>{% for m in task.macro_instances or task.macros %}{{ (macro_descriptions.get(m.split('#')[0], {}).get('description', m))[:30] }}{% if task.macro_operations and task.macro_operations.get(m) %} <b style="color:#4338ca">[{{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}]</b>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                </div>
+                <div>
+                    <label>Expected Answer</label>
+                    <code style="background:#f1f5f9;padding:.1rem .3rem;border-radius:.2rem">{{ task.expected_answer or '(none)' }}</code>
+                </div>
+            </div>
+
+            {% if task.expected_outcome %}
+            <label>Expected Outcome (annotator's notes)</label>
+            <div class="mono">{{ task.expected_outcome }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Verifier builder -->
+        <div class="section">
+            <style>
+            .tv-ev{border:1px solid #e2e8f0;border-radius:.4rem;background:#fafcff;margin-bottom:.6rem}
+            .tv-ev-head{display:flex;gap:.5rem;align-items:center;padding:.35rem .5rem;border-bottom:1px solid #eef2f7;flex-wrap:wrap}
+            .tv-ev-rows{max-height:260px;overflow-y:auto}
+            .tv-ev-row{display:flex;gap:.4rem;align-items:baseline;padding:.25rem .5rem;border-bottom:1px solid #f4f7fb;font-size:.72rem;flex-wrap:wrap}
+            .tv-ev-row:hover{background:#f1f5f9}
+            .tv-m{font-weight:800;font-size:.62rem;padding:.05rem .35rem;border-radius:.25rem}
+            .tv-m.mut{background:#fee2e2;color:#b91c1c}.tv-m.get{background:#e2e8f0;color:#475569}
+            .tv-chip{cursor:pointer;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:.7rem;padding:.02rem .45rem;font-size:.66rem;white-space:nowrap}
+            .tv-chip:hover{background:#e0e7ff}
+            .tv-chip.star{background:#fef9c3;border-color:#fde047;color:#a16207;font-weight:700}
+            .tv-pin{cursor:pointer;font-size:.62rem;border:1px solid #cbd5e1;background:#fff;border-radius:.25rem;padding:.02rem .4rem;color:#334155}
+            .tv-pin:hover{background:#f1f5f9}
+            .tv-gate{border:1px solid #dbeafe;background:#f8fbff;border-radius:.35rem;padding:.4rem .55rem;margin:.3rem 0}
+            .tv-gate table{border-collapse:collapse;width:100%}
+            .tv-gate td{padding:.12rem .3rem;font-size:.72rem}
+            .tv-gate input,.tv-gate select{font-size:.72rem;padding:.12rem .3rem;border:1px solid #cbd5e1;border-radius:.25rem}
+            .tv-gate input.f{width:120px}.tv-gate input.v{width:220px}
+            .tv-gate .url{width:min(480px,90%)}
+            .tv-live{font-size:.62rem;font-weight:800;padding:.05rem .4rem;border-radius:.3rem;margin-left:.3rem}
+            .tv-live.p{background:#dcfce7;color:#166534}.tv-live.f{background:#fee2e2;color:#b91c1c}.tv-live.w{background:#f1f5f9;color:#94a3b8}
+            .tv-adv-toggle{font-size:.66rem;color:#64748b;display:inline-flex;align-items:center;gap:.25rem;cursor:pointer}
+            </style>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <h3 style="margin:0">Verifier Builder</h3>
+                <button onclick="suggestTaskVerifier()" id="tv-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest with AI
+                </button>
+                <button onclick="saveTaskVerifier()" id="tv-save" class="btn btn-primary" style="padding:.2rem .6rem;font-size:.72rem;display:none">Save</button>
+                <span id="tv-gold-live" class="tv-live w" title="live check of this spec against the GOLD trajectory">gold: —</span>
+                <span id="tv-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            <p class="hint">Design rule: the backend gate pins <b>instruction-named values</b> (⭐ chips), grounded in the gold requests below — everything else stays open. Make the FE affordance <b>non-advisory</b> when the macro <i>is</i> the mechanism (search bar, slider, dropdown).</p>
+
+            <!-- Gold request evidence: click a row to set a macro's gate, click a chip to pin a field -->
+            <div class="tv-ev">
+                <div class="tv-ev-head">
+                    <b style="font-size:.72rem">Gold requests</b>
+                    <span style="font-size:.64rem;color:#94a3b8">pin into →</span>
+                    <select id="tv-target" style="font-size:.7rem;padding:.1rem .25rem;border:1px solid #cbd5e1;border-radius:.25rem"></select>
+                    <label style="font-size:.64rem;color:#64748b;margin-left:auto"><input type="checkbox" id="tv-ev-all" checked onchange="renderEvidence()"> include plain GETs</label>
+                    <span style="font-size:.62rem;color:#a16207">⭐ = value appears in the instruction/expected answer</span>
+                </div>
+                <div class="tv-ev-rows" id="tv-evidence"></div>
+            </div>
+            <div id="tv-result"></div>
+
+            <!-- Sandbox -->
+            <div id="tv-sandbox" style="display:none;margin-top:.6rem;padding-top:.6rem;border-top:1px dashed #e2e8f0">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                    <label style="margin:0">Test against</label>
+                    <select id="tv-which" class="param-input" style="width:auto;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:.25rem;font-size:.76rem">
+                        <option value="gold">Gold (human)</option>
+                        <option value="walk">Verification walk</option>
+                        <option value="empty">Empty trajectory (must reject)</option><option value="answer_only">Answer without actions (must reject)</option><option value="agent">Agent attempt</option>
+                    </select>
+                    <button onclick="runTaskVerifier()" id="tv-run" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run</button>
+                    <button onclick="runBoth()" id="tv-runboth" class="btn" style="padding:.25rem .7rem;font-size:.76rem">Run Gold + Walk</button>
+                    <span id="tv-run-msg" style="font-size:.7rem;color:#94a3b8"></span>
+                </div>
+                <div id="tv-run-result" style="margin-top:.5rem"></div>
+            </div>
+        </div>
+
+        <!-- Trajectory Playback -->
+        <div class="section">
+            <h3>Trajectory Playback</h3>
+            {% if task.macro_ai_review %}
+            <div style="font-size:.75rem;background:#eff6ff;padding:.6rem;margin-bottom:.5rem;border-radius:.4rem">
+                <b>AI macro review: {{ 'outdated' if task.quality.ai == 'stale' else task.macro_ai_review.status }}</b>
+                · <a href="{{ url_for('annotation.api_review_document', path=task.macro_ai_review.document) }}">Task review and changes</a>
+                <div>{{ task.macro_ai_review.span_status }}</div>
+            </div>
+            {% endif %}
+            <details open style="margin-bottom:.6rem;border:1px solid #e2e8f0;border-radius:.4rem;background:#fcfcfd;padding:.35rem .55rem">
+            <summary style="cursor:pointer;font-size:.8rem;font-weight:600;color:#334155">Macros ({{ task.macros|length }}) — spans highlighted in the action list below</summary>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                <button onclick="suggestTags()" id="suggest-tags-btn"
+                    style="padding:.2rem .6rem;font-size:.72rem;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:.25rem;cursor:pointer;font-weight:600">
+                    Suggest Tags with AI
+                </button>
+                <span id="suggest-tags-status" style="font-size:.65rem;color:#94a3b8"></span>
+            </div>
+            {% for m in task.macro_instances or task.macros %}
+            {% set macro_base = m.split('#')[0] %}
+            <div data-macro-name="{{ m }}" style="padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:.35rem;margin-bottom:.3rem;background:#f8fafc">
+                <div style="font-weight:600;font-size:.82rem;color:#1e293b">{{ macro_descriptions.get(macro_base, {}).get('description', m) }}
+                    {% if task.macro_operations and task.macro_operations.get(m) %}
+                    <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase;vertical-align:middle">op: {{ op_labels.get(task.macro_operations[m], task.macro_operations[m]) }}</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:.65rem;color:#94a3b8">{{ m }}</div>
+                {% if task.macro_spans and task.macro_spans.get(m) %}
+                <div style="font-size:.68rem;color:#2563eb;margin-top:.1rem">Tagged actions: {{ task.macro_spans[m]|join(' → ') }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if task.macro_edges %}
+            <label>Macro Dependencies</label>
+            <div style="font-size:.75rem;color:#475569">
+                {% for edge in task.macro_edges %}
+                <div>{{ macro_descriptions.get(edge.get('from',''), {}).get('description', edge.get('from','')) }} → {{ macro_descriptions.get(edge.get('to',''), {}).get('description', edge.get('to','')) }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            </details>
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+                <button onclick="playbackStep(-1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&larr; Prev</button>
+                <span id="playback-counter" style="font-size:.8rem;color:#64748b;min-width:80px;text-align:center">0 / 0</span>
+                <button onclick="playbackStep(1)" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">Next &rarr;</button>
+                <button onclick="playbackAuto()" id="playback-auto-btn" style="padding:.3rem .7rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">&#9654; Play</button>
+                <span id="playback-source" style="font-size:.72rem;margin-left:auto"></span>
+            </div>
+            <div style="display:flex;gap:.75rem;height:400px">
+                <iframe id="playback-iframe" style="flex:2;border:1px solid #e2e8f0;border-radius:.3rem" src="about:blank"></iframe>
+                <div style="flex:1;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.3rem;padding:.5rem;background:#f8fafc">
+                    {% set action_idx = namespace(n=0) %}
+                    {% for e in task.trajectory %}
+                    {% if e.type == 'action' %}
+                    <div class="traj-entry action" id="traj-{{ action_idx.n }}" onclick="playbackGo({{ action_idx.n }})" style="cursor:pointer;padding:.3rem .4rem;border-radius:.25rem;margin-bottom:.15rem;font-size:.75rem">
+                        <span style="color:#94a3b8;font-size:.65rem">{{ action_idx.n + 1 }}.</span>
+                        <strong>{{ e.action }}</strong> {{ (e.target or '')[:40] }}
+                        {% if e.text %}<em>"{{ (e.text or '')[:20] }}"</em>{% endif %}
+                    </div>
+                    {% set action_idx.n = action_idx.n + 1 %}
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Walk: record the task a SECOND time -->
+        <div class="section">
+            <h3>Verification Walk
+                <span id="vw-status-badge" class="badge" style="background:#e2e8f0;color:#475569">
+                    {{ task.review.status|upper if task.get('review') else 'NOT REVIEWED' }}
+                </span>
+            </h3>
+            <div style="font-size:.78rem;color:#64748b;margin-bottom:.5rem">
+                Walk the task again on a <strong>fresh session</strong>. Actions that appear in
+                <em>both</em> walks are the essential ones a verifier should assert; actions in only
+                one are incidental. If the second walk can't reproduce the outcome, the task is
+                broken against current data.
+            </div>
+
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
+                <button id="vw-start" onclick="vwStart()"
+                        style="padding:.35rem .9rem;border:none;border-radius:.3rem;background:#2563eb;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    Reset &amp; Start Walk
+                </button>
+                <button id="vw-stop" onclick="vwStop()" disabled
+                        style="padding:.35rem .9rem;border:1px solid #d1d5db;border-radius:.3rem;background:#fff;cursor:pointer;font-size:.85rem">
+                    Stop &amp; Compare
+                </button>
+                <textarea id="vw-answer" rows="2" placeholder="Answer from this walk (for QA tasks)"
+                          style="flex:1;min-width:200px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem"></textarea>
+                <span id="vw-count" style="font-size:.75rem;color:#94a3b8"></span>
+            </div>
+
+            <iframe id="vw-iframe" src="about:blank" allow="clipboard-read; clipboard-write"
+                    style="width:100%;height:420px;border:1px solid #e2e8f0;border-radius:.3rem;display:none"></iframe>
+
+            <div id="vw-compare" style="display:none;margin-top:.6rem"></div>
+
+            <!-- Approve / reject -->
+            <div style="display:flex;gap:.5rem;align-items:center;margin-top:.8rem;padding-top:.6rem;border-top:1px solid #e2e8f0;flex-wrap:wrap">
+                <input id="vw-note" placeholder="Review note (optional)"
+                       value="{{ task.review.note if task.review and task.review.note else '' }}"
+                       style="flex:1;min-width:220px;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.8rem">
+                <button onclick="vwReview('approved')"
+                        style="padding:.35rem 1.1rem;border:none;border-radius:.3rem;background:#16a34a;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    &#10003; Approve
+                </button>
+                <button onclick="vwReview('rejected')"
+                        style="padding:.35rem 1.1rem;border:none;border-radius:.3rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+                    &#10007; Reject
+                </button>
+                <span id="vw-review-msg" style="font-size:.75rem;color:#64748b"></span>
+            </div>
+        </div>
+
+        <!-- Agent attempt (if available) -->
+        {% if task.get('agent_result') %}
+        <div class="section">
+            <h3>Agent Attempt
+                <span class="badge {{ 'badge-pass' if task.agent_result.agent_passed else 'badge-fail' }}">
+                    {{ 'PASS' if task.agent_result.agent_passed else 'FAIL' }}
+                </span>
+            </h3>
+            <div style="font-size:.78rem;margin-bottom:.3rem">
+                <strong>Answer:</strong> <code>{{ task.agent_result.agent_answer or '(none)' }}</code>
+                · <strong>Steps:</strong> {{ task.agent_result.agent_steps or 0 }}
+                · <strong>Requests:</strong> {{ task.agent_result.request_count or 0 }}
+            </div>
+            {% if task.agent_result.agent_errors %}
+            <div style="color:#ef4444;font-size:.72rem">Errors: {{ task.agent_result.agent_errors|join(', ') }}</div>
+            {% endif %}
+            {% if task.agent_result.agent_response %}
+            <details style="margin-top:.3rem">
+                <summary style="font-size:.72rem;color:#64748b;cursor:pointer">Agent reasoning</summary>
+                <div class="mono" style="margin-top:.2rem">{{ task.agent_result.agent_response }}</div>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// --- Trajectory Playback ---
+var _trajData = {{ task.trajectory | tojson if task else '[]' }};
+// Build action list with paired observation: the first observation between
+// this action and the next one — network entries may sit in between (the
+// recorder posts the observation after the action's requests settle), so
+// scanning only the immediately-next event missed screenshots that exist.
+var _steps = [];
+for (var _i = 0; _i < _trajData.length; _i++) {
+    if (_trajData[_i].type === 'action') {
+        var obs = null;
+        for (var _j = _i + 1; _j < _trajData.length; _j++) {
+            if (_trajData[_j].type === 'action') break;
+            if (_trajData[_j].type === 'observation') { obs = _trajData[_j]; break; }
+        }
+        _steps.push({ action: _trajData[_i], observation: obs });
+    }
+}
+var _playIdx = -1;
+var _playTimer = null;
+
+// playback UI only exists when a task is selected — don't kill the script without one
+var _pcEl = document.getElementById('playback-counter');
+if (_pcEl) _pcEl.textContent = '0 / ' + _steps.length;
+
+function playbackStep(dir) {
+    playbackGo(_playIdx + dir);
+}
+
+function playbackGo(idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= _steps.length) idx = _steps.length - 1;
+    if (_steps.length === 0) return;
+    _playIdx = idx;
+    var step = _steps[idx];
+
+    document.getElementById('playback-counter').textContent = (idx + 1) + ' / ' + _steps.length;
+
+    // Highlight in sidebar
+    document.querySelectorAll('[id^="traj-"]').forEach(function(el) {
+        el.style.background = '';
+        el.style.fontWeight = '';
+    });
+    var el = document.getElementById('traj-' + idx);
+    if (el) {
+        el.style.background = '#dbeafe';
+        el.style.fontWeight = '600';
+        el.scrollIntoView({ block: 'nearest' });
+    }
+
+    var iframe = document.getElementById('playback-iframe');
+    var obs = step.observation;
+    var action = step.action;
+
+    // What the frame is showing is stated explicitly. Playback used to switch
+    // silently between a screenshot and a re-rendered HTML snapshot depending
+    // on what a task happened to have, which made two tasks look like two
+    // different tools. Now the source is always labelled.
+    var srcLabel = document.getElementById('playback-source');
+    function setLabel(text, color) {
+        if (srcLabel) { srcLabel.textContent = text; srcLabel.style.color = color; }
+    }
+
+    if (obs && obs.screenshot) {
+        // Show screenshot image
+        var taskId = {{ (task.task_id if task else "") | tojson }};
+        var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+        var imgUrl = '/annotate/api/screenshot/' + annotator + '/' + taskId + '/' + obs.screenshot;
+        // full-width (zoomed) screenshot; taller than the pane, so the user
+        // scrolls up/down instead of squinting at a shrink-to-fit image
+        iframe.srcdoc = '<html><body style="margin:0;background:#f8f9fa;overflow:auto"><img src="' + imgUrl + '" style="width:100%;height:auto;display:block"></body></html>';
+        if (obs.screenshot_captured) {
+            setLabel('screenshot (captured)', '#16a34a');
+        } else {
+            var derived = obs.backfill_method || (obs.backfilled ? 'derived' : '');
+            setLabel(derived ? ('screenshot (' + derived + ')') : 'screenshot (recorded)',
+                     derived ? '#b45309' : '#16a34a');
+        }
+    } else if (obs && obs.snapshot) {
+        iframe.srcdoc = obs.snapshot;
+        setLabel(obs.form_state_repaired
+                 ? 'live HTML snapshot (form state repaired) — no screenshot'
+                 : 'live HTML snapshot — no screenshot for this step', '#b45309');
+        if (action.selector) {
+            setTimeout(function() {
+                try {
+                    var doc = iframe.contentDocument || iframe.contentWindow.document;
+                    var target = doc.querySelector(action.selector);
+                    if (target) {
+                        target.scrollIntoView({ block: 'center' });
+                        target.style.outline = '3px solid #ef4444';
+                        target.style.outlineOffset = '2px';
+                    }
+                } catch(e) {}
+            }, 200);
+        }
+    } else {
+        iframe.srcdoc = '<html><body style="margin:0;padding:2rem;font-family:sans-serif;color:#64748b"><p>No snapshot for this step</p><p><strong>' + (action.action || '') + '</strong> ' + (action.target || '') + '</p><p>URL: ' + (action.url || '') + '</p></body></html>';
+    }
+}
+
+function playbackAuto() {
+    var btn = document.getElementById('playback-auto-btn');
+    if (_playTimer) {
+        clearInterval(_playTimer);
+        _playTimer = null;
+        btn.textContent = '\u25b6 Play';
+        return;
+    }
+    btn.textContent = '\u23f8 Pause';
+    if (_playIdx < 0) _playIdx = 0;
+    playbackGo(_playIdx);
+    _playTimer = setInterval(function() {
+        _playIdx++;
+        if (_playIdx >= _trajAll.length) {
+            clearInterval(_playTimer);
+            _playTimer = null;
+            btn.textContent = '\u25b6 Play';
+            return;
+        }
+        playbackGo(_playIdx);
+    }, 2000);
+}
+
+function renderQuality(q) {
+    var panel = document.getElementById('quality-panel');
+    if (!panel || !q) return;
+    panel.replaceChildren();
+    function add(tag, text, parent) { var node = document.createElement(tag); node.textContent = text; (parent || panel).appendChild(node); return node; }
+    add('h3', 'AI review and validation evidence');
+    var badge = add('span', 'AI: ' + q.ai_label); badge.className = 'quality-pill'; badge.dataset.state = q.ai;
+    var r = q.review || {};
+    add('p', (r.reviewer || 'No AI reviewer recorded') + (r.reviewed_at ? ' · ' + r.reviewed_at : '') + (q.legacy ? ' · Legacy review; validation not imported yet' : ''));
+    if (q.ai === 'stale') add('p', 'Task, verifier, or recording changed after this review. The previous recommendation needs another review.');
+    if (r.note) add('p', r.note);
+    [['issues','Open issues'],['changes','Repairs made'],['limitations','Validation limits']].forEach(function(pair) {
+        if (!(r[pair[0]] || []).length) return;
+        add('b', pair[1]); var ul = add('ul', ''); r[pair[0]].forEach(function(text) { add('li', text, ul); });
+    });
+    if ((r.documents || []).length) {
+        var docs = add('details', ''); add('summary', 'Review documents', docs);
+        r.documents.forEach(function(path) { var line = add('p', '', docs); var a = add('a', path, line); a.href = '/annotate/api/review_document?path=' + encodeURIComponent(path); a.target = '_blank'; a.rel = 'noopener'; });
+    }
+    var table = add('table', ''), head = add('tr', '', table);
+    ['Evidence', 'Result', 'Checked at'].forEach(function(text) { add('th', text, head); });
+    var names = {gold:'Original recording', walk:'Fresh verification walk', agent:'Agent attempt', empty:'Empty trajectory', answer_only:'Answer without actions'};
+    Object.keys(names).forEach(function(source) {
+        var run = (q.runs || []).find(function(x) { return x.source === source; });
+        var row = add('tr', '', table); add('td', names[source], row); add('td', run ? run.label : 'Not tested', row); add('td', run ? run.run_at : '—', row);
+    });
+    if (q.walk_by) add('p', 'Fresh walk recorded by ' + q.walk_by.by + (q.walk_by.ai ? ' (AI reviewer)' : '') + ' on ' + (q.walk_by.at || '').slice(0, 10) + (q.walk_by.source ? ' — ' + q.walk_by.source : '') + '.');
+    if (q.rerecorded) add('p', 'Original recording re-recorded by ' + (q.rerecorded.by || 'unknown') + ' at ' + q.rerecorded.at + '.');
+    add('p', 'These results test saved recordings. Original-recording QA uses the saved expected answer. Empty and answer-only rejection are basic checks; alternative valid paths and plausible wrong completions still need testing.');
+    add('p', 'Human tags and approval below are independent decisions. A deletion suggestion keeps the task and recording intact.');
+    var card = document.querySelector('.task-card.active');
+    if (card) { card.dataset.ai = q.ai; card.dataset.walk = q.walk; card.dataset.attention = q.attention ? 'yes' : 'no';
+        var ai = card.querySelector('.ai-pill'); ai.textContent = 'AI: ' + q.ai_label; ai.dataset.state = q.ai;
+        var walk = card.querySelector('.walk-pill'); walk.textContent = (q.walk_by && q.walk_by.ai ? 'AI walk: ' : 'Walk: ') + ({unrun:'not tested',pass:'passed',fail:'failed',stale:'outdated'}[q.walk]); walk.dataset.state = q.walk;
+        if (q.walk_by) walk.title = 'Fresh walk recorded by ' + q.walk_by.by + ' on ' + (q.walk_by.at || '').slice(0, 10);
+        if (q.rerecorded && !card.querySelector('.rerecorded-pill')) {
+            var rr = document.createElement('span'); rr.className = 'quality-pill rerecorded-pill'; rr.textContent = '\u21BA re-recorded';
+            rr.title = 'Original recording re-recorded by ' + (q.rerecorded.by || 'unknown') + ' at ' + q.rerecorded.at; walk.after(rr);
+        }
+    }
+}
+function refreshQuality() {
+    var key = {{ ((task.annotator ~ '/' ~ task.task_id) if task else '')|tojson }};
+    if (key) fetch('/annotate/api/task_quality/' + key.split('/').map(encodeURIComponent).join('/')).then(r => r.json()).then(renderQuality);
+}
+renderQuality({{ (task.quality if task else none)|tojson }});
+var _tagFilter = '';
+var _annFilter = '';
+
+function setTagFilter(btn) {
+    _tagFilter = btn.dataset.tagf;
+    document.querySelectorAll('#tag-filter-row .tagf').forEach(b => {
+        var on = b === btn;
+        b.style.outline = on ? '2px solid #1e293b' : 'none';
+        b.style.fontWeight = on ? '700' : '400';
+    });
+    filterTasks(document.getElementById('task-search').value);
+}
+
+function setAnnotatorFilter(v) {
+    _annFilter = v;
+    filterTasks(document.getElementById('task-search').value);
+}
+
+function filterTasks(q) {
+    // match against the full instruction/sites/macros/annotator (data-search),
+    // not just the 80-char excerpt the card displays
+    var terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    var visible = 0;
+    document.querySelectorAll('.task-card').forEach(c => {
+        var hay = (c.dataset.search || c.textContent).toLowerCase();
+        var tagOk = !_tagFilter
+            || (_tagFilter === 'untagged' ? !c.dataset.tag : c.dataset.tag === _tagFilter);
+        var annOk = !_annFilter || c.dataset.annotator === _annFilter;
+        var ai = document.getElementById('ai-filter').value, ev = document.getElementById('evidence-filter').value;
+        var qualityOk = (!ai || c.dataset.ai === ai) && (!ev || (ev === 'attention' ? c.dataset.attention === 'yes' : c.dataset.walk === ev));
+        var hit = tagOk && annOk && qualityOk && terms.every(t => hay.includes(t));
+        c.style.display = hit ? '' : 'none';
+        if (hit) visible++;
+    });
+    document.getElementById('task-search-empty').textContent =
+        visible + ' matching tasks';
+    saveSidebarState();
+}
+
+// --- Sidebar state persists across page loads (selection is a full navigation) ---
+var SB_KEY = 'verifySidebarState';
+var _sortOrder = {{ sort | default('newest') | tojson }};   // server-rendered sort of THIS page
+
+function saveSidebarState() {
+    try {
+        sessionStorage.setItem(SB_KEY, JSON.stringify({
+            q: document.getElementById('task-search').value,
+            ai: document.getElementById('ai-filter').value,
+            evidence: document.getElementById('evidence-filter').value,
+            tag: _tagFilter,
+            ann: _annFilter,
+            sort: _sortOrder,
+            scroll: document.querySelector('.sidebar').scrollTop
+        }));
+    } catch (e) {}
+}
+
+function restoreSidebarState() {
+    var st = {};
+    try { st = JSON.parse(sessionStorage.getItem(SB_KEY) || '{}'); } catch (e) {}
+    // remembered sort order: if this page was loaded WITHOUT an explicit ?sort=
+    // and the remembered order differs from what the server rendered, reload once
+    // with the remembered order (the param then keeps it explicit from there on).
+    var params = new URLSearchParams(window.location.search);
+    if (!params.get('sort') && st.sort && st.sort !== _sortOrder) {
+        params.set('sort', st.sort);
+        window.location.replace('/annotate/verify?' + params.toString());
+        return;
+    }
+    if (st.tag) {
+        var btn = document.querySelector('#tag-filter-row .tagf[data-tagf="' + st.tag + '"]');
+        if (btn) {
+            _tagFilter = st.tag;
+            document.querySelectorAll('#tag-filter-row .tagf').forEach(b => {
+                var on = b === btn;
+                b.style.outline = on ? '2px solid #1e293b' : 'none';
+                b.style.fontWeight = on ? '700' : '400';
+            });
+        }
+    }
+    if (st.ann) {
+        var sel = document.getElementById('annotator-filter');
+        sel.value = st.ann;
+        if (sel.value === st.ann) _annFilter = st.ann;
+    }
+    document.getElementById('ai-filter').value = st.ai || '';
+    document.getElementById('evidence-filter').value = st.evidence || '';
+    if (st.q) document.getElementById('task-search').value = st.q;
+    filterTasks(document.getElementById('task-search').value);
+
+    var sb = document.querySelector('.sidebar');
+    if (typeof st.scroll === 'number') sb.scrollTop = st.scroll;
+    var active = document.querySelector('.task-card.active');
+    if (active && active.style.display !== 'none') {
+        var r = active.getBoundingClientRect(), s = sb.getBoundingClientRect();
+        if (r.top < s.top || r.bottom > s.bottom) active.scrollIntoView({block: 'nearest'});
+    }
+    var _scrollT = null;
+    sb.addEventListener('scroll', function () {
+        clearTimeout(_scrollT);
+        _scrollT = setTimeout(saveSidebarState, 150);
+    });
+}
+restoreSidebarState();
+
+// --- Delete / Re-record (task header buttons) ---
+var _reviewTaskId = {{ (task.task_id if task else "") | tojson }};
+var _reviewAnnotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+
+var _reviewCurTag = {{ ((task.review_tag.tag if task.review_tag else '') if task else "") | tojson }};
+var _reviewerName = {{ session.get('annotator_name', 'anonymous') | tojson }};
+var _reviewTagInfo = {{ (task.review_tag if task and task.review_tag else none) | tojson }};
+
+// "verified by <name> X days ago" — shown next to the Verified button and as a
+// tooltip on the sidebar pills (review_tag stores {tag, by, at}).
+function _agoLabel(atIso) {
+    var ms = Date.now() - new Date(atIso).getTime();
+    if (isNaN(ms)) return '';
+    var days = Math.floor(ms / 86400000);
+    if (days <= 0) {
+        var hours = Math.floor(ms / 3600000);
+        return hours <= 0 ? 'just now' : hours + (hours === 1 ? ' hour ago' : ' hours ago');
+    }
+    return days + (days === 1 ? ' day ago' : ' days ago');
+}
+(function () {
+    var el = document.getElementById('verified-meta');
+    if (el && _reviewTagInfo && _reviewTagInfo.tag === 'verified' && _reviewTagInfo.at) {
+        el.textContent = 'verified by ' + (_reviewTagInfo.by || 'unknown') + ' · ' + _agoLabel(_reviewTagInfo.at);
+    }
+    // Sidebar pills: show "✓ <name> · Nd ago" inline so no task needs opening.
+    document.querySelectorAll('.verified-pill').forEach(function (p) {
+        if (p.dataset.at) {
+            var ms = Date.now() - new Date(p.dataset.at).getTime();
+            var short = isNaN(ms) ? ''
+                : ms < 3600000 ? 'just now'
+                : ms < 86400000 ? Math.floor(ms / 3600000) + 'h ago'
+                : Math.floor(ms / 86400000) + 'd ago';
+            p.textContent = '✓ ' + (p.dataset.by || 'verified') + (short ? ' · ' + short : '');
+            p.title = 'verified by ' + (p.dataset.by || 'unknown') + ' · ' + _agoLabel(p.dataset.at);
+        }
+    });
+})();
+
+function toggleSortOrder() {
+    var params = new URLSearchParams(window.location.search);
+    var current = params.get('sort') || 'newest';
+
+    params.set('sort', current === 'newest' ? 'oldest' : 'newest');
+
+    window.location.href = '/annotate/verify?' + params.toString();
+}
+
+function _nextTaskCard() {
+    // the next VISIBLE card below the active one (respects search/annotator/tag
+    // filters) — with the "Unreviewed" filter on, this is a pure triage queue
+    var cards = Array.from(document.querySelectorAll('.task-card'));
+    var i = cards.indexOf(document.querySelector('.task-card.active'));
+    if (i < 0) return null;
+    for (var j = i + 1; j < cards.length; j++)
+        if (cards[j].style.display !== 'none') return cards[j];
+    return null;
+}
+
+function setReviewTag(tag) {
+    if (!_reviewTaskId) return;
+    // clicking the active tag clears it
+    var value = (_reviewCurTag === tag) ? null
+        : {tag: tag, by: _reviewerName, at: new Date().toISOString()};
+    fetch('/annotate/api/update_task_field', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: _reviewTaskId, annotator: _reviewAnnotator,
+                              field: 'review_tag', value: value})
+    }).then(r => r.json()).then(d => {
+        if (d.status !== 'ok') { alert('Tag failed: ' + (d.error || 'unknown')); return; }
+        // tagging = done with this task -> advance to the next one in the list
+        // (the sidebar re-renders with the fresh pill). Clearing a tag stays put.
+        var next = value && _nextTaskCard();
+        if (next) next.click();
+        else location.reload();
+    }).catch(e => alert('Tag failed: ' + e));
+}
+
+function rerecordTask() {
+    if (!_reviewTaskId) return;
+    if (!confirm('Re-record "' + _reviewTaskId + '"?\n\nThe annotation interface will open prefilled with this task\'s design. The current recording is replaced only when you save the new one.')) return;
+    location.href = '/annotate/task?rerecord=' + encodeURIComponent(_reviewTaskId)
+        + '&annotator=' + encodeURIComponent(_reviewAnnotator);
+}
+
+function deleteTask() {
+    if (!_reviewTaskId) return;
+    if (!confirm('Move task "' + _reviewTaskId + '" to trash?')) return;
+    fetch('/annotate/api/tasks/' + encodeURIComponent(_reviewTaskId)
+          + '?annotator=' + encodeURIComponent(_reviewAnnotator), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'trashed') { alert('Delete failed: ' + (d.error || 'unknown error')); return; }
+            var next = _nextTaskCard();
+            if (next) next.click();
+            else location.href = '/annotate/verify';
+        })
+        .catch(e => alert('Delete failed: ' + e));
+}
+
+
+function suggestTags() {
+    var taskId = {{ (task.task_id if task else "") | tojson }};
+    var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+    if (!taskId) return;
+    var btn = document.getElementById('suggest-tags-btn');
+    var status = document.getElementById('suggest-tags-status');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    status.textContent = '';
+    fetch('/annotate/api/suggest_tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator})
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags with AI';
+        if (d.suggested_spans) {
+            // Show suggestions inline
+            var spans = d.suggested_spans;
+            var macroEls = document.querySelectorAll('[data-macro-name]');
+            for (var macro in spans) {
+                var span = spans[macro];
+                var el = document.querySelector('[data-macro-name="' + macro + '"]');
+                if (el) {
+                    var existing = el.querySelector('.ai-suggestion');
+                    if (existing) existing.remove();
+                    var div = document.createElement('div');
+                    div.className = 'ai-suggestion';
+                    div.style.cssText = 'font-size:.68rem;color:#16a34a;margin-top:.2rem;background:#f0fdf4;padding:.2rem .4rem;border-radius:.2rem';
+                    div.innerHTML = 'AI suggestion: actions ' + span[0] + ' → ' + span[1] +
+                        ' <button onclick="applyTagSuggestion(\'' + macro + '\',' + JSON.stringify(span) + ')" style="font-size:.6rem;padding:.1rem .3rem;background:#16a34a;color:#fff;border:none;border-radius:.2rem;cursor:pointer;margin-left:.3rem">Apply</button>';
+                    el.appendChild(div);
+                }
+            }
+            // Also show for macros not in DOM yet
+            var allMacros = Object.keys(spans);
+            var shown = document.querySelectorAll('[data-macro-name]');
+            var shownNames = [];
+            shown.forEach(function(e) { shownNames.push(e.getAttribute('data-macro-name')); });
+            var missing = allMacros.filter(function(m) { return shownNames.indexOf(m) === -1; });
+            if (missing.length) {
+                status.textContent = 'Also suggested: ' + missing.map(function(m) { return m + ' [' + spans[m] + ']'; }).join(', ');
+            } else {
+                status.textContent = 'Suggestions shown below each macro';
+            }
+        } else {
+            status.textContent = d.error || 'Failed';
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Suggest Tags with AI';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+function applyTagSuggestion(macro, span) {
+    var taskId = {{ (task.task_id if task else "") | tojson }};
+    var annotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+    // Load current macro_spans, update, save
+    fetch('/annotate/api/update_task_field', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'macro_spans', value: null})
+    }).then(function(r) { return r.json(); }).then(function() {
+        // Reload to reflect changes
+        location.reload();
+    });
+}
+
+function saveInstruction(taskId, annotator, value) {
+    var el = document.getElementById('instruction-original');
+    var st = document.getElementById('instr-status');
+    fetch('/annotate/api/update_task_field', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, annotator: annotator, field: 'instruction', value: value})
+    }).then(r => r.json()).then(d => {
+        if (d.status === 'ok') {
+            refreshQuality();
+            if (el) { el.style.borderColor = '#86efac'; setTimeout(function() { if (el) el.style.borderColor = '#cbd5e1'; }, 1500); }
+            if (st) { st.textContent = '✓ saved'; st.style.color = '#16a34a'; setTimeout(function() { if (st) st.textContent = ''; }, 2000); }
+        } else if (st) { st.textContent = 'save failed'; st.style.color = '#dc2626'; }
+    }).catch(function() { if (st) { st.textContent = 'save failed'; st.style.color = '#dc2626'; } });
+}
+
+// ── Verification Walk ──────────────────────────────────────────────────────
+// The annotator re-walks the task in the iframe below. recorder.js is injected
+// into every /sites/* page and posts its action+observation stream to the
+// parent window — the same channel the annotation workspace uses — so this
+// panel captures a second, independent trajectory of the same task.
+
+var vwTaskId    = {{ (task.task_id if task else "") | tojson }};
+var vwAnnotator = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+var vwStartUrl  = {{ ((task.starting_url or '') if task else "") | tojson }};
+var vwSites     = {{ (task.sites or []) | tojson if task else '[]' }};
+var vwTrajectory = [];
+var vwRecording = false;
+
+function vwSiteId() {
+    if (vwSites.length) return (typeof vwSites[0] === 'string') ? vwSites[0] : vwSites[0].id;
+    return '';
+}
+
+function vwStart() {
+    // Fresh session: revert the site data mutated by the first walk (or by
+    // exploration) so this is a genuine independent attempt.
+    fetch('/_reset_data', {method: 'POST'}).then(function() {
+        vwTrajectory = [];
+        vwRecording = true;
+        var url = vwStartUrl || ('/sites/' + vwSiteId() + '/');
+        var iframe = document.getElementById('vw-iframe');
+        iframe.src = url;
+        iframe.style.display = 'block';
+        document.getElementById('vw-start').disabled = true;
+        document.getElementById('vw-stop').disabled = false;
+        document.getElementById('vw-compare').style.display = 'none';
+        vwUpdateCount();
+    });
+}
+
+window.addEventListener('message', function(e) {
+    if (!vwRecording) return;
+    var d = e.data;
+    if (!d || (d.mw !== 'action' && d.mw !== 'observation' && d.mw !== 'network')) return;
+    var rec = {};
+    for (var k in d) { if (k !== 'mw') rec[k] = d[k]; }
+    rec.type = d.mw;
+    vwTrajectory.push(rec);
+    vwUpdateCount();
+});
+
+function vwUpdateCount() {
+    var acts = vwTrajectory.filter(function(e) { return e.type === 'action'; }).length;
+    document.getElementById('vw-count').textContent =
+        vwRecording ? (acts + ' actions recorded') : '';
+}
+
+function vwStop() {
+    vwRecording = false;
+    document.getElementById('vw-start').disabled = false;
+    document.getElementById('vw-stop').disabled = true;
+
+    fetch('/annotate/api/verification_walk', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            task_id: vwTaskId,
+            annotator: vwAnnotator,
+            trajectory: vwTrajectory,
+            answer: document.getElementById('vw-answer').value.trim(),
+        }),
+    }).then(function(r) { return r.json(); }).then(vwRenderCompare);
+}
+
+function vwRenderCompare(d) {
+    if (d.error) { alert('Error: ' + d.error); return; }
+
+    function list(title, items, color, hint) {
+        var rows = items.length
+            ? items.map(function(a) {
+                  return '<div style="padding:.2rem .4rem;font-size:.75rem;border-bottom:1px solid #f1f5f9">'
+                       + '<strong>' + a.action + '</strong> '
+                       + '<span style="color:#64748b">' + (a.target || '') + '</span>'
+                       + (a.value ? ' <em style="color:#0f766e">"' + a.value + '"</em>' : '')
+                       + '</div>'; }).join('')
+            : '<div style="padding:.4rem;font-size:.75rem;color:#94a3b8">(none)</div>';
+        return '<div style="flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:.3rem;overflow:hidden">'
+             + '<div style="padding:.3rem .5rem;background:' + color + ';font-size:.72rem;font-weight:600">'
+             + title + ' (' + items.length + ')</div>'
+             + '<div style="font-size:.7rem;color:#94a3b8;padding:.2rem .5rem;background:#fafafa">' + hint + '</div>'
+             + rows + '</div>';
+    }
+
+    var answerLine = '';
+    if (d.answer_walk) {
+        var agree = d.answers_agree;
+        answerLine = '<div style="margin-bottom:.5rem;padding:.4rem .6rem;border-radius:.3rem;font-size:.78rem;'
+            + 'background:' + (agree ? '#dcfce7' : '#fee2e2') + '">'
+            + (agree ? '&#10003; Answer reproduced: ' : '&#10007; ANSWER DIFFERS — original: ')
+            + '<code>' + (d.answer_original || '(none)') + '</code>'
+            + (agree ? '' : ' &nbsp;vs this walk: <code>' + d.answer_walk + '</code> — the task may be broken against current data')
+            + '</div>';
+    }
+
+    document.getElementById('vw-compare').innerHTML =
+        answerLine
+        + '<div style="font-size:.78rem;color:#475569;margin-bottom:.4rem">'
+        + 'Original walk: <strong>' + d.original_actions + '</strong> actions &nbsp;·&nbsp; '
+        + 'This walk: <strong>' + d.walk_actions + '</strong> actions</div>'
+        + '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'
+        + list('In BOTH walks', d.in_both, '#dcfce7', 'essential — assert these')
+        + list('Original only', d.original_only, '#fef3c7', 'incidental — do not assert')
+        + list('This walk only', d.walk_only, '#fef3c7', 'incidental — do not assert')
+        + '</div>';
+    document.getElementById('vw-compare').style.display = 'block';
+}
+
+function vwReview(status) {
+    fetch('/annotate/api/task_status', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            task_id: vwTaskId, annotator: vwAnnotator, status: status,
+            note: document.getElementById('vw-note').value.trim(),
+        }),
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        var badge = document.getElementById('vw-status-badge');
+        badge.textContent = status.toUpperCase();
+        badge.style.background = status === 'approved' ? '#16a34a' : '#dc2626';
+        badge.style.color = '#fff';
+        document.getElementById('vw-review-msg').textContent =
+            'Saved by ' + d.review.reviewer;
+    });
+}
+
+// --- Task Verifier Builder (fill macro templates from this trajectory) ---
+var TV_TASK = {{ (task.task_id if task else "") | tojson }};
+var TV_ANN  = {{ ((task.annotator or 'anonymous') if task else "") | tojson }};
+var TV_MACROS = {};   // macro -> filled tree (editable model)
+var TV_FEEDBACK = {}; // macro -> NL feedback for the later coding-agent fix pass
+var TV_INSTR = {{ (task.instruction if task else "") | tojson }};
+var TV_EXPECTED = {{ (task.expected_answer if task and task.expected_answer else "") | tojson }};
+var TV_LIVE = {};     // macro -> last gold-run passed bool
+var TV_OPS = {{ task.macro_operations | tojson if task and task.macro_operations else '{}' }};  // macro -> reasoning op (stored key)
+var OP_LABELS = {{ op_labels | tojson }};  // op key -> display label (e.g. read -> read/memorize)
+function opLabel(op){ return OP_LABELS[op] || op; }
+var TASK_SPANS = {{ task.macro_spans | tojson if task and task.macro_spans else '{}' }};       // macro -> [start, end] (1-based action indices)
+
+// Tag trajectory rows with their macro span + reasoning op: a labeled chip on the
+// span's first action, a matching left border across the covered rows.
+(function annotateTrajectoryWithSpans() {
+    var palette = ['#4338ca', '#0e7490', '#b45309', '#15803d', '#be185d', '#7c3aed'];
+    Object.keys(TASK_SPANS).forEach(function (m, mi) {
+        var sp = TASK_SPANS[m];
+        if (!sp || sp.length < 2) return;
+        var color = palette[mi % palette.length];
+        for (var i = sp[0]; i <= sp[1]; i++) {
+            var row = document.getElementById('traj-' + (i - 1));  // row ids are 0-based
+            if (!row) continue;
+            row.style.borderLeft = '3px solid ' + color;
+            if (i === sp[0]) {
+                var chip = document.createElement('span');
+                chip.style.cssText = 'float:right;font-size:.58rem;padding:.02rem .35rem;border-radius:.5rem;'
+                    + 'font-weight:700;color:#fff;background:' + color;
+                chip.textContent = m.replace(/_/g, ' ')
+                    + (TV_OPS[m] ? ' · ' + opLabel(TV_OPS[m]) : '')
+                    + (sp[1] > sp[0] ? ' (' + sp[0] + '→' + sp[1] + ')' : '');
+                row.appendChild(chip);
+            }
+        }
+    });
+})();
+
+// ===================== Evidence panel + structured gate editor =====================
+// Parse the gold trajectory's network events into pin-able evidence rows.
+var TV_EV_HIDDEN = 0;   // network events outside the recording window (session noise)
+function tvWindow() {
+    // recording time span from action/observation timestamps
+    var lo = null, hi = null;
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'action' && e.type !== 'observation') continue;
+        var t = e.timestamp ? Date.parse(e.timestamp) : NaN;
+        if (isNaN(t)) continue;
+        if (lo === null || t < lo) lo = t;
+        if (hi === null || t > hi) hi = t;
+    }
+    return [lo, hi];
+}
+function tvEvidence() {
+    var out = [];
+    var w = tvWindow(), MARGIN = 90 * 1000;
+    TV_EV_HIDDEN = 0;
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'network') continue;
+        if (w[0] !== null && e.timestamp) {
+            var t = Date.parse(e.timestamp);
+            if (!isNaN(t) && (t < w[0] - MARGIN || t > w[1] + MARGIN)) { TV_EV_HIDDEN++; continue; }
+        }
+        var url = e.url || '', method = (e.method || 'GET').toUpperCase();
+        var path = url.split('?')[0], qs = url.indexOf('?') >= 0 ? url.split('?').slice(1).join('?') : '';
+        var query = {};
+        if (qs) qs.split('&').forEach(function(p){
+            var kv = p.split('='); if (kv[0]) query[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1]||'').replace(/\+/g,' '));
+        });
+        var body = e.requestBody;
+        if (typeof body === 'string') { try { body = JSON.parse(body); } catch(err) { body = body ? {_raw: body} : null; } }
+        out.push({method: method, url: url, path: path, query: query, body: (body && typeof body === 'object') ? body : null});
+    }
+    return out;
+}
+function tvStar(val) {  // does this value appear in the instruction / expected answer?
+    var s = String(val == null ? '' : val).trim().toLowerCase();
+    if (s.length < 2) return false;
+    var hay = (TV_INSTR + ' ' + TV_EXPECTED).toLowerCase();
+    return hay.indexOf(s) >= 0;
+}
+function renderEvidence() {
+    var el = document.getElementById('tv-evidence');
+    if (!el) return;
+    var all = document.getElementById('tv-ev-all').checked;
+    var rows = tvEvidence(), html = '', shown = 0;
+    rows.forEach(function(r, idx) {
+        var interesting = r.method !== 'GET' || Object.keys(r.query).length || r.body;
+        if (!all && !interesting) return;
+        shown++;
+        var chips = '';
+        Object.keys(r.query).forEach(function(k){
+            var star = tvStar(r.query[k]);
+            chips += '<span class="tv-chip'+(star?' star':'')+'" title="pin url constraint '+tvEsc(k)+'='+tvEsc(r.query[k])+'" '
+                   + 'onclick="pinQuery('+idx+',\''+tvEsc(k).replace(/'/g,"\\'")+'\')">'+(star?'⭐':'')+tvEsc(k)+'='+tvEsc(String(r.query[k]).slice(0,40))+'</span> ';
+        });
+        Object.keys(r.body || {}).forEach(function(k){
+            var v = r.body[k], vs = typeof v === 'object' ? JSON.stringify(v) : String(v);
+            var star = tvStar(vs);
+            chips += '<span class="tv-chip'+(star?' star':'')+'" title="pin body field '+tvEsc(k)+'" '
+                   + 'onclick="pinBody('+idx+',\''+tvEsc(k).replace(/'/g,"\\'")+'\')">'+(star?'⭐':'')+'body.'+tvEsc(k)+'='+tvEsc(vs.slice(0,40))+'</span> ';
+        });
+        html += '<div class="tv-ev-row"><span class="tv-m '+(r.method==='GET'?'get':'mut')+'">'+r.method+'</span>'
+              + '<span style="color:#334155;word-break:break-all">'+tvEsc(r.path)+'</span>'
+              + '<button class="tv-pin" onclick="pinGate('+idx+')" title="use this request as the target macro\'s backend gate">→ gate</button>'
+              + chips + '</div>';
+    });
+    if (TV_EV_HIDDEN > 0)
+        html += '<div style="padding:.3rem .5rem;font-size:.66rem;color:#a16207;background:#fffbeb">'
+              + TV_EV_HIDDEN + ' request(s) outside the recording window hidden (session noise from other pages)</div>';
+    el.innerHTML = html || '<div style="padding:.5rem;font-size:.7rem;color:#94a3b8">no '+(all?'':'mutation/query ')+'requests recorded in the gold trajectory</div>';
+}
+function populateTarget() {
+    var sel = document.getElementById('tv-target');
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = Object.keys(TV_MACROS).map(function(m){ return '<option'+(m===cur?' selected':'')+'>'+tvEsc(m)+'</option>'; }).join('');
+}
+// Walk a macro tree collecting leaf refs by type.
+function tvLeaves(node, type, out) {
+    out = out || [];
+    if (!node || typeof node !== 'object') return out;
+    if (node.op) { (node.checks||[]).forEach(function(c){ tvLeaves(c, type, out); }); return out; }
+    if (!type || node.type === type) out.push(node);
+    return out;
+}
+function tvGate(macro, create) {  // the macro's first request_made leaf (its backend gate)
+    var tree = TV_MACROS[macro];
+    if (!tree) return null;
+    var leaves = tvLeaves(tree, 'request_made');
+    if (leaves.length) return leaves[0];
+    if (!create) return null;
+    var leaf = {type: 'request_made', label: 'backend gate', method: {open:true}, url: {open:true}};
+    if (tree.op) { (tree.checks = tree.checks || []).push(leaf); }
+    else { TV_MACROS[macro] = {op: 'AND', checks: [tree, leaf]}; }
+    return leaf;
+}
+// Every macro carries the 3 canonical components: page_visited + action (FE
+// affordance) + request_made (backend gate). Missing ones are added OPEN
+// ({open:true} = not asserted, passes until pinned) so they're editable here.
+// Per-component on/off: toggling ON inserts that component's check into the
+// macro tree; toggling OFF removes it. Nothing is added automatically — a
+// verifier only changes when YOU flip a toggle (and then Save).
+function tvCompLeaf(type) {
+    if (type === 'page_visited')
+        return {type:'page_visited', label:'page visited', url:{open:true}};
+    if (type === 'action_included')
+        return {type:'action_included', label:'FE affordance', action:{open:true}, target:{open:true}, value:{open:true}, advisory:true};
+    return {type:'request_made', label:'backend gate', method:{open:true}, url:{open:true}};
+}
+function compToggle(macro, type, on) {
+    var tree = TV_MACROS[macro];
+    if (on) {
+        var leaf = tvCompLeaf(type);
+        if (tree && tree.op) (tree.checks = tree.checks || []).push(leaf);
+        else if (tree) TV_MACROS[macro] = {op:'AND', checks:[tree, leaf]};
+        else TV_MACROS[macro] = leaf;
+    } else {
+        var ls = tvLeaves(tree, type);
+        if (!ls.length) return;
+        var t = tree;
+        for (var i = 0; i < ls.length; i++) {
+            var r = tvRemoveNode(t, ls[i]);
+            if (r === null) {
+                alert('This is the only check left in the macro — removing it would leave a vacuous verifier. Turn another component on first.');
+                renderTaskVerifier();
+                return;
+            }
+            t = r;
+        }
+        TV_MACROS[macro] = t;
+    }
+    tvChanged();
+}
+function tvPage(macro) { return tvLeaves(TV_MACROS[macro], 'page_visited')[0] || null; }
+function tvVisitedPages() {
+    // distinct pages actually visited in the gold trajectory, in first-seen order
+    var seen = {}, out = [];
+    for (var i = 0; i < _trajData.length; i++) {
+        var e = _trajData[i];
+        if (e.type !== 'observation' || !e.url) continue;
+        if (!seen[e.url]) { seen[e.url] = 1; out.push(e.url); }
+    }
+    return out;
+}
+function pageSetUrl(macro, url) {
+    var p = tvPage(macro); if (!p) return;
+    p.url = url || {open:true};
+    if (url) p.advisory = false;   // pinning a page url = it should gate
+    tvChanged();
+}
+function pageSelect(macro, sel) {
+    if (sel.value === '__custom__') {
+        var cur = tvPage(macro);
+        var v = prompt('url substring or re:pattern the visited page must match:',
+                       (cur && typeof cur.url === 'string') ? cur.url : '');
+        if (v === null) { renderTaskVerifier(); return; }  // cancelled — restore select
+        pageSetUrl(macro, v.trim());
+        return;
+    }
+    pageSetUrl(macro, sel.value);
+}
+function gateAdvisory(macro, on) {
+    var g = tvGate(macro); if (g) { g.advisory = on ? true : false; tvChanged(); }
+}
+function pageAdvisory(macro, on) {
+    var p = tvPage(macro); if (p) { p.advisory = on ? true : false; tvChanged(); }
+}
+function tvTargetMacro() {
+    var sel = document.getElementById('tv-target');
+    return sel && sel.value ? sel.value : Object.keys(TV_MACROS)[0];
+}
+function pinGate(idx) {
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true); g.advisory = false; g.advisory = false; g.advisory = false;
+    g.method = r.method;
+    g.url = r.path;
+    tvChanged();
+}
+function escRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function pinQuery(idx, key) {
+    // GET-param constraint lives in the url (query params are part of the URL):
+    // re:<path>\?.*key=value — order-insensitive enough; edit as text if needed.
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true);
+    g.method = r.method;
+    var base = (typeof g.url === 'string' && g.url.indexOf('re:') === 0) ? g.url : 're:' + escRe(r.path) + '\\?';
+    g.url = base + (base.endsWith('\\?') ? '' : '.*') + '.*' + escRe(key) + '=' + escRe(encodeURIComponent(String(r.query[key])).replace(/%20/g,'+'));
+    tvChanged();
+}
+function pinBody(idx, key) {
+    var m = tvTargetMacro(); if (!m) return;
+    var r = tvEvidence()[idx], g = tvGate(m, true); g.advisory = false;
+    g.method = r.method; if (typeof g.url !== 'string') g.url = r.path;
+    var v = r.body[key];   // keep the gold value's REAL type (list stays list, number stays number)
+    var mode = 'equals';
+    if (typeof v === 'number' || (typeof v === 'string' && v !== '' && !isNaN(parseFloat(v)) && isFinite(v))) mode = 'numeric';
+    else if (typeof v === 'string' && v.length > 30) mode = 'contains';
+    g.body_fields = g.body_fields && !g.body_fields.open ? g.body_fields : {};
+    g.body_fields[key] = {value: v, mode: mode};
+    tvChanged();
+}
+// Value inputs are typed: text that parses as JSON ([], {}, 42, true, null, "...")
+// becomes that value; everything else is a plain string — no ""-wrapping needed.
+function tvParseVal(s) {
+    var t = String(s == null ? '' : s).trim();
+    if (t === '') return '';
+    if (/^(\[|\{|-?\d|true$|false$|null$|")/.test(t)) {
+        try { return JSON.parse(t); } catch (e) { /* fall through: plain string */ }
+    }
+    return s;
+}
+// Structured gate editor rendered inside each macro card.
+function gateEditorHTML(macro) {
+    var g = tvGate(macro);
+    var live = TV_LIVE[macro];
+    var badge = live === undefined ? '' : '<span class="tv-live '+(live?'p':'f')+'">gold '+(live?'✓':'✗')+'</span>';
+    // component on/off strip — checked = the component exists in this macro's tree
+    var comps = [['request_made','request'], ['action_included','action'], ['page_visited','page visited']];
+    var strip = '<div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">'
+        + '<b style="font-size:.7rem;color:#1d4ed8">components</b>' + badge
+        + comps.map(function(cp){
+            var on = tvLeaves(TV_MACROS[macro], cp[0]).length > 0;
+            return '<label class="tv-adv-toggle"><input type="checkbox" '+(on?'checked':'')
+                 + ' onchange="compToggle(\''+macro+'\',\''+cp[0]+'\',this.checked)"><b>'+cp[1]+'</b></label>';
+          }).join('')
+        + '</div>';
+    // page_visited component editor — dropdown of pages actually visited in gold
+    // (built BEFORE the no-gate early return: macros like report_information have
+    // no request gate but still need their page/action editors)
+    var pv = tvPage(macro);
+    var pvHtml = '';
+    if (pv) {
+        var pvUrl = typeof pv.url === 'string' ? pv.url : '';
+        var pages = tvVisitedPages();
+        var inList = pvUrl === '' || pages.indexOf(pvUrl) >= 0;
+        var pvOpts = '<option value=""'+(pvUrl===''?' selected':'')+'>(any page)</option>'
+            + pages.map(function(u){
+                return '<option value="'+tvEsc(u)+'"'+(u===pvUrl?' selected':'')+'>'+tvEsc(u)+'</option>';
+              }).join('')
+            + (!inList ? '<option value="'+tvEsc(pvUrl)+'" selected>'+tvEsc(pvUrl)+' (custom)</option>' : '')
+            + '<option value="__custom__">custom…</option>';
+        pvHtml = '<div style="display:flex;gap:.4rem;align-items:center;margin-top:.25rem;flex-wrap:wrap">'
+            + '<b style="font-size:.7rem;color:#0e7490">page visited</b>'
+            + '<select style="max-width:min(480px,80%)" onchange="pageSelect(\''+macro+'\',this)">'+pvOpts+'</select>'
+            + '<label class="tv-adv-toggle" title="advisory = does not gate pass/fail"><input type="checkbox" '+(pv.advisory===true?'checked':'')+' onchange="pageAdvisory(\''+macro+'\',this.checked)">advisory</label>'
+            + '</div>';
+    }
+    // FE affordance advisory toggles
+    var fe = tvLeaves(TV_MACROS[macro], 'action_included');
+    var feHtml = fe.length ? '<div style="margin-top:.3rem;font-size:.68rem;color:#64748b">FE affordance: '
+        + fe.map(function(l, i){
+            var on = l.advisory !== false;
+            return '<label class="tv-adv-toggle"><input type="checkbox" '+(on?'checked':'')
+                 + ' onchange="feAdvisory(\''+macro+'\','+i+',this.checked)">'
+                 + tvEsc(l.action || 'action')+' advisory</label>';
+          }).join(' · ')
+        + ' <span style="color:#a16207">(uncheck = the UI mechanism is REQUIRED)</span></div>' : '';
+    if (!g) return '<div class="tv-gate">' + strip
+        + '<div style="font-size:.68rem;color:#94a3b8;margin-top:.2rem">no request gate — toggle "request" on, or click "→ gate" on a gold request above</div>'
+        + pvHtml + feHtml + '</div>';
+    var method = typeof g.method === 'string' ? g.method : '';
+    var url = typeof g.url === 'string' ? g.url : '';
+    var opts = ['','GET','POST','PUT','PATCH','DELETE'].map(function(o){
+        return '<option value="'+o+'"'+(o===method?' selected':'')+'>'+(o||'ANY')+'</option>'; }).join('');
+    var rowsHtml = '';
+    var bf = (g.body_fields && !g.body_fields.open) ? g.body_fields : {};
+    Object.keys(bf).forEach(function(k){
+        var v = bf[k], val = (v && typeof v === 'object' && 'value' in v) ? v.value : v;
+        var mode = (v && typeof v === 'object' && v.mode) ? v.mode : 'auto';
+        var modeOpts = ['auto','equals','contains','numeric','fuzzy'].map(function(o){
+            return '<option'+(o===mode?' selected':'')+'>'+o+'</option>'; }).join('');
+        var disp = (typeof val === 'string') ? val : JSON.stringify(val);
+        rowsHtml += '<tr><td>body.<input class="f" value="'+tvEsc(k)+'" onchange="gateRenameField(\''+macro+'\',\''+tvEsc(k)+'\',this.value)"></td>'
+            + '<td><input class="v" title="plain text = string · [] {} 42 true parse as JSON" value="'+tvEsc(disp)+'" onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',this.value,null)"></td>'
+            + '<td><select onchange="gateSetField(\''+macro+'\',\''+tvEsc(k)+'\',null,this.value)">'+modeOpts+'</select></td>'
+            + '<td><button class="tv-pin" onclick="gateDelField(\''+macro+'\',\''+tvEsc(k)+'\')">✕</button></td></tr>';
+    });
+    return '<div class="tv-gate">' + strip
+        + '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.25rem">'
+        + '<b style="font-size:.7rem;color:#1d4ed8">request</b>'
+        + '<select onchange="gateSetMU(\''+macro+'\',this.value,null)">'+opts+'</select>'
+        + '<input class="url" placeholder="url substring or re:pattern" value="'+tvEsc(url)+'" onchange="gateSetMU(\''+macro+'\',null,this.value)">'
+        + '<label class="tv-adv-toggle" title="advisory = does not gate pass/fail"><input type="checkbox" '+(g.advisory===true?'checked':'')+' onchange="gateAdvisory(\''+macro+'\',this.checked)">advisory</label>'
+        + '</div>'
+        + (rowsHtml ? '<table>'+rowsHtml+'</table>' : '<div style="font-size:.66rem;color:#94a3b8;margin-top:.2rem">no field constraints — click a ⭐ chip above to pin an instruction-named value</div>')
+        + '<button class="tv-pin" style="margin-top:.2rem" onclick="gateAddField(\''+macro+'\')">+ field constraint</button>'
+        + pvHtml + feHtml + '</div>';
+}
+function tvRemoveNode(node, target) {
+    // Remove `target` (by reference) from the tree; prune empty groups. Returns
+    // the (possibly new) node, or null if this whole subtree vanished.
+    if (node === target) return null;
+    if (!node || !node.op) return node;
+    node.checks = (node.checks || [])
+        .map(function(c){ return tvRemoveNode(c, target); })
+        .filter(function(c){ return c !== null; });
+    if (!node.checks.length) return null;
+    if (node.checks.length === 1) return node.checks[0];  // collapse single-child group
+    return node;
+}
+function gateRemove(macro) {
+    var g = tvGate(macro); if (!g) return;
+    var remaining = tvRemoveNode(TV_MACROS[macro], g);
+    if (remaining === null) {
+        alert('The request gate is the only check in this macro — removing it would leave a vacuous verifier that passes on anything. Edit it, or add another check first.');
+        return;
+    }
+    TV_MACROS[macro] = remaining;
+    tvChanged();
+}
+function gateSetMU(macro, method, url) {
+    var g = tvGate(macro, true);
+    if (method !== null) g.method = method || {open:true};
+    if (url !== null) g.url = url || {open:true};
+    tvChanged();
+}
+function gateSetField(macro, key, val, mode) {
+    var g = tvGate(macro, true);
+    g.body_fields = (g.body_fields && !g.body_fields.open) ? g.body_fields : {};
+    var cur = g.body_fields[key];
+    var obj = (cur && typeof cur === 'object' && 'value' in cur) ? cur : {value: cur, mode: 'auto'};
+    if (val !== null) obj.value = tvParseVal(val);   // [] {} 42 true parse as JSON; else string
+    if (mode !== null) obj.mode = mode;
+    g.body_fields[key] = obj;
+    tvChanged();
+}
+function gateRenameField(macro, oldK, newK) {
+    var g = tvGate(macro); if (!g || !g.body_fields || oldK === newK) return;
+    g.body_fields[newK] = g.body_fields[oldK]; delete g.body_fields[oldK];
+    tvChanged();
+}
+function gateDelField(macro, key) {
+    var g = tvGate(macro); if (!g || !g.body_fields) return;
+    delete g.body_fields[key];
+    if (!Object.keys(g.body_fields).length) delete g.body_fields;
+    tvChanged();
+}
+function gateAddField(macro) {
+    var k = prompt('field name (as it appears in the request body):'); if (!k) return;
+    gateSetField(macro, k, '', 'auto');
+}
+function feAdvisory(macro, i, on) {
+    var fe = tvLeaves(TV_MACROS[macro], 'action_included');
+    if (fe[i]) fe[i].advisory = on ? true : false;
+    tvChanged();
+}
+// Any structured edit: re-render + debounce a live gold validation run.
+var _tvValTimer = null;
+function tvChanged() {
+    renderTaskVerifier();
+    document.getElementById('tv-save').style.display = Object.keys(TV_MACROS).length ? '' : 'none';
+    tvValidateSoon();
+}
+function tvValidateSoon() {
+    if (_tvValTimer) clearTimeout(_tvValTimer);
+    _tvValTimer = setTimeout(tvValidateGold, 600);
+}
+function tvValidateGold() {
+    if (!Object.keys(TV_MACROS).length) return;
+    var el = document.getElementById('tv-gold-live');
+    el.className = 'tv-live w'; el.textContent = 'gold: …';
+    fetch('/annotate/api/run_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN, which: 'gold', macros: TV_MACROS})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.error) { el.className='tv-live w'; el.textContent = 'gold: ?'; el.title = d.error; return; }
+        TV_LIVE = {};
+        Object.keys(d.macros||{}).forEach(function(m){ TV_LIVE[m] = !!d.macros[m].passed; });
+        el.className = 'tv-live ' + (d.passed ? 'p' : 'f');
+        el.textContent = 'gold: ' + (d.passed ? 'PASS' : 'FAIL');
+        renderTaskVerifier();   // repaint per-macro badges without revalidating
+    }).catch(function(){ el.className='tv-live w'; el.textContent='gold: ?'; });
+}
+// ===================== end evidence/gate editor =====================
+
+function suggestTaskVerifier() {
+    var btn = document.getElementById('tv-btn');
+    var status = document.getElementById('tv-status');
+    btn.disabled = true; btn.textContent = 'Filling…'; status.textContent = '';
+    fetch('/annotate/api/suggest_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        btn.disabled = false; btn.textContent = 'Suggest with AI';
+        if (d.error && !(d.macros && Object.keys(d.macros).length)) {
+            status.textContent = d.error;
+        } else {
+            status.textContent = (d.filled_count||0) + '/' + (d.slot_count||0) + ' fields filled · ' + (d.model||'');
+        }
+        TV_MACROS = d.macros || {};
+        renderTaskVerifier();
+        tvValidateSoon();
+        document.getElementById('tv-save').style.display =
+            Object.keys(TV_MACROS).length ? '' : 'none';
+    }).catch(function(e){
+        btn.disabled = false; btn.textContent = 'Suggest with AI';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+// --- readable check-tree rendering (same as the Verifier Review page) ---
+function tvEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function tvHas(v){ return !(v==null || (typeof v==='object' && v.open===true)); }
+function tvFmt(v){
+    if (v && typeof v==='object' && v.open===true) return '<span class="tv-any">any</span>';
+    if (v && typeof v==='object') return '<code>'+tvEsc(JSON.stringify(v))+'</code>';
+    return '<code>'+tvEsc(v)+'</code>';
+}
+function tvLeaf(l){
+    var t=l.type;
+    if(t==='action_included') return '<span class="lt">action</span> <b>'+tvEsc(l.action||'?')+'</b> on '+tvFmt(l.target)+(tvHas(l.value)?' = '+tvFmt(l.value):'');
+    if(t==='request_made') return '<span class="lt">request</span> '+tvFmt(l.method)+' '+tvFmt(l.url)+(tvHas(l.status)?' → status '+tvFmt(l.status):'')+(tvHas(l.body_fields)?' · body '+tvFmt(l.body_fields):'');
+    if(t==='page_visited') return '<span class="lt">visited</span> '+tvFmt(l.url);
+    if(t==='qa_answer') return '<span class="lt">answer</span> matches '+tvFmt(l.expected)+' <span class="tv-any">('+(l.leaf?'reported':'reasoning')+', '+tvEsc(l.mode||'')+')</span>';
+    if(t==='answer_grounded') return '<span class="lt">grounded</span> on '+tvFmt(l.url)+(tvHas(l.text)?' · text '+tvFmt(l.text):'');
+    if(t==='reasoning_contains') return '<span class="lt">reasoning</span> reaches '+tvFmt(l.expected);
+    if(t==='answer_matches') return '<span class="lt">answer</span> = '+tvFmt(l.expected);
+    return '<span class="lt">'+tvEsc(t||'?')+'</span> <code>'+tvEsc(JSON.stringify(l))+'</code>';
+}
+function tvNode(node){
+    if(node && node.op){
+        var or = (node.op||'AND').toUpperCase()==='OR';
+        return '<div class="tv-group '+(or?'or':'and')+'"><div class="tv-glbl">'+(or?'satisfy ANY of':'satisfy ALL of')+'</div>'
+               + (node.checks||[]).map(tvNode).join('') + '</div>';
+    }
+    return '<div class="tv-leaf">'+tvLeaf(node||{})+'</div>';
+}
+
+function renderTaskVerifier() {
+    var el = document.getElementById('tv-result');
+    el.innerHTML = '';
+    Object.keys(TV_MACROS).forEach(function(macro){
+        var box = document.createElement('div');
+        box.className = 'tv-macro';
+        var opBadge = TV_OPS[macro]
+            ? ' <span style="font-size:.6rem;background:#e0e7ff;color:#4338ca;padding:.08rem .4rem;border-radius:.5rem;font-weight:700;text-transform:uppercase">op: '+tvEsc(opLabel(TV_OPS[macro]))+'</span>'
+            : '';
+        var liveBadge = TV_LIVE[macro] === undefined ? ''
+            : ' <span class="tv-live '+(TV_LIVE[macro]?'p':'f')+'">gold '+(TV_LIVE[macro]?'✓':'✗')+'</span>';
+        box.innerHTML =
+            '<div class="mhead"><span class="mname">'+tvEsc(macro)+'</span>'+opBadge+liveBadge+'</div>'
+          + '<div class="mbody">' + gateEditorHTML(macro)
+          + '<div class="tv-body-tree">' + tvNode(TV_MACROS[macro])
+          + '<details class="tv-raw"><summary>edit raw JSON</summary></details></div>'
+          + '<div class="tv-fb"><label>Feedback</label>'
+          + '<div class="fbrow"><button class="btn btn-primary fbsave" style="padding:.15rem .5rem;font-size:.68rem">Save</button>'
+          + '<span class="fbst"></span></div></div></div>';
+        // editable raw-JSON fallback that keeps the readable view in sync
+        var ta = document.createElement('textarea');
+        ta.value = JSON.stringify(TV_MACROS[macro], null, 2);
+        ta.onchange = function(){
+            try { TV_MACROS[macro] = JSON.parse(ta.value); renderTaskVerifier(); }
+            catch(e){ ta.style.borderColor='#ef4444'; }
+        };
+        box.querySelector('.tv-raw').appendChild(ta);
+        // per-macro NL feedback, applied by a coding agent in a later pass
+        var fb = box.querySelector('.tv-fb');
+        var fbst = fb.querySelector('.fbst');
+        var fbta = document.createElement('textarea');
+        fbta.placeholder = "What should change about this macro's checks?";
+        fbta.value = TV_FEEDBACK[macro] || '';
+        if (fbta.value) fbst.textContent = 'saved';
+        fbta.oninput = function(){
+            TV_FEEDBACK[macro] = fbta.value;
+            fbst.textContent = 'unsaved changes';
+        };
+        fb.insertBefore(fbta, fb.querySelector('.fbrow'));
+        fb.querySelector('.fbsave').onclick = function(){ saveFeedback(fbst); };
+        el.appendChild(box);
+    });
+    document.getElementById('tv-sandbox').style.display =
+        Object.keys(TV_MACROS).length ? '' : 'none';
+    populateTarget();
+    renderEvidence();
+}
+
+// A macro "asserts nothing" when no gating (non-advisory) check has a single
+// pinned param — every field is still {open:true}, so it passes on ANY
+// trajectory. Reviewed means pinned: warn before saving such a draft.
+function tvAssertsNothing(node, underAdvisory) {
+    if (!node || typeof node !== 'object') return true;
+    var adv = underAdvisory || node.advisory === true;
+    if (node.op) {
+        var ch = node.checks || [];
+        for (var i = 0; i < ch.length; i++)
+            if (!tvAssertsNothing(ch[i], adv)) return false;
+        return true;
+    }
+    if (adv) return true;   // advisory leaves don't gate
+    var skip = {type:1, label:1, advisory:1, leaf:1, mode:1, alternatives:1};
+    for (var k in node) {
+        if (skip[k]) continue;
+        var v = node[k];
+        if (v == null) continue;
+        if (typeof v === 'object' && v.open === true) continue;
+        return false;       // a pinned param — this leaf asserts something
+    }
+    return true;
+}
+function saveTaskVerifier() {
+    var status = document.getElementById('tv-status');
+    var vacuous = Object.keys(TV_MACROS).filter(function(m){ return tvAssertsNothing(TV_MACROS[m]); });
+    if (vacuous.length && !confirm(
+            'These macros assert NOTHING (all params open — they will pass on any trajectory):\n\n  '
+            + vacuous.join(', ')
+            + '\n\nPin at least one gating value per macro, or Save anyway?'))
+        { status.textContent = 'save cancelled — pin the open macros'; return; }
+    status.textContent = 'saving…';
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({macros: TV_MACROS})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        status.textContent = d.error ? ('error: '+d.error) : 'saved ✓';
+        if (!d.error) refreshQuality();
+    });
+}
+
+function saveFeedback(statusEl) {
+    // save the whole feedback dict (all macros), dropping blank entries
+    var pruned = {};
+    Object.keys(TV_FEEDBACK).forEach(function(m){
+        var t = (TV_FEEDBACK[m] || '').trim();
+        if (t) pruned[m] = t;
+    });
+    statusEl.textContent = 'saving…';
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({feedback: pruned, feedback_at: new Date().toISOString()})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        statusEl.textContent = d.error ? ('error: ' + d.error) : 'saved ✓';
+    }).catch(function(e){ statusEl.textContent = 'error: ' + e; });
+}
+
+// --- Sandbox: run the current spec against a trajectory ---
+function runTaskVerifier(which, container) {
+    which = which || document.getElementById('tv-which').value;
+    var msg = document.getElementById('tv-run-msg');
+    if (!container) { document.getElementById('tv-run-result').innerHTML = ''; }
+    msg.textContent = 'running ' + which + '…';
+    return fetch('/annotate/api/run_task_verifier', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: TV_TASK, annotator: TV_ANN, which: which, macros: TV_MACROS})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        msg.textContent = '';
+        renderRunResult(d, which, container);
+        if (d.quality) renderQuality(d.quality);
+        if (!d.error) msg.textContent = d.evidence_saved ? 'Saved validation evidence updated.' : 'Draft result only — save this verifier to record validation evidence.';
+        return d;
+    });
+}
+function runBoth() {
+    document.getElementById('tv-run-result').innerHTML = '';
+    var box = document.getElementById('tv-run-result');
+    var g = document.createElement('div'), w = document.createElement('div');
+    box.appendChild(g); box.appendChild(w);
+    runTaskVerifier('gold', g); runTaskVerifier('walk', w);
+}
+function renderRunResult(d, which, container) {
+    var el = container || document.getElementById('tv-run-result');
+    if (d.error) { el.innerHTML = '<div style="font-size:.74rem;color:#b45309">'+which+': '+d.error+'</div>'; return; }
+    var negative = which === 'empty' || which === 'answer_only';
+    var expectedResult = negative ? !d.passed : d.passed;
+    var verdict = negative ? (d.passed ? 'INCORRECTLY ACCEPTED' : 'CORRECTLY REJECTED') : (d.passed ? 'PASS' : 'FAIL');
+    var head = '<div style="display:flex;align-items:center;gap:.4rem;margin:.3rem 0">'+
+        '<span class="badge '+(expectedResult?'badge-pass':'badge-fail')+'">'+verdict+'</span>'+
+        '<b style="font-size:.78rem">'+d.source+'</b>'+
+        '<span style="font-size:.68rem;color:#94a3b8">'+d.action_count+' actions</span></div>';
+    var rows = '';
+    Object.keys(d.macros||{}).forEach(function(macro){
+        var res = d.macros[macro];
+        rows += '<div style="margin:.2rem 0"><span class="badge '+(res.passed?'badge-pass':'badge-fail')+'">'+(res.passed?'✓':'✗')+'</span> '+
+                '<span style="font-family:monospace;font-size:.74rem">'+macro+'</span>';
+        rows += renderNode(res);
+        rows += '</div>';
+    });
+    el.innerHTML = head + rows;
+}
+function renderNode(node) {
+    if (node.op) {
+        var glab = node.label ? ' <b style="color:#475569">'+node.label+'</b>' : '';
+        var inner = (node.checks||[]).map(renderNode).join('');
+        return '<div style="margin-left:1rem;font-size:.7rem;color:#94a3b8">'+node.op+' ('+(node.passed?'pass':'fail')+')'+glab+inner+'</div>';
+    }
+    var c = node.passed ? '#166534' : '#991b1b';
+    var lab = node.label ? '<b>'+node.label+'</b> <span style="color:#94a3b8">('+node.type+')</span>' : node.type;
+    return '<div style="margin-left:1.2rem;font-size:.72rem;color:'+c+'">'+
+           (node.passed?'✓':'✗')+' '+lab+' <span style="color:#94a3b8">— '+(node.reason||'')+'</span></div>';
+}
+
+// load any previously saved verifier for this task
+if (TV_TASK) {
+    fetch('/annotate/api/task_verifier/' + encodeURIComponent(TV_ANN) + '/' + encodeURIComponent(TV_TASK))
+        .then(function(r){ return r.json(); }).then(function(d){
+            if (d.feedback && typeof d.feedback === 'object') TV_FEEDBACK = d.feedback;
+            if (d.macros && Object.keys(d.macros).length) {
+                TV_MACROS = d.macros; renderTaskVerifier();
+                document.getElementById('tv-save').style.display = '';
+                var notes = [];
+                if (d.expected_refreshed && d.expected_refreshed.length)
+                    notes.push('expected answer refreshed (' + d.expected_refreshed.join(', ') + ')');
+                if (d.macros_removed && d.macros_removed.length)
+                    notes.push('untagged macros dropped: ' + d.macros_removed.join(', '));
+                if (d.macros_added && d.macros_added.length)
+                    notes.push('new tags scaffolded (all open — pin what should gate): ' + d.macros_added.join(', '));
+                document.getElementById('tv-status').textContent = notes.length
+                    ? '⚠ synced with task.json — ' + notes.join(' · ') + ' — Save to persist'
+                    : 'loaded saved verifier';
+                tvValidateSoon();   // live gold badge on load
+            } else {
+                renderEvidence();   // evidence panel is useful even before a spec exists
+            }
+        });
+}
+</script>
+</body>
+</html>

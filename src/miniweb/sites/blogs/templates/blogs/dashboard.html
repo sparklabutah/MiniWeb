@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — TumblrVibe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1a1a2e; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; }
+        a { color: #7c83ff; text-decoration: none; }
+
+        .top-bar { background: #16213e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #7c83ff; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+
+        .dash { max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+        .profile { background: #16213e; border-radius: .6rem; padding: 1.5rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; }
+        .profile img { width: 64px; height: 64px; border-radius: 50%; }
+        .profile .info h2 { font-size: 1.2rem; }
+        .profile .info p { font-size: .85rem; color: #888; }
+
+        .section { margin-bottom: 1.5rem; }
+        .section h3 { font-size: 1rem; color: #7c83ff; margin-bottom: .7rem; border-bottom: 1px solid #0f3460; padding-bottom: .3rem; }
+        .section .item { background: #16213e; border-radius: .4rem; padding: .7rem 1rem; margin-bottom: .4rem; display: flex; justify-content: space-between; align-items: center; }
+        .section .item .title { font-weight: 600; font-size: .9rem; }
+        .section .item .meta { font-size: .75rem; color: #888; }
+        .empty { color: #666; font-size: .85rem; padding: .5rem; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .tag-list span { background: #0f3460; color: #7c83ff; padding: .2rem .5rem; border-radius: .3rem; font-size: .8rem; }
+        .blog-list span { background: #0f3460; color: #7c83ff; padding: .2rem .5rem; border-radius: .3rem; font-size: .8rem; display: inline-block; margin: .15rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('blogs.index') }}" class="logo">TumblrVibe</a>
+        <div class="nav-links">
+            <a href="{{ url_for('blogs.index') }}">Home</a>
+            <a href="{{ url_for('blogs.index') }}">Feed</a>
+            <a href="{{ url_for('blogs.compose_page') }}">Compose</a>
+            <a href="{{ url_for('blogs.logout') }}">Logout</a>
+        </div>
+    </div>
+    <div class="dash">
+        <div class="profile">
+            <img src="{{ user.avatar }}" alt="">
+            <div class="info">
+                <h2>{{ user.display_name }}</h2>
+                <p>@{{ user.username }}</p>
+                <p>{{ user.bio }}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Saved Posts ({{ saved_posts|length }})</h3>
+            {% if saved_posts %}
+            {% for p in saved_posts %}
+            <div class="item">
+                <div>
+                    <div class="title"><a href="{{ url_for('blogs.post_detail', post_id=p.id) }}">{{ p.title }}</a></div>
+                    <div class="meta">{{ p.author_display_name }} &middot; {{ p.date }}</div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty">No saved posts yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>My Posts ({{ my_posts|length }})</h3>
+            {% if my_posts %}
+            {% for p in my_posts %}
+            <div class="item">
+                <div>
+                    <div class="title"><a href="{{ url_for('blogs.post_detail', post_id=p.id) }}">{{ p.title }}</a></div>
+                    <div class="meta">{{ p.date }} &middot; {{ p.notes_count }} notes</div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty">No posts yet. Start writing!</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Followed Blogs</h3>
+            {% if user.followed_blogs %}
+            <div class="blog-list">
+                {% for b in user.followed_blogs %}
+                <span>@{{ b }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">Not following any blogs yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h3>Subscribed Tags</h3>
+            {% if user.subscribed_tags %}
+            <div class="tag-list">
+                {% for t in user.subscribed_tags %}
+                <span>#{{ t }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">No tag subscriptions yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

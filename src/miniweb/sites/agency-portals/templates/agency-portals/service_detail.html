@@ -1,0 +1,28 @@
+{% extends "agency-portals/base.html" %}
+{% block title %}{{ service.name }} - City of Lakeport{% endblock %}
+{% block content %}
+<div class="main-content">
+    <div class="detail-header">
+        <h2>{{ service.name }}</h2>
+        <div class="detail-meta">
+            <span><strong>Service Code:</strong> {{ service.code }}</span>
+            <span><strong>Category:</strong> {{ service.category }}</span>
+            <span><strong>Fee:</strong> {{ service.fee_range }}</span>
+            <span><strong>Available Online:</strong> {{ "Yes" if service.online else "No" }}</span>
+        </div>
+    </div>
+    <div class="detail-body">
+        <p>{{ service.description }}</p>
+        {% if dept %}
+        <h3 style="margin-top:1.5rem;">Department</h3>
+        <p><a href="{{ url_for('agency-portals.department_detail', dept_id=dept.id) }}">{{ dept.name }}</a></p>
+        <p style="font-size:.85rem;color:#71767a;">{{ dept.phone }} | {{ dept.email }}</p>
+        {% endif %}
+        {% if service.online %}
+        <div style="margin-top:1.5rem;">
+            <a href="{{ url_for('agency-portals.apply_page', service_id=service.id) }}" class="btn btn-primary">Apply for this Service</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

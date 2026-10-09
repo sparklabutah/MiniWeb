@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wishlist - ShopHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #eaeded; color: #0f1111; }
+        .header { background: #131921; padding: .6rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+        .header .logo { color: #fff; font-size: 1.4rem; font-weight: 700; text-decoration: none; }
+        .header .logo span { color: #febd69; }
+        .header-nav { margin-left: auto; display: flex; gap: .6rem; align-items: center; }
+        .header-nav a { color: #fff; text-decoration: none; font-size: .9rem; padding: .3rem .5rem; border-radius: .3rem; }
+        .header-nav a:hover { background: #3a4553; color: #febd69; }
+        .nav-cart { background: #232f3e; font-weight: 600; }
+        .cart-badge { background: #febd69; color: #131921; padding: 0 6px; border-radius: 8px; font-size: .75rem; font-weight: 700; margin-left: 3px; }
+        .main { max-width: 900px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .main h2 { margin-bottom: 1rem; font-size: 1.4rem; }
+        .wish-item { background: #fff; border: 1px solid #d5d9d9; border-radius: .4rem; padding: 1rem 1.2rem; margin-bottom: .6rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .wish-item a { color: #007185; text-decoration: none; font-size: .95rem; }
+        .wish-item a:hover { text-decoration: underline; color: #c7511f; }
+        .wish-item .price { color: #0f1111; font-weight: 600; font-size: 1rem; margin-left: .5rem; }
+        .wish-item .actions { display: flex; gap: .5rem; }
+        .btn-remove { background: #d5d9d9; color: #0f1111; border: 1px solid #b7b7b7; padding: .4rem .8rem; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
+        .btn-remove:hover { background: #c7c7c7; }
+        .btn-add { background: #ffd814; color: #0f1111; border: 1px solid #fcd200; padding: .4rem .8rem; border-radius: .3rem; cursor: pointer; font-size: .85rem; font-weight: 600; }
+        .btn-add:hover { background: #f7ca00; }
+        .empty { text-align: center; color: #565959; padding: 3rem; background: #fff; border-radius: .4rem; }
+        .empty a { color: #007185; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('e-commerce.index') }}" class="logo">Shop<span>Hub</span></a>
+        <div class="header-nav">
+            <a href="{{ url_for('e-commerce.index') }}">Home</a>
+            <a href="{{ url_for('e-commerce.orders_page') }}">Orders</a>
+            <a href="{{ url_for('e-commerce.cart_page') }}" class="nav-cart">Cart{% if user and user.cart|length > 0 %} <span class="cart-badge">{{ user.cart|length }}</span>{% endif %}</a>
+            <a href="{{ url_for('e-commerce.logout') }}">Logout ({{ user.name }})</a>
+        </div>
+    </div>
+    <div class="main">
+        <h2>Wishlist ({{ wishlist_items|length }} item{{ 's' if wishlist_items|length != 1 else '' }})</h2>
+        {% if wishlist_items %}
+        {% for p in wishlist_items %}
+        <div class="wish-item">
+            <div>
+                <a href="{{ url_for('e-commerce.product_detail', product_id=p.id) }}">{{ p.name }}</a>
+                {% if p.price %}<span class="price">${{ "%.2f"|format(p.price) }}</span>{% endif %}
+            </div>
+            <div class="actions">
+                <form method="POST" action="{{ url_for('e-commerce.form_add_to_cart') }}" style="display:inline;">
+                    <input type="hidden" name="product_id" value="{{ p.id }}">
+                    <input type="hidden" name="quantity" value="1">
+                    <input type="hidden" name="redirect_to" value="{{ url_for('e-commerce.wishlist_page') }}">
+                    <button type="submit" class="btn-add">Add to Cart</button>
+                </form>
+                <form method="POST" action="{{ url_for('e-commerce.form_toggle_wishlist') }}" style="display:inline;">
+                    <input type="hidden" name="product_id" value="{{ p.id }}">
+                    <input type="hidden" name="redirect_to" value="{{ url_for('e-commerce.wishlist_page') }}">
+                    <button type="submit" class="btn-remove">Remove</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty">
+            <p>Your wishlist is empty.</p>
+            <p><a href="{{ url_for('e-commerce.index') }}">Continue shopping</a></p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesPro CRM - Tasks</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7fafc; color: #2d3748; }
+        .header { background: #1a365d; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #bee3f8; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover, .header-nav a.active { color: #fff; }
+        .header-nav .user-info { color: #90cdf4; font-size: .85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        h2 { font-size: 1.2rem; color: #1a365d; margin-bottom: 1rem; }
+        .tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
+        .tabs a { padding: .4rem .9rem; border-radius: 6px; font-size: .85rem; text-decoration: none; color: #4a5568; background: #edf2f7; }
+        .tabs a.active { background: #2b6cb0; color: #fff; }
+        .toolbar { display: flex; gap: .8rem; margin-bottom: 1.2rem; flex-wrap: wrap; align-items: center; }
+        .toolbar select { padding: .5rem .8rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem; background: #fff; }
+        .toolbar button { padding: .5rem 1rem; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; font-size: .9rem; cursor: pointer; }
+        .toolbar button:hover { background: #2c5282; }
+        .result-count { font-size: .85rem; color: #718096; margin-bottom: .8rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+        th, td { text-align: left; padding: .7rem .8rem; border-bottom: 1px solid #edf2f7; font-size: .88rem; }
+        th { background: #edf2f7; color: #4a5568; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+        td a { color: #2b6cb0; text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .78rem; font-weight: 600; }
+        .badge-open { background: #ebf8ff; color: #2b6cb0; }
+        .badge-completed { background: #f0fff4; color: #276749; }
+        .prio-high { color: #c53030; font-weight: 700; }
+        .prio-normal { color: #718096; }
+        .prio-low { color: #a0aec0; }
+        .overdue { color: #c53030; font-weight: 600; }
+        .task-done td { color: #a0aec0; }
+        .task-done .task-title { text-decoration: line-through; }
+        .act-btn { padding: .35rem .8rem; border: none; border-radius: 6px; font-size: .82rem; cursor: pointer; }
+        .act-btn.complete { background: #38a169; color: #fff; }
+        .act-btn.complete:hover { background: #2f855a; }
+        .act-btn.reopen { background: #edf2f7; color: #4a5568; }
+        .create-form { background: #fff; padding: 1.2rem; border-radius: 8px; box-shadow: 0 1px 8px rgba(0,0,0,0.06); margin-top: 1.5rem; }
+        .create-form h3 { font-size: 1rem; margin-bottom: .8rem; color: #1a365d; }
+        .form-row { display: flex; gap: .8rem; margin-bottom: .8rem; flex-wrap: wrap; }
+        .form-row label { display: block; font-size: .82rem; color: #4a5568; margin-bottom: .3rem; }
+        .form-row input, .form-row select, .form-row textarea { padding: .45rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: .9rem; width: 100%; font-family: inherit; }
+        .form-row textarea { min-height: 50px; resize: vertical; }
+        .form-group { flex: 1; min-width: 150px; }
+        .empty { color: #a0aec0; padding: 1.5rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SalesPro CRM</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('crm.index') }}">Dashboard</a>
+            <a href="{{ url_for('crm.contacts_page') }}">Contacts</a>
+            <a href="{{ url_for('crm.companies_page') }}">Companies</a>
+            <a href="{{ url_for('crm.deals_page') }}">Deals</a>
+            <a href="{{ url_for('crm.activities_page') }}">Activities</a>
+            <a href="{{ url_for('crm.tasks_page') }}" class="active">Tasks</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('crm.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('crm.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <h2>Tasks <span style="font-size:.85rem;color:#718096;font-weight:400;">&mdash; {{ open_count }} open</span></h2>
+
+        <div class="tabs">
+            <a href="{{ url_for('crm.tasks_page', status='open') }}" class="{% if status_filter == 'open' %}active{% endif %}">Open</a>
+            <a href="{{ url_for('crm.tasks_page', status='completed') }}" class="{% if status_filter == 'completed' %}active{% endif %}">Completed</a>
+            <a href="{{ url_for('crm.tasks_page', status='all') }}" class="{% if status_filter not in ['open','completed'] %}active{% endif %}">All</a>
+        </div>
+
+        <form class="toolbar" method="GET" action="{{ url_for('crm.tasks_page') }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <select name="owner_id">
+                <option value="">All Assignees</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if owner_filter == u.id|string %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+
+        <div class="result-count">{{ total_count }} task{{ '' if total_count == 1 else 's' }}{% if total_pages > 1 %} &mdash; page {{ page }} of {{ total_pages }}{% endif %}</div>
+
+        <table>
+            <thead>
+                <tr><th>Title</th><th>Due Date</th><th>Priority</th><th>Contact</th><th>Deal</th><th>Assignee</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+            {% for t in tasks %}
+                <tr class="{% if t.status == 'completed' %}task-done{% endif %}">
+                    <td class="task-title">{{ t.title }}</td>
+                    <td class="{% if t.status == 'open' and t.due_date and t.due_date < today %}overdue{% endif %}">{{ t.due_date or '—' }}</td>
+                    <td class="prio-{{ t.priority }}">{{ t.priority|title }}</td>
+                    <td>{% if t.contact_id %}<a href="{{ url_for('crm.contact_detail', contact_id=t.contact_id) }}">{{ t._contact_name }}</a>{% else %}—{% endif %}</td>
+                    <td>{% if t.deal_id %}<a href="{{ url_for('crm.deal_detail', deal_id=t.deal_id) }}">{{ t._deal_name }}</a>{% else %}—{% endif %}</td>
+                    <td>{{ t._owner_name }}</td>
+                    <td><span class="badge badge-{{ t.status }}">{{ t.status|title }}</span></td>
+                    <td>
+                        {% if user %}
+                        {% if t.status == 'open' %}
+                        <form method="POST" action="{{ url_for('crm.form_complete_task', task_id=t.id) }}" style="display:inline;">
+                            <button type="submit" class="act-btn complete">Complete</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('crm.form_reopen_task', task_id=t.id) }}" style="display:inline;">
+                            <button type="submit" class="act-btn reopen">Reopen</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            {% if not tasks %}
+                <tr><td colspan="8" class="empty">No {{ status_filter if status_filter in ['open','completed'] else '' }} tasks.</td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+
+        {% if total_pages > 1 %}
+        <div class="pagination" style="display:flex; gap:.8rem; align-items:center; justify-content:center; margin-top:1rem; font-size:.9rem;">
+            {% if page > 1 %}<a href="{{ url_for('crm.tasks_page', status=status_filter, owner_id=owner_filter, page=page-1) }}" style="color:#2b6cb0;text-decoration:none;">&larr; Previous</a>{% endif %}
+            <span style="color:#718096;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}<a href="{{ url_for('crm.tasks_page', status=status_filter, owner_id=owner_filter, page=page+1) }}" style="color:#2b6cb0;text-decoration:none;">Next &rarr;</a>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if user %}
+        <div class="create-form">
+            <h3>New Task</h3>
+            <form method="POST" action="{{ url_for('crm.form_create_task') }}">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label for="title">Title</label>
+                        <input type="text" name="title" id="title" placeholder="e.g. Follow up on proposal" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="due_date">Due Date</label>
+                        <input type="date" name="due_date" id="due_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select name="priority" id="priority">
+                            <option value="high">High</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="deal_id">Deal</label>
+                        <select name="deal_id" id="deal_id">
+                            <option value="0">— None —</option>
+                            {% for d in deals %}
+                            <option value="{{ d.id }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_id">Contact</label>
+                        <select name="contact_id" id="contact_id">
+                            <option value="0">— None —</option>
+                            {% for c in contacts %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="owner_id">Assign To</label>
+                        <select name="owner_id" id="owner_id">
+                            {% for u in users %}
+                            <option value="{{ u.id }}" {% if user and u.id == user.id %}selected{% endif %}>{{ u.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:3;">
+                        <label for="notes">Notes</label>
+                        <textarea name="notes" id="notes" placeholder="Optional details..."></textarea>
+                    </div>
+                </div>
+                <button type="submit" style="padding:.5rem 1.5rem;background:#2b6cb0;color:#fff;border:none;border-radius:6px;font-size:.9rem;cursor:pointer;">Create Task</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

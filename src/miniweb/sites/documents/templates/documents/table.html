@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ doc.title }} - Data Table - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .toolbar { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.4rem 1rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+        .toolbar-left { display: flex; align-items: center; gap: 0.8rem; }
+        .toolbar-left .back { color: #5f6368; text-decoration: none; font-size: 1.2rem; padding: 0.2rem 0.4rem; border-radius: 4px; }
+        .toolbar-left .back:hover { background: #f1f3f4; }
+        .doc-title-display { font-size: 1.1rem; font-weight: 500; color: #202124; }
+        .nav-links { display: flex; gap: 0.3rem; }
+        .nav-links a { font-size: 0.82rem; color: #5f6368; text-decoration: none; padding: 0.3rem 0.5rem; border-radius: 4px; }
+        .nav-links a:hover { background: #f1f3f4; }
+
+        .grid-container { max-width: 900px; margin: 1.5rem auto; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); border-radius: 2px; padding: 1.5rem 2rem; }
+        .grid-container h2 { font-size: 1.3rem; font-weight: 500; margin-bottom: 0.2rem; }
+        .grid-container .sub { font-size: 0.85rem; color: #5f6368; margin-bottom: 1.2rem; }
+
+        table.data-grid { width: 100%; border-collapse: collapse; }
+        table.data-grid td { padding: 0; border: 1px solid #dadce0; }
+        td.rownum { background: #f8f9fa; color: #80868b; font-size: 0.72rem; text-align: center; width: 2rem; padding: 0.5rem 0; }
+        .cell-input { width: 100%; border: none; padding: 0.5rem 0.6rem; font-size: 0.9rem; color: #202124; background: transparent; font-family: inherit; }
+        .cell-input:focus { outline: 2px solid #1a73e8; outline-offset: -2px; background: #f8fbff; }
+        tr.grid-header .cell-input { font-weight: 600; color: #1a73e8; background: #e8f0fe; }
+
+        .actions { display: flex; gap: 0.6rem; margin-top: 1rem; align-items: center; }
+        .btn { cursor: pointer; font-family: inherit; font-size: 0.85rem; border-radius: 4px; padding: 0.45rem 1rem; border: none; font-weight: 500; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-secondary { background: #f1f3f4; color: #5f6368; }
+        .btn-secondary:hover { background: #e4e6e9; }
+        .notice { background: #fff3cd; color: #856404; padding: 0.6rem 1rem; font-size: 0.85rem; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}" class="back" title="Back to document">&larr;</a>
+            <span class="doc-title-display">{{ doc.title }} &middot; Data Table</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}">Editor</a>
+            <a href="{{ url_for('documents.index') }}">All Docs</a>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <h2>Data Table</h2>
+        <div class="sub">Edit values directly in any cell. Use &ldquo;+ Add row&rdquo; to append a line item, then Save Changes.</div>
+
+        {% if not can_edit %}
+        <div class="notice">Read-only &mdash; you do not have edit access to this document, so changes cannot be saved.</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('documents.table_submit', doc_id=doc.id) }}">
+            <table class="data-grid" id="dataGrid">
+                {% for row in grid %}
+                {% set r = loop.index0 %}
+                <tr class="{{ 'grid-header' if r == 0 else 'grid-row' }}">
+                    <td class="rownum">{{ '' if r == 0 else r }}</td>
+                    {% for cell in row %}
+                    <td><input class="cell-input" name="cell_{{ r }}_{{ loop.index0 }}" value="{{ cell }}"{{ ' readonly' if not can_edit }}></td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+
+            {% if can_edit %}
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" onclick="gridAddRow()">+ Add row</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <script>
+        // Number of data columns is fixed by the header row.
+        var GRID_COLS = {{ grid[0] | length }};
+        function gridAddRow() {
+            var table = document.getElementById("dataGrid");
+            var newIndex = table.rows.length; // row 0 is the header
+            var tr = table.insertRow(-1);
+            tr.className = "grid-row";
+            var numCell = tr.insertCell(-1);
+            numCell.className = "rownum";
+            numCell.textContent = newIndex;
+            for (var c = 0; c < GRID_COLS; c++) {
+                var td = tr.insertCell(-1);
+                var input = document.createElement("input");
+                input.className = "cell-input";
+                input.name = "cell_" + newIndex + "_" + c;
+                input.value = "";
+                td.appendChild(input);
+            }
+        }
+    </script>
+</body>
+</html>

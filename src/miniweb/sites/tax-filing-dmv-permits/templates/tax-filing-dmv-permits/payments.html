@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'payments' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <h2>Payment History</h2>
+        <a class="action-btn green" href="{{ url_for('tax-filing-dmv-permits.make_payment_page') }}">+ Make Payment</a>
+        <form class="filters" method="get">
+            <div><label for="type">Type</label>
+                <select name="type" id="type"><option value="">All Types</option>
+                    {% for t in payment_types %}<option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t|replace("_"," ")|title }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label for="date_from">From</label><input type="date" name="date_from" id="date_from" value="{{ date_from or '' }}"></div>
+            <div><label for="date_to">To</label><input type="date" name="date_to" id="date_to" value="{{ date_to or '' }}"></div>
+            <button type="submit">Filter</button>
+        </form>
+        <table>
+            <thead><tr><th>Payment ID</th><th>Type</th><th>Amount</th><th>Method</th><th>Date</th><th>Confirmation</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.payment_id }}</td>
+                    <td>{{ p.type|replace("_"," ")|title }}</td>
+                    <td>${{ "%.2f"|format(p.amount) }}</td>
+                    <td>{{ p.method|replace("_"," ")|title }}</td>
+                    <td>{{ p.payment_date }}</td>
+                    <td>{{ p.confirmation_number }}</td>
+                    <td><span class="badge badge-completed">{{ p.status|title }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+</body>
+</html>

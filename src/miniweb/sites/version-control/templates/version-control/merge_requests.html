@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merge Requests - MeridianGit</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-logo svg { fill: #f0f6fc; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-links a.active { font-weight: 600; border-bottom: 2px solid #f78166; }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-user .btn-signin { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 16px; border-radius: 6px; font-size: 14px; }
+
+        .main-container { max-width: 1012px; margin: 0 auto; padding: 24px 32px; }
+        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .page-header h1 { font-size: 24px; font-weight: 400; color: #e6edf3; }
+        .page-header .total { font-size: 14px; color: #8b949e; margin-left: 8px; background: #21262d; padding: 2px 8px; border-radius: 12px; }
+
+        .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+        .filter-bar input[type="text"] { flex: 1; min-width: 200px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 5px 12px; font-size: 14px; }
+        .filter-bar input:focus { outline: none; border-color: #1f6feb; }
+        .filter-bar select { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 5px 12px; font-size: 14px; }
+        .filter-bar button { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 5px 16px; font-size: 14px; cursor: pointer; }
+        .filter-bar button:hover { background: #30363d; }
+
+        .mr-list { list-style: none; }
+        .mr-item { padding: 12px 0; border-bottom: 1px solid #21262d; display: flex; gap: 12px; }
+        .mr-icon { flex-shrink: 0; margin-top: 2px; }
+        .mr-icon svg { width: 16px; height: 16px; }
+        .mr-icon.open svg { fill: #3fb950; }
+        .mr-icon.merged svg { fill: #a371f7; }
+        .mr-icon.closed svg { fill: #f85149; }
+        .mr-content { flex: 1; min-width: 0; }
+        .mr-title { font-size: 16px; font-weight: 600; }
+        .mr-title a { color: #e6edf3; }
+        .mr-title a:hover { color: #58a6ff; }
+        .mr-meta { font-size: 12px; color: #8b949e; margin-top: 4px; }
+        .mr-project { background: #1f6feb22; color: #58a6ff; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+        .mr-branches { font-size: 12px; color: #8b949e; margin-top: 2px; }
+        .branch-tag { background: #1f6feb22; color: #58a6ff; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 24px; }
+        .pagination a, .pagination span { padding: 5px 12px; border: 1px solid #30363d; border-radius: 6px; font-size: 14px; color: #c9d1d9; }
+        .pagination a:hover { background: #21262d; text-decoration: none; }
+        .pagination .current { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+        .pagination .disabled { color: #484f58; }
+
+        .empty-state { text-align: center; padding: 48px 0; color: #8b949e; }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+    <a href="{{ url_for('version-control.index') }}" class="nav-logo">
+        <svg height="28" width="28" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        MeridianGit
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('version-control.index') }}">Dashboard</a>
+        <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+        <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+        <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+        <a href="{{ url_for('version-control.merge_requests_page') }}" class="active">Merge Requests</a>
+        <a href="{{ url_for('version-control.members_page') }}">Members</a>
+    </div>
+    <div class="nav-user">
+        {% if session.get('vc_username') %}
+        <a href="{{ url_for('version-control.user_profile', user_id=session.vc_user_id) }}" style="color:#e6edf3;font-size:14px;text-decoration:none;">{{ session.vc_name }}</a>
+        <a href="{{ url_for('version-control.logout') }}" style="color:#8b949e;font-size:13px;">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('version-control.login_page') }}" class="btn-signin" style="text-decoration:none;">Sign in</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="main-container">
+    <div class="page-header">
+        <h1>Merge Requests <span class="total">{{ total }}</span></h1>
+    </div>
+
+    <form method="get" action="{{ url_for('version-control.merge_requests_page') }}" class="filter-bar">
+        <input type="text" name="q" placeholder="Search merge requests..." value="{{ search }}">
+        <select name="state">
+            <option value="">All states</option>
+            <option value="open" {% if state_filter == 'open' %}selected{% endif %}>Open</option>
+            <option value="merged" {% if state_filter == 'merged' %}selected{% endif %}>Merged</option>
+            <option value="closed" {% if state_filter == 'closed' %}selected{% endif %}>Closed</option>
+        </select>
+        <select name="project">
+            <option value="">All projects</option>
+            {% for p in project_names %}
+            <option value="{{ p }}" {% if p == project_filter %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filter</button>
+    </form>
+
+    {% if merge_requests %}
+    <ul class="mr-list">
+        {% for mr in merge_requests %}
+        <li class="mr-item">
+            <div class="mr-icon {{ 'merged' if mr.state_id == 3 else ('closed' if mr.state_id == 2 else 'open') }}">
+                {% if mr.state_id == 3 %}
+                <svg viewBox="0 0 16 16"><path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8-8a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM4.25 4a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"></path></svg>
+                {% elif mr.state_id == 2 %}
+                <svg viewBox="0 0 16 16"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path></svg>
+                {% else %}
+                <svg viewBox="0 0 16 16"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path></svg>
+                {% endif %}
+            </div>
+            <div class="mr-content">
+                <div class="mr-title">
+                    <a href="{{ url_for('version-control.mr_detail', mr_id=mr.id) }}">{{ mr.title }}</a>
+                </div>
+                <div class="mr-meta">
+                    <span class="mr-project">{{ mr.project_name }}</span>
+                    !{{ mr.id }} opened {{ mr.created_at[:10] }}
+                    {% if mr.updated_at %} &middot; updated {{ mr.updated_at[:10] }}{% endif %}
+                </div>
+                {% if mr.source_branch or mr.target_branch %}
+                <div class="mr-branches">
+                    <span class="branch-tag">{{ mr.source_branch }}</span>
+                    &rarr;
+                    <span class="branch-tag">{{ mr.target_branch }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('version-control.merge_requests_page', page=page-1, state=state_filter, project=project_filter, q=search) }}">Previous</a>
+        {% else %}
+        <span class="disabled">Previous</span>
+        {% endif %}
+        <span class="current">Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ url_for('version-control.merge_requests_page', page=page+1, state=state_filter, project=project_filter, q=search) }}">Next</a>
+        {% else %}
+        <span class="disabled">Next</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <h3>No merge requests found</h3>
+        <p>Try adjusting your search or filter criteria.</p>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

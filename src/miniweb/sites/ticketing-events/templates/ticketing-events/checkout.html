@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - {{ event.name }} - Lakeport Events</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #d63031, #e17055); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+        .header h1 a span { font-weight: 300; opacity: .85; }
+        .header-actions a { color: #fff; text-decoration: none; font-size: .9rem; margin-left: 1rem; }
+        .container { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .breadcrumb { font-size: .85rem; color: #666; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #d63031; text-decoration: none; }
+        h2 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .checkout-card { background: #fff; border-radius: .6rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .event-summary { padding-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
+        .event-summary h3 { font-size: 1.2rem; margin-bottom: .3rem; }
+        .event-summary p { font-size: .9rem; color: #666; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .85rem; color: #334155; font-weight: 600; margin-bottom: .4rem; }
+        .form-group select, .form-group input { width: 100%; padding: .6rem .8rem; border: 1.5px solid #d1d5db; border-radius: .4rem; font-size: .9rem; background: #fff; }
+        .form-group select:focus, .form-group input:focus { border-color: #d63031; outline: none; }
+        .ticket-option { padding: .5rem 0; font-size: .85rem; color: #333; }
+        .btn-checkout { width: 100%; padding: .8rem; background: #d63031; color: #fff; border: none; border-radius: .4rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        .btn-checkout:hover { background: #c0392b; }
+        .btn-checkout:disabled { background: #ccc; cursor: not-allowed; }
+        .promo-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+        .error-banner { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: .7rem 1rem; border-radius: .4rem; font-size: .9rem; margin-bottom: 1.2rem; }
+
+        /* Seat map */
+        .seat-legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .78rem; color: #555; margin-bottom: 1rem; }
+        .seat-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+        .swatch { width: 16px; height: 16px; border-radius: 3px; display: inline-block; border: 1px solid #cbd5e1; }
+        .swatch.free { background: #fff; }
+        .swatch.sel { background: #d63031; border-color: #d63031; }
+        .swatch.taken { background: #cbd5e1; border-color: #cbd5e1; }
+        .stage { text-align: center; background: #1a1a2e; color: #fff; font-size: .75rem; letter-spacing: .3em; text-transform: uppercase; padding: .35rem; border-radius: .3rem; margin-bottom: 1rem; }
+        .section-block { margin-bottom: 1.4rem; }
+        .section-title { font-size: .95rem; font-weight: 700; color: #334155; margin-bottom: .5rem; display: flex; justify-content: space-between; }
+        .section-title .price { color: #d63031; }
+        .seat-scroll { overflow-x: auto; }
+        .seat-row { display: flex; align-items: center; gap: .25rem; margin-bottom: .25rem; white-space: nowrap; }
+        .row-label { width: 20px; font-size: .72rem; color: #999; text-align: center; flex-shrink: 0; }
+        .seat { width: 24px; height: 24px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; font-size: .6rem; color: #94a3b8; cursor: pointer; flex-shrink: 0; padding: 0; }
+        .seat:hover:not(:disabled) { border-color: #d63031; }
+        .seat.selected { background: #d63031; border-color: #d63031; color: #fff; }
+        .seat.taken { background: #cbd5e1; border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+        .selection-summary { background: #f8f9fa; border-radius: .4rem; padding: .8rem 1rem; margin-top: 1rem; font-size: .88rem; }
+        .selection-summary strong { color: #1a1a2e; }
+        #selectedSeatsText { color: #d63031; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('ticketing-events.index') }}">Lakeport<span>Events</span></a></h1>
+        <div class="header-actions">
+            {% if logged_in %}
+                <a href="{{ url_for('ticketing-events.my_tickets') }}">My Tickets</a>
+                <a href="{{ url_for('ticketing-events.settings_page') }}">Settings</a>
+                <a href="{{ url_for('ticketing-events.logout') }}">Sign Out</a>
+            {% else %}
+                <a href="{{ url_for('ticketing-events.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('ticketing-events.index') }}">Events</a> &gt;
+            <a href="{{ url_for('ticketing-events.event_detail', event_id=event.id) }}">{{ event.name }}</a> &gt;
+            Checkout
+        </div>
+        <h2>Checkout</h2>
+        <div class="checkout-card">
+            <div class="event-summary">
+                <h3>{{ event.name }}</h3>
+                <p>{{ event.date }} &middot; {{ event.time }} &middot; {{ event.venue }}</p>
+            </div>
+
+            {% if error %}
+            <div class="error-banner" id="errorBanner">{{ error }}</div>
+            {% endif %}
+
+            {% if reserved %}
+            <!-- Reserved seating: pick specific seats from the seat map -->
+            <form method="POST" action="{{ url_for('ticketing-events.checkout_submit', event_id=event.id) }}" id="seatForm">
+                <input type="hidden" name="ticket_type" id="ticketTypeField" value="">
+                <input type="hidden" name="seats" id="seatsField" value="">
+                <div class="stage">Stage</div>
+                <div class="seat-legend">
+                    <span><i class="swatch free"></i> Available</span>
+                    <span><i class="swatch sel"></i> Selected</span>
+                    <span><i class="swatch taken"></i> Taken</span>
+                </div>
+                {% for section in seat_map %}
+                <div class="section-block">
+                    <div class="section-title">
+                        <span>{{ section.type }}</span>
+                        <span class="price">${{ '%.2f'|format(section.price) }}</span>
+                    </div>
+                    <div class="seat-scroll">
+                        {% for row in section.rows %}
+                        <div class="seat-row">
+                            <span class="row-label">{{ row.letter }}</span>
+                            {% for seat in row.seats %}
+                            <button type="button"
+                                    class="seat{% if seat.taken %} taken{% endif %}"
+                                    data-label="{{ seat.label }}"
+                                    data-section="{{ section.type }}"
+                                    {% if seat.taken %}disabled{% endif %}
+                                    onclick="toggleSeat(this)">{{ seat.num }}</button>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="selection-summary">
+                    <div>Selected seats: <span id="selectedSeatsText">none</span></div>
+                    <div style="margin-top:.3rem;">Section: <strong id="selectedSection">&mdash;</strong> &middot; Quantity: <strong id="selectedCount">0</strong></div>
+                </div>
+
+                <div class="promo-section">
+                    <div class="form-group">
+                        <label for="promo_code">Promo Code (optional)</label>
+                        <input type="text" id="promo_code" name="promo_code" placeholder="Enter promo code">
+                    </div>
+                </div>
+                <button type="submit" class="btn-checkout" id="seatSubmit" disabled>Select seats to continue</button>
+            </form>
+            <script>
+                var selected = [];   // seat labels, all from one section
+                var section = null;
+
+                function toggleSeat(btn) {
+                    var label = btn.getAttribute('data-label');
+                    var sec = btn.getAttribute('data-section');
+                    var idx = selected.indexOf(label);
+                    if (idx >= 0) {
+                        selected.splice(idx, 1);
+                        btn.classList.remove('selected');
+                    } else {
+                        // Seats must all come from a single section (one ticket type per order)
+                        if (section && sec !== section) {
+                            clearSelection();
+                        }
+                        section = sec;
+                        selected.push(label);
+                        btn.classList.add('selected');
+                    }
+                    if (selected.length === 0) section = null;
+                    refresh();
+                }
+
+                function clearSelection() {
+                    selected.forEach(function(l) {
+                        var b = document.querySelector('.seat[data-label="' + l.replace(/"/g, '\\"') + '"]');
+                        if (b) b.classList.remove('selected');
+                    });
+                    selected = [];
+                    section = null;
+                }
+
+                function refresh() {
+                    document.getElementById('selectedSeatsText').textContent = selected.length ? selected.join(', ') : 'none';
+                    document.getElementById('selectedSection').textContent = section || '—';
+                    document.getElementById('selectedCount').textContent = selected.length;
+                    document.getElementById('seatsField').value = selected.join(',');
+                    document.getElementById('ticketTypeField').value = section || '';
+                    var btn = document.getElementById('seatSubmit');
+                    btn.disabled = selected.length === 0;
+                    btn.textContent = selected.length
+                        ? 'Complete Purchase (' + selected.length + ' seat' + (selected.length > 1 ? 's' : '') + ')'
+                        : 'Select seats to continue';
+                }
+            </script>
+            {% else %}
+            <!-- General admission: quantity only, no seat map -->
+            <form method="POST" action="{{ url_for('ticketing-events.checkout_submit', event_id=event.id) }}">
+                <div class="form-group">
+                    <label for="ticket_type">Ticket Type</label>
+                    <select id="ticket_type" name="ticket_type" required>
+                        {% for tt in event.ticket_types %}
+                        {% set remaining = tt.available - tt.sold %}
+                        {% if tt.available == 0 or remaining > 0 %}
+                        <option value="{{ tt.type }}">{{ tt.type }} - ${{ '%.2f'|format(tt.price) }}{% if tt.available > 0 %} ({{ remaining }} left){% endif %}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantity</label>
+                    <select id="quantity" name="quantity">
+                        {% for i in range(1, 11) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="promo-section">
+                    <div class="form-group">
+                        <label for="promo_code">Promo Code (optional)</label>
+                        <input type="text" id="promo_code" name="promo_code" placeholder="Enter promo code">
+                    </div>
+                </div>
+                <button type="submit" class="btn-checkout">Complete Purchase</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

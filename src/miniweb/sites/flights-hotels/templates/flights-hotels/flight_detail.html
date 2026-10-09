@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ flight.flight_number }} - SkyLodge Travel</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #1a202c; }
+        .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: .8rem 2rem; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #63b3ed; }
+        nav { max-width: 1000px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #1a365d; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #ebf4ff; }
+        nav a.active { font-weight: 700; background: #bee3f8; }
+        nav .right { margin-left: auto; }
+        nav .btn-login { background: #1a365d; color: #fff; padding: .4rem 1rem; border-radius: .3rem; }
+        nav .btn-logout { color: #e53e3e; }
+        .container { max-width: 700px; margin: 1.5rem auto; padding: 0 2rem; }
+        .back { font-size: .9rem; color: #4299e1; text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { text-decoration: underline; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .airline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+        .airline-header .airline-name { font-size: 1.3rem; font-weight: 700; color: #1a365d; }
+        .airline-header .flight-num { font-size: 1rem; color: #718096; }
+        .airline-header .price { font-size: 1.8rem; font-weight: 700; color: #2b6cb0; }
+        .route-display { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding: 1.5rem; background: #f7fafc; border-radius: .4rem; }
+        .endpoint { text-align: center; }
+        .endpoint .code { font-size: 2rem; font-weight: 700; color: #2d3748; }
+        .endpoint .city { font-size: .85rem; color: #718096; margin-top: .2rem; }
+        .endpoint .time { font-size: 1.1rem; font-weight: 600; color: #4a5568; margin-top: .3rem; }
+        .route-middle { text-align: center; flex: 1; padding: 0 1rem; }
+        .route-middle .arrow { font-size: 1.5rem; color: #a0aec0; }
+        .route-middle .duration { font-size: .9rem; color: #4a5568; margin-top: .3rem; }
+        .route-middle .stops { font-size: .82rem; color: #718096; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .info-item label { font-size: .78rem; font-weight: 600; color: #a0aec0; text-transform: uppercase; letter-spacing: .03rem; }
+        .info-item .value { font-size: 1rem; color: #2d3748; margin-top: .15rem; }
+        .class-badge { display: inline-block; font-size: .8rem; text-transform: uppercase; font-weight: 600; padding: .2rem .7rem; border-radius: .25rem; }
+        .class-badge.economy { background: #e6fffa; color: #234e52; }
+        .class-badge.business { background: #ebf4ff; color: #1a365d; }
+        .class-badge.first { background: #fefcbf; color: #744210; }
+        .book-form { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+        .book-form h3 { font-size: 1rem; color: #1a365d; margin-bottom: .8rem; }
+        .book-form .form-row { display: flex; gap: 1rem; align-items: flex-end; }
+        .book-form label { display: block; font-size: .82rem; font-weight: 600; color: #4a5568; margin-bottom: .2rem; }
+        .book-form select, .book-form input { padding: .5rem .7rem; border: 1px solid #cbd5e0; border-radius: .3rem; font-size: .9rem; }
+        .book-btn { background: #38a169; color: #fff; border: none; padding: .6rem 1.5rem; border-radius: .3rem; cursor: pointer; font-size: .95rem; font-weight: 600; }
+        .book-btn:hover { background: #2f855a; }
+        .seat-error { background: #fed7d7; color: #9b2c2c; padding: .5rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 600; margin-bottom: .8rem; }
+        .step-tag { font-size: .72rem; font-weight: 600; color: #718096; background: #edf2f7; padding: .15rem .5rem; border-radius: .3rem; margin-left: .5rem; }
+        .wizard-note { font-size: .78rem; color: #a0aec0; margin-top: .7rem; }
+        .seatmap { margin: .3rem 0 .3rem; }
+        .seat-legend { font-size: .78rem; color: #718096; margin-bottom: .6rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .seat-legend span { display: inline-flex; align-items: center; gap: .3rem; }
+        .seat-swatch { width: 1rem; height: 1rem; border-radius: .2rem; display: inline-block; border: 1px solid #cbd5e0; }
+        .seat-swatch.free { background: #fff; }
+        .seat-swatch.sel { background: #38a169; border-color: #2f855a; }
+        .seat-swatch.taken { background: #e2e8f0; }
+        .seat-row { display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+        .seat-row .row-label { width: 1.6rem; font-size: .8rem; font-weight: 600; color: #718096; text-align: right; }
+        .seat-cell { position: relative; }
+        .seat-cell input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .seat-cell label { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2rem; margin: 0; font-size: .78rem; font-weight: 600; border: 1px solid #cbd5e0; border-radius: .3rem; background: #fff; color: #2d3748; cursor: pointer; }
+        .seat-cell input:checked + label { background: #38a169; border-color: #2f855a; color: #fff; }
+        .seat-cell input:disabled + label { background: #e2e8f0; color: #a0aec0; cursor: not-allowed; text-decoration: line-through; }
+        .seat-aisle { width: .9rem; }
+        .footer { text-align: center; padding: 2rem; color: #a0aec0; font-size: .8rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('flights-hotels.index') }}">Sky<span>Lodge</span> Travel</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('flights-hotels.index') }}">Home</a>
+        <a href="{{ url_for('flights-hotels.flights_page') }}" class="active">Flights</a>
+        <a href="{{ url_for('flights-hotels.hotels_page') }}">Hotels</a>
+        <a href="{{ url_for('flights-hotels.bookings_page') }}">My Bookings</a>
+        {% if logged_in %}
+        <a href="{{ url_for('flights-hotels.logout') }}" class="right btn-logout">Sign Out ({{ user.name }})</a>
+        {% else %}
+        <a href="{{ url_for('flights-hotels.login_page') }}" class="right btn-login">Sign In</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <a href="{{ url_for('flights-hotels.flights_page') }}" class="back">&larr; Back to flights</a>
+
+        <div class="detail-card">
+            <div class="airline-header">
+                <div>
+                    <div class="airline-name">{{ flight.airline }}</div>
+                    <div class="flight-num">Flight {{ flight.flight_number }}</div>
+                </div>
+                <div class="price">${{ "%.2f"|format(flight.price) }}</div>
+            </div>
+
+            <div class="route-display">
+                <div class="endpoint">
+                    <div class="code">{{ flight.origin }}</div>
+                    <div class="city">{{ flight.origin_city }}</div>
+                    <div class="time">{{ flight.departure_time }}</div>
+                </div>
+                <div class="route-middle">
+                    <div class="arrow">&#8594;</div>
+                    <div class="duration">{{ flight.duration_minutes // 60 }}h {{ flight.duration_minutes % 60 }}m</div>
+                    <div class="stops">{{ 'Nonstop' if flight.stops == 0 else '%d stop%s' % (flight.stops, 's' if flight.stops > 1 else '') }}</div>
+                </div>
+                <div class="endpoint">
+                    <div class="code">{{ flight.destination }}</div>
+                    <div class="city">{{ flight.dest_city }}</div>
+                    <div class="time">{{ flight.arrival_time }}</div>
+                </div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Date</label>
+                    <div class="value">{{ flight.date }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Class</label>
+                    <div class="value"><span class="class-badge {{ flight.class }}">{{ flight.class }}</span></div>
+                </div>
+                <div class="info-item">
+                    <label>Aircraft</label>
+                    <div class="value">{{ flight.aircraft }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Duration</label>
+                    <div class="value">{{ flight.duration_minutes }} minutes</div>
+                </div>
+            </div>
+
+            <div class="book-form">
+                <h3>Book This Flight <span class="step-tag">Step 1 of 3 &middot; Trip details</span></h3>
+                {% if form_error %}<div class="seat-error">{{ form_error }}</div>{% endif %}
+                <form method="post" action="{{ url_for('flights-hotels.book_flight', flight_id=flight.id) }}">
+                    <div class="form-row">
+                        <div>
+                            <label for="travelers">Travelers</label>
+                            <select name="travelers" id="travelers" onchange="fhSyncPax()">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="cabin_class">Cabin Class</label>
+                            <select name="cabin_class" id="cabin_class">
+                                {% for key, cab in cabin_classes.items() %}
+                                <option value="{{ key }}">{{ cab.label }}{% if cab.mult != 1.0 %} (+{{ ((cab.mult - 1) * 100)|round|int }}%){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="trip_type">Trip</label>
+                            <select name="trip_type" id="trip_type" onchange="fhSyncTrip()">
+                                <option value="one_way">One-way</option>
+                                <option value="round_trip">Round-trip</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="depart_date">Departure Date</label>
+                            <input type="date" name="depart_date" id="depart_date" value="{{ flight.date }}">
+                        </div>
+                        <div id="return-wrap" style="display:none;">
+                            <label for="return_date">Return Date</label>
+                            <input type="date" name="return_date" id="return_date">
+                        </div>
+                    </div>
+                    <div class="form-row" id="pax-rows" style="margin-top:1rem;">
+                        <div id="pax-1">
+                            <label for="passenger_name_1">Passenger 1 (lead)</label>
+                            <input type="text" name="passenger_name_1" id="passenger_name_1" placeholder="Full name" required>
+                        </div>
+                        <div id="pax-2" style="display:none;">
+                            <label for="passenger_name_2">Passenger 2</label>
+                            <input type="text" name="passenger_name_2" id="passenger_name_2" placeholder="Full name">
+                        </div>
+                        <div id="pax-3" style="display:none;">
+                            <label for="passenger_name_3">Passenger 3</label>
+                            <input type="text" name="passenger_name_3" id="passenger_name_3" placeholder="Full name">
+                        </div>
+                        <div id="pax-4" style="display:none;">
+                            <label for="passenger_name_4">Passenger 4</label>
+                            <input type="text" name="passenger_name_4" id="passenger_name_4" placeholder="Full name">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:1.2rem;">
+                        <button type="submit" class="book-btn">Continue to Seat Selection &rarr;</button>
+                    </div>
+                    <p class="wizard-note">Next you'll pick your seats, then review &amp; pay. No booking is made yet.</p>
+                </form>
+                <script>
+                    function fhSyncPax() {
+                        var n = parseInt(document.getElementById('travelers').value, 10) || 1;
+                        for (var i = 1; i <= 4; i++) {
+                            document.getElementById('pax-' + i).style.display = (i <= n) ? '' : 'none';
+                        }
+                    }
+                    function fhSyncTrip() {
+                        var rt = document.getElementById('trip_type').value === 'round_trip';
+                        document.getElementById('return-wrap').style.display = rt ? '' : 'none';
+                    }
+                    fhSyncPax(); fhSyncTrip();
+                </script>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">SkyLodge Travel -- Your journey starts here</div>
+</body>
+</html>

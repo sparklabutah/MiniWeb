@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ rev.title or doc.title }} (version {{ rev.timestamp[:10] }}) - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .toolbar { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.5rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 0.8rem; }
+        .toolbar-left a { color: #5f6368; text-decoration: none; font-size: 1.2rem; }
+        .toolbar-left h1 { font-size: 1.1rem; font-weight: 500; color: #202124; }
+        .toolbar-right { display: flex; align-items: center; gap: 0.5rem; }
+        .btn { padding: 0.35rem 0.8rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; text-decoration: none; color: #5f6368; background: #f1f3f4; }
+        .btn:hover { background: #e8eaed; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+
+        .version-banner { max-width: 816px; margin: 1rem auto 0; padding: 0.7rem 1.2rem; background: #fef7e0; border: 1px solid #f4b400; border-radius: 8px; color: #7a5c00; font-size: 0.88rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .version-banner .rev-info { line-height: 1.5; }
+
+        .document { max-width: 816px; margin: 1rem auto 3rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.12); border-radius: 2px; padding: 4rem 5rem; min-height: 50vh; }
+        .document h2 { font-size: 1.5rem; font-weight: 600; color: #202124; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e8eaed; }
+        .document-content { font-size: 1rem; line-height: 1.7; color: #3c4043; white-space: pre-wrap; word-wrap: break-word; }
+        .no-snapshot { color: #80868b; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}" title="Back to editor">&larr;</a>
+            <h1>{{ rev.title or doc.title }}</h1>
+        </div>
+        <div class="toolbar-right">
+            <a href="{{ url_for('documents.editor', doc_id=doc.id) }}" class="btn">Back to current</a>
+            {% if can_edit and has_snapshot %}
+            <form method="post"
+                  action="{{ url_for('documents.form_restore_version', doc_id=doc.id, rev_id=rev.id) }}"
+                  style="display:inline"
+                  onsubmit="return confirm('Restore this version? The current content will be replaced (a new revision is recorded).')">
+                <button type="submit" class="btn btn-primary">Restore this version</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="version-banner">
+        <div class="rev-info">
+            You are viewing a <strong>previous version</strong> of this document.<br>
+            {{ rev.summary }} &middot; {{ user_map.get(rev.user_id, {}).get('name', 'Unknown') }} &middot; {{ rev.timestamp[:16].replace('T', ' ') }}
+        </div>
+    </div>
+
+    <div class="document">
+        <h2>{{ rev.title or doc.title }}</h2>
+        {% if has_snapshot %}
+        <div class="document-content" id="version-content">{{ rev.content }}</div>
+        {% else %}
+        <div class="document-content no-snapshot">No content snapshot was captured for this revision.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

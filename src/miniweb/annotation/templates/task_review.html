@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Review — MiniWeb Annotation</title>
+    <style>
+        :root { --bg:#f6f7f9; --panel:#fff; --ink:#1d2330; --muted:#6b7385; --line:#dfe3ea; --accent:#e8742a; --focus:#2f6fd6;
+                --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --ins:#dcfce7; --del:#fee2e2; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg:#14171d; --panel:#1c2028; --ink:#e6e9ef; --muted:#8d95a6; --line:#2e3440; --accent:#f08a45; --focus:#5b93ec;
+                    --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; --ins:#14532d; --del:#5f1d1d; }
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body { margin: 0; font: 13.5px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink);
+               display: grid; grid-template-rows: auto auto auto minmax(170px, 30vh) minmax(0, 1fr); height: 100vh; overflow: hidden; }
+        .top { background: #1e293b; color: #fff; padding: .45rem 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .top a { color: #94a3b8; text-decoration: none; font-size: .82rem; }
+        .top a:hover, .top a.here { color: #fff; }
+        .top .brand { color: #fff; font-weight: 700; }
+        .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 7px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+        select, button, input { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+        select { padding: 3px 6px; max-width: 380px; }
+        button { padding: 3px 10px; cursor: pointer; }
+        button:disabled { opacity: .45; cursor: default; }
+        .key { font-weight: 700; font-size: 14px; }
+        .pos { color: var(--muted); font-size: 12px; }
+        .chip { font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--line); white-space: nowrap; }
+        .chip.ok { color: var(--ok); border-color: currentColor; } .chip.bad { color: var(--bad); border-color: currentColor; }
+        .chip.warn { color: var(--warn); border-color: currentColor; } .chip.info { color: var(--focus); border-color: currentColor; }
+        .spacer { flex: 1; }
+        .dec button { font-weight: 600; }
+        .dec .v.on { background: var(--ok); color: #fff; border-color: var(--ok); }
+        .dec .s.on { background: var(--warn); color: #fff; border-color: var(--warn); }
+        .dec .d { color: var(--bad); }
+        .dec input { flex: 1; min-width: 160px; padding: 3px 8px; }
+        .hint { color: var(--muted); font-size: 11.5px; }
+        .compare { display: grid; grid-template-columns: 1fr 1fr .85fr; gap: 10px; padding: 10px 14px 0; min-height: 0; }
+        .col { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; overflow: auto; min-height: 0; }
+        .eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 3px; }
+        .instr { font-size: 14px; margin-bottom: 6px; }
+        .row { display: grid; grid-template-columns: 62px 1fr; gap: 6px; font-size: 12.5px; padding: 2px 0; }
+        .row .k { color: var(--muted); }
+        ins { background: var(--ins); text-decoration: none; border-radius: 3px; padding: 0 1px; }
+        del { background: var(--del); border-radius: 3px; padding: 0 1px; color: var(--muted); }
+        .tag { display: inline-block; font-size: 11.5px; padding: 0 6px; margin: 1px 2px 1px 0; border-radius: 4px; border: 1px solid var(--line); }
+        .tag.add { background: var(--ins); } .tag.rem { background: var(--del); text-decoration: line-through; color: var(--muted); }
+        .tag.inc { border-style: dashed; color: var(--muted); }
+        .tag .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+        details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+        pre.out { white-space: pre-wrap; font: 11.5px/1.4 ui-monospace, monospace; margin: 4px 0; color: var(--muted); }
+        ul.notes { margin: 3px 0 0; padding-left: 16px; font-size: 12.5px; }
+        ul.flags li { color: var(--warn); }
+        .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; }
+        .clamp.open { -webkit-line-clamp: unset; }
+        main { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); gap: 10px; padding: 10px 14px 12px; min-height: 0; }
+        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 0; }
+        .phead { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+        .seg button { border: 0; border-radius: 0; font-size: 12px; padding: 2px 9px; }
+        .seg button.on { background: var(--focus); color: #fff; }
+        .stage { flex: 1; min-height: 0; overflow: auto; background: #0b0d13; }
+        .stage img { display: block; width: 100%; }
+        .stage pre { color: #cbd5e1; font: 12px/1.45 ui-monospace, monospace; margin: 0; padding: 10px 12px; white-space: pre-wrap; }
+        .stage .empty { color: #8d95a6; padding: 30px; text-align: center; }
+        .caption { padding: 5px 10px; font-size: 12.5px; border-top: 1px solid var(--line); }
+        .caption code { font-size: 11.5px; }
+        .tl { padding: 6px 10px 8px; overflow-x: auto; border-top: 1px solid var(--line); max-height: 150px; overflow-y: auto; }
+        .tl-row { display: grid; align-items: center; gap: 2px; margin: 1px 0; }
+        .tl-label { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; cursor: pointer; }
+        .cell { height: 11px; border-radius: 2px; background: var(--line); cursor: pointer; opacity: .35; }
+        .cell.in { opacity: .9; } .cell.cur { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+        .act { height: 16px; border-radius: 2px; background: var(--line); cursor: pointer; font-size: 9px; text-align: center; color: var(--muted); line-height: 16px; overflow: hidden; }
+        .act.cur { background: var(--accent); color: #fff; }
+        .vlist { overflow: auto; padding: 8px 10px; min-height: 0; flex: 1; }
+        .vm { border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; margin-bottom: 7px; }
+        .vm h4 { margin: 0 0 3px; font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+        .vm ul { margin: 0; padding-left: 16px; font-size: 12.3px; }
+        .vm li { margin: 1px 0; word-break: break-word; }
+        .vm .adv { color: var(--muted); }
+        .op { font-size: 10.5px; padding: 0 5px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 22%, transparent); font-weight: 500; }
+        .res { margin-left: auto; font-size: 11px; font-weight: 500; }
+        .muted { color: var(--muted); }
+        a { color: var(--focus); }
+        body.focus { grid-template-rows: auto auto auto minmax(0, 1fr); }   /* compare row removed from the grid */
+        body.focus .compare { display: none; }
+        #focus-btn { font-size: 12px; padding: 2px 9px; }
+        body.focus #focus-btn { background: var(--focus); color: #fff; border-color: var(--focus); }
+        @media (max-width: 1100px) {
+            body { display: block; height: auto; overflow: auto; }
+            .compare, main { grid-template-columns: 1fr; }
+            .col { max-height: 40vh; } .panel { min-height: 60vh; }
+        }
+    </style>
+</head>
+<body>
+<div class="top">
+    <a href="/annotate/" class="brand">MiniWeb Annotation</a>
+    <a href="/annotate/verify">Verifier Builder</a>
+    <a href="/annotate/macro-browser">Macro Browser</a>
+    <a href="/annotate/task-review" class="here">Task Review</a>
+</div>
+<div class="bar">
+    <select id="queue" aria-label="Review queue"></select>
+    <select id="ann" aria-label="Annotator"></select>
+    <button id="prev" title="Previous task (p)">&lt;</button>
+    <span class="pos" id="pos"></span>
+    <button id="next" title="Next task (n)">&gt;</button>
+    <span class="key" id="key">—</span>
+    <span id="chips"></span>
+    <span class="spacer"></span>
+    <a id="builder" href="#" target="_blank" title="Open this task in the Verifier Builder (e)">Builder ↗</a>
+</div>
+<div class="bar dec">
+    <button class="v" id="b-v" title="Human verified (v) — press again to clear">✓ Verified</button>
+    <button class="s" id="b-s" title="Stale (s) — press again to clear">⚠ Stale</button>
+    <button id="b-r" title="Re-record in the annotator, new tab (r)">↺ Re-record</button>
+    <button class="d" id="b-d" title="Move to trash (d)">🗑 Delete</button>
+    <input id="note" placeholder="Note saved with your tag (optional)" aria-label="Review note">
+    <span class="hint" id="tagline"></span>
+    <span class="hint">n/p task · ←/→ step · space play · f focus · w walk · b before-tags · t verifier tab</span>
+</div>
+<section class="compare">
+    <div class="col" id="c-before"></div>
+    <div class="col" id="c-now"></div>
+    <div class="col" id="c-notes"></div>
+</section>
+<main>
+    <div class="panel">
+        <div class="phead">
+            <span class="seg"><button id="src-gold" class="on">Original recording</button><button id="src-walk">Fresh walk</button></span>
+            <span class="seg"><button id="lane-now" class="on">Tags now</button><button id="lane-before">Tags before</button></span>
+            <button id="focus-btn" title="Hide the comparison row to enlarge the recording (f)">⤢ Focus</button>
+            <span class="pos" id="fpos"></span>
+        </div>
+        <div class="stage" id="stage"><div class="empty">Loading…</div></div>
+        <div class="caption" id="caption"></div>
+        <div class="tl" id="tl"></div>
+    </div>
+    <div class="panel">
+        <div class="phead">
+            <span class="eyebrow" style="margin:0">Verifier</span>
+            <span class="seg"><button id="v-now" class="on">Now</button><button id="v-before">Before</button></span>
+            <span class="pos" id="vstatus"></span>
+        </div>
+        <div class="vlist" id="vlist"></div>
+    </div>
+</main>
+<script>
+const REVIEWER = {{ reviewer | tojson }};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hue = (n) => { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const color = (n) => `hsl(${hue(n)} 60% 52%)`;
+const splitKey = (k) => [k.slice(0, k.indexOf('/')), k.slice(k.indexOf('/') + 1)];
+
+let IDX = null, list = [], cur = 0, D = null, REC = {}, source = 'gold', lanes = 'now', vtab = 'now',
+    frame = 0, timer = null, seq = 0, CHECKS = {}, ownHash = '';
+
+async function init() {
+    IDX = await (await fetch('/annotate/api/task_review/index')).json();
+    $('queue').innerHTML = IDX.queues.map((q) => `<option value="${q.id}">${esc(q.label)} (${q.count})</option>`).join('');
+    const anns = [...new Set(IDX.tasks.map((t) => t.annotator))].sort();
+    $('ann').innerHTML = '<option value="">all annotators</option>' + anns.map((a) => `<option>${esc(a)}</option>`).join('');
+    const h = new URLSearchParams(location.hash.slice(1));
+    setQueue(h.get('queue'));
+    if (h.get('ann')) $('ann').value = h.get('ann');
+    filter();
+    go(Math.max(0, locate(h.get('key'))));
+}
+
+function setQueue(q) {
+    if (q && IDX.queues.some((x) => x.id === q)) $('queue').value = q;
+}
+
+function locate(key) {
+    if (!key) return 0;
+    let i = list.findIndex((t) => t.key === key);
+    if (i < 0 && IDX.tasks.some((t) => t.key === key)) {
+        $('queue').value = 'all'; $('ann').value = ''; filter();
+        i = list.findIndex((t) => t.key === key);
+    }
+    return i;
+}
+
+function filter() {
+    const q = $('queue').value, a = $('ann').value;
+    list = IDX.tasks.filter((t) => t.queues.includes(q) && (!a || t.annotator === a));
+}
+
+async function refreshIndex(keepKey) {
+    IDX = await (await fetch('/annotate/api/task_review/index')).json();
+    const q = $('queue').value;
+    $('queue').innerHTML = IDX.queues.map((x) => `<option value="${x.id}">${esc(x.label)} (${x.count})</option>`).join('');
+    $('queue').value = q;
+    filter();
+    return keepKey ? list.findIndex((t) => t.key === keepKey) : -1;
+}
+
+async function go(i) {
+    stop();
+    if (!list.length) { D = null; renderEmpty(); return; }
+    cur = Math.max(0, Math.min(i, list.length - 1));
+    const key = list[cur].key, [a, t] = splitKey(key), my = ++seq;
+    ownHash = `#queue=${$('queue').value}${$('ann').value ? '&ann=' + encodeURIComponent($('ann').value) : ''}&key=${encodeURIComponent(key)}`;
+    location.hash = ownHash;
+    const [d, gold] = await Promise.all([
+        fetch(`/annotate/api/task_review/task/${encodeURIComponent(a)}/${encodeURIComponent(t)}`).then((r) => r.json()),
+        fetch(`/annotate/api/macro_browser/task/${encodeURIComponent(a)}/${encodeURIComponent(t)}`).then((r) => r.json())]);
+    if (my !== seq) return;
+    D = d; REC = {gold}; CHECKS = {}; source = 'gold'; frame = 0; $('note').value = '';
+    render();
+    runChecks(my);
+}
+
+function renderEmpty() {
+    $('pos').textContent = '0 / 0'; $('key').textContent = 'Nothing in this queue';
+    ['c-before', 'c-now', 'c-notes', 'vlist', 'tl', 'caption', 'chips', 'tagline'].forEach((id) => $(id).innerHTML = '');
+    $('stage').innerHTML = '<div class="empty">This queue is empty.</div>';
+}
+
+// ---------- word diff ----------
+// Word-level diff rendered as phrase blocks (~~old phrase~~ new phrase). When most
+// words changed, the new text is shown plainly with a "rewritten" marker instead.
+function wordDiff(a, b) {
+    const x = String(a || '').split(/\s+/).filter(Boolean), y = String(b || '').split(/\s+/).filter(Boolean);
+    const n = x.length, m = y.length, L = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+        L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    if (!n) return esc(b);
+    if (L[0][0] / Math.max(n, m) < 0.5)
+        return `<span class="chip warn" title="Most words changed — compare with the Before column">rewritten</span> ${esc(b)}`;
+    const ops = [];
+    let i = 0, j = 0;
+    while (i < n || j < m) {
+        if (i < n && j < m && x[i] === y[j]) { ops.push(['=', x[i]]); i++; j++; }
+        else if (j >= m || (i < n && L[i + 1][j] >= L[i][j + 1])) { ops.push(['-', x[i]]); i++; }
+        else { ops.push(['+', y[j]]); j++; }
+    }
+    const out = [];
+    for (let k = 0; k < ops.length;) {
+        if (ops[k][0] === '=') { out.push(esc(ops[k][1])); k++; continue; }
+        const del = [], ins = [];
+        while (k < ops.length && ops[k][0] !== '=') { (ops[k][0] === '-' ? del : ins).push(ops[k][1]); k++; }
+        if (del.length) out.push(`<del>${esc(del.join(' '))}</del>`);
+        if (ins.length) out.push(`<ins>${esc(ins.join(' '))}</ins>`);
+    }
+    return out.join(' ');
+}
+
+const tagName = (t) => t.macro + (t.op ? '.' + t.op : '');
+function tagChips(tags, other) {
+    const left = {};
+    (other || []).forEach((t) => left[tagName(t)] = (left[tagName(t)] || 0) + 1);
+    const html = tags.map((t) => {
+        const n = tagName(t), kept = left[n] > 0;
+        if (kept) left[n]--;
+        return `<span class="tag ${other && !kept ? 'add' : ''} ${t.required === false ? 'inc' : ''}" title="${esc((t.required === false ? '[incidental — performed in the recording, not required; not graded] ' : '') + (t.subtask || ''))}"><span class="sw" style="background:${color(t.macro)}"></span>${esc(t.instance)}${t.op ? '.' + esc(t.op) : ''}<span class="muted"> ${t.span ? t.span.join('–') : ''}</span></span>`;
+    });
+    if (other) for (const [n, c] of Object.entries(left)) for (let k = 0; k < c; k++) html.push(`<span class="tag rem" title="removed">${esc(n)}</span>`);
+    return html.join('') || '<span class="muted">none</span>';
+}
+
+function sideHtml(side, title, sub, diffAgainst) {
+    if (!side) return `<div class="eyebrow">${title}</div><div class="muted">No earlier version recorded — this task has not been corrected.</div>`;
+    const instr = diffAgainst ? wordDiff(diffAgainst.instruction, side.instruction) : esc(side.instruction);
+    const ans = diffAgainst && (diffAgainst.expected_answer || '').trim() !== (side.expected_answer || '').trim()
+        ? `${diffAgainst.expected_answer ? `<del>${esc(diffAgainst.expected_answer)}</del> ` : ''}<ins>${esc(side.expected_answer || '—')}</ins>` : esc(side.expected_answer || '—');
+    return `<div class="eyebrow">${title}${sub ? ` · <span title="${esc(sub)}">${esc(sub)}</span>` : ''}</div>
+        <div class="instr">${instr || '<span class="muted">(empty)</span>'}</div>
+        <div class="row"><span class="k">Answer</span><span>${ans}</span></div>
+        <div class="row"><span class="k">Tags</span><span>${tagChips(side.tags, diffAgainst ? diffAgainst.tags : null)}</span></div>
+        <div class="row"><span class="k">Sites</span><span>${esc((side.sites || []).map((s) => typeof s === 'string' ? s : s.id).join(', '))}</span></div>
+        ${side.expected_outcome ? `<details><summary>Expected outcome</summary><pre class="out">${esc(side.expected_outcome)}</pre></details>` : ''}`;
+}
+
+function render() {
+    const t = list[cur], d = D, [a, tid] = splitKey(d.key);
+    $('pos').textContent = `${cur + 1} / ${list.length}`;
+    $('key').textContent = d.key;
+    $('builder').href = `/annotate/verify?annotator=${encodeURIComponent(a)}&task_id=${encodeURIComponent(tid)}`;
+    const wb = d.walk_by, day = (at) => (at || '').slice(0, 10);
+    const who = (s) => s === 'walk' && wb ? ` · ${wb.ai ? 'AI' : esc(wb.by)}` : '';
+    const whoTip = (s) => s === 'walk' && wb ? ` title="Fresh walk recorded by ${esc(wb.by)}${wb.ai ? ' (AI reviewer)' : ''} on ${day(wb.at)}"` : '';
+    const run = (s) => d.runs[s] ? `<span class="chip ${d.runs[s].passed ? 'ok' : 'bad'}"${whoTip(s)}>${s === 'gold' ? 'Original' : 'Walk'} ${d.runs[s].passed ? '✓' : '✗'}${who(s)}</span>` : '';
+    const rr = d.rerecorded ? `<span class="chip info" title="Original recording was re-recorded in the builder by ${esc(d.rerecorded.by || 'unknown')} at ${esc(d.rerecorded.at)}">↺ re-recorded by ${esc(d.rerecorded.by || 'unknown')} · ${day(d.rerecorded.at)}</span> ` : '';
+    const ch = Object.entries(d.changed || {}).filter(([, v]) => v).map(([k]) => k);
+    const fl = d.ai.flags.length ? `<span class="chip warn" title="See “Needs a decision” in Review notes">⚑ ${d.ai.flags.length} to decide</span> ` : '';
+    const np = d.new_pull ? '<span class="chip info" title="Pulled from Railway in the latest batch">new from Railway</span> ' : '';
+    $('chips').innerHTML = `${fl}${np}${d.ai.recommendation ? `<span class="chip info">AI: ${esc(d.ai.recommendation)}</span> ` : ''}${rr}${run('gold')} ${run('walk')} ` +
+        (ch.length ? `<span class="chip warn">changed: ${ch.join(', ')}</span>` : '<span class="chip">unchanged</span>');
+    renderDecision();
+    $('c-before').innerHTML = sideHtml(d.before, 'Before correction', d.before && d.before.source, null);
+    $('c-now').innerHTML = sideHtml(d.now, 'Now', d.reviewed ? 'reviewed by a human since the last correction' : '', d.before);
+    $('c-notes').innerHTML = notesHtml(d);
+    $('c-notes').querySelectorAll('.clamp').forEach((el) => el.onclick = () => el.classList.toggle('open'));
+    $('src-walk').disabled = !d.has_walk;
+    $('src-walk').textContent = d.walk_by ? `Fresh walk · ${d.walk_by.ai ? 'AI' : d.walk_by.by}` : 'Fresh walk';
+    renderRecording();
+    renderVerifier();
+}
+
+function notesHtml(d) {
+    const ai = d.ai;
+    const list2 = (xs, cls) => xs.length ? `<ul class="notes ${cls || ''}">${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+    return `<div class="eyebrow">Review notes</div>
+        ${ai.flags.length ? `<div class="eyebrow" style="color:var(--warn)">Needs a decision</div>${list2(ai.flags, 'flags')}` : ''}
+        ${ai.note ? `<div class="eyebrow" style="margin-top:6px">AI review</div><div class="clamp" title="click to expand">${esc(ai.note)}</div>` : '<div class="muted">No AI review.</div>'}
+        ${ai.changes.length ? `<details><summary>Changes made (${ai.changes.length})</summary>${list2(ai.changes)}</details>` : ''}
+        ${ai.macro_notes.length ? `<details><summary>Tag review notes (${ai.macro_notes.length})</summary>${list2(ai.macro_notes)}</details>` : ''}
+        ${ai.issues.length && !ai.flags.length ? list2(ai.issues, 'flags') : ''}`;
+}
+
+function renderDecision() {
+    // D.human is only set for a tag newer than the last correction; older tags count as unmarked
+    const h = D.human || {}, tag = h.tag;
+    $('b-v').classList.toggle('on', tag === 'verified'); $('b-s').classList.toggle('on', tag === 'stale');
+    $('tagline').innerHTML = tag ? `${esc(tag)} by ${esc(h.by || '?')}${h.at ? ' · ' + esc(String(h.at).slice(0, 10)) : ''}` +
+        (h.note ? ` · “${esc(h.note)}”` : '') : 'not reviewed yet';
+    if (h.note && !$('note').value) $('note').value = h.note;
+}
+
+// ---------- recording ----------
+function rec() { return REC[source]; }
+function laneTags() {
+    if (source === 'walk') return [];
+    return lanes === 'before' && D.before ? D.before.tags : D.now.tags;
+}
+function renderRecording() {
+    $('src-gold').classList.toggle('on', source === 'gold'); $('src-walk').classList.toggle('on', source === 'walk');
+    $('lane-now').classList.toggle('on', lanes === 'now'); $('lane-before').classList.toggle('on', lanes === 'before');
+    const r = rec();
+    if (!r) { $('stage').innerHTML = '<div class="empty">Loading…</div>'; return; }
+    const acts = r.actions || [], a = acts[frame], [ann, tid] = splitKey(D.key);
+    $('fpos').textContent = acts.length ? `step ${frame + 1} / ${acts.length}` : 'no actions';
+    drawStage(a, ann, tid);
+    $('caption').innerHTML = a ? `<b>${a.index}.</b> <code>${esc(a.action)}</code> ${esc(a.target)}${a.value ? ` = <code>${esc(a.value)}</code>` : ''} <span class="muted">${esc(a.url)}</span>`
+        : '<span class="muted">No recorded actions.</span>';
+    const n = acts.length, cols = `130px repeat(${n}, minmax(14px, 1fr))`, num = (i) => (n <= 30 || (i + 1) % 5 === 0 || i === 0) ? i + 1 : '';
+    let html = `<div class="tl-row" style="grid-template-columns:${cols}"><span class="tl-label">${source === 'walk' ? 'walk steps' : 'steps'}</span>` +
+        acts.map((x, i) => `<div class="act ${i === frame ? 'cur' : ''}" data-i="${i}" title="${x.index}. ${esc(x.action)} ${esc(x.target)}">${num(i)}</div>`).join('') + '</div>';
+    for (const g of laneTags()) {
+        html += `<div class="tl-row" style="grid-template-columns:${cols}"><span class="tl-label" data-span="${g.span ? g.span[0] - 1 : ''}">${esc(g.instance)}${g.op ? '.' + esc(g.op) : ''}</span>` +
+            acts.map((_, i) => { const inn = g.span && i >= g.span[0] - 1 && i <= g.span[1] - 1;
+                return `<div class="cell ${inn ? 'in' : ''} ${inn && i === frame ? 'cur' : ''}" data-i="${i}" style="${inn ? `background:${color(g.macro)}` : ''}"></div>`; }).join('') + '</div>';
+    }
+    if (source === 'walk') html += '<div class="muted" style="font-size:11px">Tag spans refer to the original recording.</div>';
+    $('tl').innerHTML = html;
+    $('tl').querySelectorAll('[data-i]').forEach((el) => el.onclick = () => { stop(); frame = +el.dataset.i; renderRecording(); });
+    $('tl').querySelectorAll('[data-span]').forEach((el) => el.onclick = () => { if (el.dataset.span !== '') { stop(); frame = +el.dataset.span; renderRecording(); } });
+}
+
+// ---------- stage: recorded screenshot, or the page outline when none was recorded ----------
+function drawStage(a, ann, tid) {
+    $('stage').innerHTML = a && a.frame ? `<img alt="Screenshot for step ${a.index}" src="/annotate/api/screenshot/${encodeURIComponent(ann)}/${encodeURIComponent(tid)}/${a.frame}">`
+        : a && a.outline ? `<pre aria-label="Page outline (no screenshot recorded)">${esc(a.outline)}</pre>`
+        : '<div class="empty">No screenshot recorded for this step.</div>';
+}
+
+async function setSource(s) {
+    if (s === 'walk' && !D.has_walk) return;
+    source = s; frame = 0; stop();
+    if (!REC[s]) {
+        const [a, t] = splitKey(D.key), my = seq;
+        renderRecording();
+        const r = await fetch(`/annotate/api/macro_browser/task/${encodeURIComponent(a)}/${encodeURIComponent(t)}?source=${s}`).then((x) => x.json());
+        if (my !== seq) return;
+        REC[s] = r;
+    }
+    renderRecording();
+}
+
+function play() {
+    if (timer) return stop();
+    timer = setInterval(() => { const n = (rec() && rec().actions.length) || 0; if (frame >= n - 1) return stop(); frame++; renderRecording(); }, 1100);
+}
+function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+// ---------- verifier ----------
+function prettyUrl(u) {
+    let s = String(u || '');
+    if (s.startsWith('re:')) {
+        s = s.slice(3).replace(/^\(\?[a-z]+\)/, '')
+            .replace(/\(\?=\(\?:\[\^#\]\*&\)\?([^=()]+)=(.*?)\(\?:&\|\$\)\)/g, (m, k, v) => ` ${k}=${v}`)
+            .replace(/\(\?:\[\?#\]\|\$\)/g, '').replace(/\(\?:\\\+\|%20\| \)/g, ' ')
+            .replace(/\\d\+/g, '#').replace(/\\(.)/g, '$1').replace(/\$$/, '');
+    }
+    return s;
+}
+function fieldText(k, v) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && 'value' in v) {
+        const val = Array.isArray(v.value) ? v.value.join(' | ') : v.value;
+        const how = {fuzzy: '≈', contains: '∋', contains_all: '∋ all of', regex: '~', numeric: '=', between: 'between', one_of: 'one of',
+                     nonempty: 'is not empty', raw_equals: '=', equals: '='}[v.mode] || (v.mode || '=');
+        return v.mode === 'nonempty' ? `${k} ${how}` : `${k} ${how} “${String(val).slice(0, 120)}”${v.mode === 'fuzzy' ? ' (judge)' : ''}`;
+    }
+    if (v && typeof v === 'object' && v.open) return `${k} any`;
+    return `${k} = “${String(Array.isArray(v) ? v.join(', ') : v).slice(0, 120)}”`;
+}
+function leafText(n) {
+    const f = n.body_fields ? ' with ' + Object.entries(n.body_fields).map(([k, v]) => fieldText(k, v)).join(', ') : '';
+    switch (n.type) {
+        case 'request_made': return `${n.method || 'request'} ${prettyUrl(n.url)}${f}${n.status ? ` → ${[].concat(n.status).join('/')}` : ''}`;
+        case 'request_sequence': return (n.steps || []).map((st) => leafText(st) + (st.after_requests ? ' (not undone later)' : '')).join(' → ');
+        case 'page_visited': return `visited ${prettyUrl(n.url)}`;
+        case 'qa_answer': case 'answer_matches': return `answer matches “${String(n.expected || '').slice(0, 140)}”`;
+        case 'observation_matches': return `final state of ${prettyUrl(n.url)}: ${esc2([].concat(n.text || []).join(', ') || n.pattern || n.html_pattern || '')}`;
+        case 'action_included': return `UI ${n.action || 'action'}${n.target ? ' on ' + n.target : ''}${n.value ? ' = ' + n.value : ''}`;
+        case 'request_count': return `${n.min ?? 1}–${n.max ?? '∞'} × ${leafText(Object.assign({type: 'request_made'}, n.match || {}))}`;
+        case 'download_received': return `downloaded ${typeof n.filename === 'object' ? n.filename.value : (n.filename || 'a file')}`;
+        default: return n.type || 'check';
+    }
+}
+function esc2(s) { return String(s).slice(0, 140); }
+function treeHtml(node) {
+    if (!node || typeof node !== 'object') return '';
+    if (node.checks) {
+        const items = node.checks.map(treeHtml).join('');
+        return (node.op || 'AND').toUpperCase() === 'OR' ? `<li>any of:<ul>${items}</ul></li>` : items;
+    }
+    return `<li class="${node.advisory ? 'adv' : ''}">${esc(leafText(node))}${node.advisory ? ' <i>(advisory)</i>' : ''}</li>`;
+}
+function renderVerifier() {
+    $('v-now').classList.toggle('on', vtab === 'now'); $('v-before').classList.toggle('on', vtab === 'before');
+    const side = vtab === 'before' ? D.before : D.now;
+    const macros = (side && side.verifier) || {};
+    const ops = {}; ((side && side.tags) || []).forEach((t) => { if (t.op && !ops[t.macro]) ops[t.macro] = t.op; });
+    const res = (m, s) => {
+        if (vtab !== 'now' || !CHECKS[s]) return '';
+        const v = CHECKS[s].by_macro ? CHECKS[s].by_macro[m] : undefined;
+        if (v === undefined) return '';
+        return `<span style="color:var(${v ? '--ok' : '--bad'})">${s === 'gold' ? 'orig' : 'walk'} ${v ? '✓' : '✗'}</span>`;
+    };
+    $('vlist').innerHTML = Object.keys(macros).length ? Object.entries(macros).map(([m, tree]) => `<div class="vm">
+        <h4 data-macro="${esc(m)}"><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${color(m)}"></span>${esc(m)}${ops[m] ? ` <span class="op">${esc(ops[m])}</span>` : ''}
+        ${tree && tree.advisory ? '<span class="chip" title="Performed in the recording but not required by the instruction: reported, never fails the task">advisory — not graded</span>' : ''}
+        <span class="res">${res(m, 'gold')} ${res(m, 'walk')}</span></h4><ul>${treeHtml(tree)}</ul></div>`).join('')
+        : `<div class="muted">${vtab === 'before' ? 'No verifier before correction.' : 'No verifier saved.'}</div>`;
+    $('vlist').querySelectorAll('h4[data-macro]').forEach((h) => h.onclick = () => {
+        const g = D.now.tags.find((t) => t.macro === h.dataset.macro && t.span);
+        if (g && source === 'gold') { lanes = 'now'; frame = g.span[0] - 1; renderRecording(); }
+    });
+}
+
+async function runChecks(my) {
+    const [a, t] = splitKey(D.key);
+    $('vstatus').textContent = 'checking…';
+    const call = (which) => fetch('/annotate/api/run_task_verifier', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({annotator: a, task_id: t, which})}).then((r) => r.ok ? r.json() : null).catch(() => null);
+    const [g, w] = await Promise.all([call('gold'), D.has_walk ? call('walk') : Promise.resolve(null)]);
+    if (my !== seq) return;
+    CHECKS = {gold: g, walk: w};
+    $('vstatus').textContent = g ? `original ${g.passed ? '✓' : '✗'}${w ? ` · walk ${w.passed ? '✓' : '✗'}` : ''}` : 'no verifier';
+    renderVerifier();
+}
+
+// ---------- decisions ----------
+async function setTag(tag) {
+    if (!D) return;
+    // pressing the active tag clears it; a tag from before the last correction is not shown, so it is overwritten
+    const [a, t] = splitKey(D.key), same = D.human && D.human.tag === tag;
+    const value = same ? null : {tag, by: REVIEWER, at: new Date().toISOString(), ...( $('note').value.trim() ? {note: $('note').value.trim()} : {})};
+    const r = await fetch('/annotate/api/update_task_field', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({annotator: a, task_id: t, field: 'review_tag', value})}).then((x) => x.json()).catch((e) => ({error: String(e)}));
+    if (r.status !== 'ok') { alert('Saving the tag failed: ' + (r.error || 'unknown')); return; }
+    const key = D.key, was = cur;
+    const i = await refreshIndex(key);
+    if (same) { go(i >= 0 ? i : was); return; }
+    // decided: stay on the same slot, which now holds the next task when this one left the queue
+    go(i >= 0 ? i + 1 : was);
+}
+function rerecord() {
+    if (!D) return;
+    const [a, t] = splitKey(D.key);
+    window.open(`/annotate/task?rerecord=${encodeURIComponent(t)}&annotator=${encodeURIComponent(a)}`, '_blank');
+}
+async function del() {
+    if (!D || !confirm(`Move ${D.key} to the trash? It can be restored from data/annotations/.trash.`)) return;
+    const [a, t] = splitKey(D.key), was = cur;
+    const r = await fetch(`/annotate/api/tasks/${encodeURIComponent(t)}?annotator=${encodeURIComponent(a)}`, {method: 'DELETE'}).then((x) => x.json());
+    if (r.status !== 'trashed') { alert('Delete failed: ' + (r.error || 'unknown')); return; }
+    await refreshIndex(); go(was);
+}
+
+// ---------- wiring ----------
+$('queue').onchange = () => { filter(); go(0); };
+$('ann').onchange = () => { filter(); go(0); };
+$('prev').onclick = () => go(cur - 1);
+$('next').onclick = () => go(cur + 1);
+$('b-v').onclick = () => setTag('verified');
+$('b-s').onclick = () => setTag('stale');
+$('b-r').onclick = rerecord;
+$('b-d').onclick = del;
+$('src-gold').onclick = () => setSource('gold');
+$('src-walk').onclick = () => setSource('walk');
+$('lane-now').onclick = () => { lanes = 'now'; renderRecording(); };
+function toggleFocus() {
+    document.body.classList.toggle('focus');
+    try { localStorage.setItem('mw-review-focus', document.body.classList.contains('focus') ? '1' : ''); } catch (e) { /* private mode */ }
+    renderRecording();
+}
+$('focus-btn').onclick = toggleFocus;
+try { if (localStorage.getItem('mw-review-focus')) document.body.classList.add('focus'); } catch (e) { /* private mode */ }
+$('lane-before').onclick = () => { lanes = 'before'; renderRecording(); };
+$('v-now').onclick = () => { vtab = 'now'; renderVerifier(); };
+$('v-before').onclick = () => { vtab = 'before'; renderVerifier(); };
+document.addEventListener('keydown', (e) => {
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+    const n = (rec() && rec().actions.length) || 0;
+    const k = e.key;
+    if (k === 'n') go(cur + 1); else if (k === 'p') go(cur - 1);
+    else if (k === 'ArrowRight') { stop(); frame = Math.min(n - 1, frame + 1); renderRecording(); }
+    else if (k === 'ArrowLeft') { stop(); frame = Math.max(0, frame - 1); renderRecording(); }
+    else if (k === ' ') { e.preventDefault(); play(); }
+    else if (k === 'v') setTag('verified'); else if (k === 's') setTag('stale');
+    else if (k === 'r') rerecord(); else if (k === 'd') del();
+    else if (k === 'w') setSource(source === 'gold' ? 'walk' : 'gold');
+    else if (k === 'b') { lanes = lanes === 'now' ? 'before' : 'now'; renderRecording(); }
+    else if (k === 'f') toggleFocus();
+    else if (k === 't') { vtab = vtab === 'now' ? 'before' : 'now'; renderVerifier(); }
+    else if (k === 'e') window.open($('builder').href, '_blank');
+});
+window.addEventListener('hashchange', () => {
+    if (!IDX || location.hash === ownHash) return;
+    const h = new URLSearchParams(location.hash.slice(1));
+    setQueue(h.get('queue'));
+    $('ann').value = h.get('ann') || '';
+    filter();
+    go(Math.max(0, locate(h.get('key'))));
+});
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit {{ entry.title }} - VaultGuard</title>
+    <link rel="stylesheet" href="/static/pm.css">
+</head>
+<body>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <h2>Edit Entry</h2>
+                <a class="back-link" href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}">&lsaquo; Back to {{ entry.title }}</a>
+            </div>
+
+            <form class="card card-pad" method="post" action="{{ url_for('password-managers.edit_entry_submit', entry_id=entry.id) }}">
+                <div class="card-title">Login Details</div>
+
+                <div class="field">
+                    <label class="form-label" for="title">Title</label>
+                    <input type="text" name="title" id="title" value="{{ entry.title }}" required>
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="username">Username / Email</label>
+                        <input type="text" name="username" id="username" value="{{ entry.username }}">
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="password">Password</label>
+                        <input type="text" name="password" id="password" placeholder="Leave blank to keep current">
+                        <div class="muted" style="margin-top:.3rem;">Leave blank to keep the existing password.</div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="url">Website URL</label>
+                    <input type="text" name="url" id="url" value="{{ entry.url }}">
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="form-label" for="category">Category</label>
+                        <select name="category" id="category">
+                            <option value="login" {% if entry.category == 'login' %}selected{% endif %}>Login</option>
+                            <option value="secure_note" {% if entry.category == 'secure_note' %}selected{% endif %}>Secure Note</option>
+                            <option value="credit_card" {% if entry.category == 'credit_card' %}selected{% endif %}>Credit Card</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="form-label" for="strength">Strength</label>
+                        <select name="strength" id="strength">
+                            <option value="excellent" {% if entry.strength == 'excellent' %}selected{% endif %}>Excellent</option>
+                            <option value="strong" {% if entry.strength == 'strong' %}selected{% endif %}>Strong</option>
+                            <option value="fair" {% if entry.strength == 'fair' %}selected{% endif %}>Fair</option>
+                            <option value="weak" {% if entry.strength == 'weak' %}selected{% endif %}>Weak</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="tags">Tags (comma-separated)</label>
+                    <input type="text" name="tags" id="tags" value="{{ entry.tags|join(', ') }}">
+                </div>
+
+                <div class="field">
+                    <label class="form-label" for="notes">Notes</label>
+                    <textarea name="notes" id="notes">{{ entry.notes }}</textarea>
+                </div>
+
+                <div class="checkline">
+                    <input type="checkbox" name="favorite" id="favorite" {% if entry.favorite %}checked{% endif %}>
+                    <label for="favorite">Mark as favorite</label>
+                </div>
+
+                <div style="margin-top:1.2rem; display:flex; gap:.6rem;">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a class="btn btn-outline" href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}">Cancel</a>
+                </div>
+            </form>
+        </main>
+    </div>
+</body>
+</html>

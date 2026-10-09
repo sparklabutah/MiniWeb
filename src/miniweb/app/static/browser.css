@@ -1,0 +1,432 @@
+/* ============================================================
+   MiniWeb Browser Chrome
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    color: #202124;
+    background: #dee1e6;
+}
+
+/* ---- Tab bar ---- */
+
+#tab-bar {
+    display: flex;
+    align-items: flex-end;
+    background: #dee1e6;
+    padding: 8px 8px 0;
+    min-height: 42px;
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#tabs-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    /* size to the tabs so the + button sits right after the last tab
+       (shrinks + scrolls when the bar fills up) */
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+#tabs-container::-webkit-scrollbar { display: none; }
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #c8cad0;
+    border-radius: 8px 8px 0 0;
+    padding: 7px 12px;
+    font-size: 13px;
+    max-width: 240px;
+    min-width: 80px;
+    cursor: pointer;
+    position: relative;
+    transition: background .1s;
+    flex-shrink: 0;
+}
+.tab:hover { background: #d5d7dc; }
+.tab.active {
+    background: #ffffff;
+    cursor: default;
+}
+
+.tab-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #5f6368;
+}
+.tab.active .tab-title { color: #202124; }
+
+.tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #5f6368;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background .1s;
+}
+.tab-close:hover {
+    background: rgba(0,0,0,.12);
+    color: #202124;
+}
+
+#new-tab-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #5f6368;
+    font-size: 20px;
+    cursor: pointer;
+    margin-left: 4px;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+    transition: background .1s;
+}
+#new-tab-btn:hover { background: rgba(0,0,0,.08); }
+#new-tab-btn:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+/* ---- Navigation bar ---- */
+
+#nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: #ffffff;
+    border-bottom: 1px solid #dfe1e5;
+    flex-shrink: 0;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #5f6368;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0;
+    transition: background .1s;
+    flex-shrink: 0;
+}
+.nav-btn:hover { background: #f1f3f4; }
+.nav-btn:disabled {
+    opacity: .3;
+    cursor: default;
+}
+.nav-btn:disabled:hover { background: transparent; }
+
+.nav-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+#url-bar-wrapper {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+#url-bar {
+    width: 100%;
+    padding: 7px 14px;
+    background: #f1f3f4;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #202124;
+    outline: none;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+}
+#url-bar:focus {
+    background: #fff;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26,115,232,.2);
+}
+#url-bar::placeholder { color: #80868b; }
+
+/* ---- Content area ---- */
+
+#content-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #fff;
+}
+
+#content-area iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+}
+#content-area iframe.active { display: block; }
+
+/* ---- New Tab Page ---- */
+
+#new-tab-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 5vh;
+    background: #fff;
+    overflow-y: auto;
+}
+#new-tab-page.active {
+    display: flex;
+}
+
+.ntp-logo {
+    font-size: 3.2rem;
+    font-weight: 700;
+    color: #202124;
+    margin-bottom: 6px;
+    letter-spacing: -.02em;
+}
+
+.ntp-subtitle {
+    font-size: 14px;
+    color: #5f6368;
+    margin-bottom: 24px;
+}
+
+.ntp-search-box {
+    width: 100%;
+    max-width: 560px;
+    position: relative;
+    margin-bottom: 36px;
+    padding: 0 16px;
+}
+
+.ntp-search-box .search-icon {
+    position: absolute;
+    left: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9aa0a6;
+    pointer-events: none;
+}
+
+#ntp-search {
+    width: 100%;
+    padding: 12px 20px 12px 44px;
+    border: 1px solid #dfe1e5;
+    border-radius: 24px;
+    font-size: 16px;
+    font-family: inherit;
+    color: #202124;
+    outline: none;
+    transition: box-shadow .15s, border-color .15s;
+    background: #fff;
+}
+#ntp-search:focus {
+    border-color: transparent;
+    box-shadow: 0 1px 6px rgba(32,33,36,.28);
+}
+#ntp-search::placeholder { color: #9aa0a6; }
+
+/* Search results dropdown */
+#ntp-search-results {
+    position: absolute;
+    top: 100%;
+    left: 16px;
+    right: 16px;
+    background: #fff;
+    border: 1px solid #dfe1e5;
+    border-top: none;
+    border-radius: 0 0 24px 24px;
+    box-shadow: 0 4px 8px rgba(32,33,36,.1);
+    display: none;
+    z-index: 10;
+    max-height: 320px;
+    overflow-y: auto;
+}
+#ntp-search-results.visible { display: block; }
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #202124;
+    transition: background .1s;
+}
+.search-result-item:hover { background: #f1f3f4; }
+.search-result-item:last-child { border-radius: 0 0 24px 24px; }
+
+.search-result-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.search-result-info { flex: 1; min-width: 0; }
+.search-result-name {
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.search-result-desc {
+    font-size: 12px;
+    color: #5f6368;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Category sections */
+#ntp-categories {
+    width: 100%;
+    max-width: 900px;
+    padding: 0 24px 48px;
+}
+
+.ntp-category {
+    margin-bottom: 24px;
+}
+
+.ntp-category-header {
+    font-size: 15px;
+    font-weight: 600;
+    color: #202124;
+    padding: 8px 4px 8px;
+    border-bottom: 1px solid #e8eaed;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cat-icon { font-size: 18px; }
+
+.cat-count {
+    font-size: 12px;
+    font-weight: 400;
+    color: #80868b;
+    margin-left: 4px;
+}
+
+.ntp-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 104px);
+    gap: 2px;
+    justify-content: start;
+}
+
+/* Legacy: keep #ntp-bookmarks for compatibility */
+#ntp-bookmarks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 112px);
+    gap: 4px;
+    justify-content: center;
+    max-width: 720px;
+    width: 100%;
+    padding: 0 16px 48px;
+}
+
+.bookmark-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 4px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #202124;
+    transition: background .1s;
+}
+.bookmark-tile:hover { background: #f1f3f4; }
+
+.bookmark-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #f1f3f4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.bookmark-label {
+    font-size: 12px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100px;
+    line-height: 1.3;
+    color: #5f6368;
+}
+
+/* ---- Browser shell layout ---- */
+
+#browser-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+}

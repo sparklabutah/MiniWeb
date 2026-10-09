@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages - Lakeport Medical Center</title>
+    <link rel="stylesheet" href="/static/health.css">
+</head>
+<body>
+    {% set active_page = 'messages' %}
+    {% include "health-portals/_masthead.html" %}
+    <div class="main">
+        <div class="toolbar">
+            <h2>Messages</h2>
+            <a href="{{ url_for('health-portals.compose_page') }}">Compose</a>
+        </div>
+        <div class="filter-tabs">
+            <a href="{{ url_for('health-portals.messages_page') }}" class="{% if not filters.read %}active{% endif %}">All</a>
+            <a href="{{ url_for('health-portals.messages_page', read='unread') }}" class="{% if filters.read == 'unread' %}active{% endif %}">Unread</a>
+            <a href="{{ url_for('health-portals.messages_page', read='read') }}" class="{% if filters.read == 'read' %}active{% endif %}">Read</a>
+        </div>
+        <div class="msg-list" style="margin-top: 1rem;">
+            {% for msg in messages %}
+            <div class="msg-item">
+                <a href="{{ url_for('health-portals.message_detail', msg_id=msg.id) }}">
+                    <div class="msg-title">{{ msg.subject }}</div>
+                    <div class="msg-sub">{{ msg.sender_name }} &mdash; {{ msg.date[:10] }}</div>
+                </a>
+                {% if not msg.read and msg.recipient_id == user.id %}<span class="badge badge-unread">New</span>{% endif %}
+            </div>
+            {% else %}
+            <div class="empty">No messages found.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% include "health-portals/_footer.html" %}
+</body>
+</html>

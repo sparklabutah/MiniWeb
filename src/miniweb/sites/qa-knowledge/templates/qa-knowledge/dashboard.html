@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - KnowledgeHub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f6f6f6; color: #232629; }
+        a { color: #0074cc; text-decoration: none; } a:hover { color: #0a95ff; }
+        .header { background: #f48024; padding: 8px 16px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { color: #fff; font-weight: 700; font-size: 18px; }
+        .header nav a { color: #fff; margin-right: 12px; font-size: 14px; }
+        .header .user-area { color: #fff; font-size: 13px; margin-left: auto; }
+        .header .user-area a { color: #fff; }
+        .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+        .card { background: #fff; border: 1px solid #d6d9dc; border-radius: 4px; padding: 16px; margin-bottom: 16px; }
+        h2 { margin-bottom: 16px; }
+        h3 { font-size: 16px; margin-bottom: 8px; }
+        .q-list-item { padding: 8px 0; border-bottom: 1px solid #e3e6e8; font-size: 14px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 4px 8px; border-radius: 3px; font-size: 13px; }
+        .meta { font-size: 12px; color: #6a737c; }
+    </style>
+</head>
+<body>
+    {% include "qa-knowledge/_header.html" %}
+
+    <div class="container">
+        <h2>Dashboard</h2>
+
+        <div class="card">
+            <h3>Saved Questions ({{ saved_questions|length }})</h3>
+            {% for q in saved_questions %}
+            <div class="q-list-item">
+                <a href="{{ url_for('qa-knowledge.question_detail', qid=q.id) }}">{{ q.title }}</a>
+                <div class="meta">Score: {{ q.score }} &middot; {{ q.answer_count }} answers</div>
+            </div>
+            {% endfor %}
+            {% if not saved_questions %}
+            <p class="meta">No saved questions yet. Click "Save" on any question to bookmark it.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Followed Tags ({{ followed_tags|length }})</h3>
+            {% if followed_tags %}
+            <div class="tags">
+                {% for t in followed_tags %}
+                <a href="{{ url_for('qa-knowledge.tag_questions', tag=t) }}" class="tag">{{ t }}</a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="meta">No followed tags yet. Visit a tag page and click "Follow Tag".</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

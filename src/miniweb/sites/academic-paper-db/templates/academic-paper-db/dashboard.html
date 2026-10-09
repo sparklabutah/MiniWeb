@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Library — Scholar Search</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #fff; color: #222; }
+        a { color: #1a0dab; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: #fff; border-bottom: 1px solid #ebebeb; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 22px; }
+        .logo span.blue { color: #4285f4; }
+        .logo span.red { color: #ea4335; }
+        .logo span.yellow { color: #fbbc04; }
+        .logo span.green { color: #34a853; }
+        .header .spacer { flex: 1; }
+        .header a.nav { color: #222; font-size: 13px; margin-left: 16px; }
+
+        .tabs { border-bottom: 1px solid #ebebeb; padding: 0 20px 0 170px; display: flex; gap: 4px; }
+        .tabs a { color: #70757a; padding: 10px 16px; font-size: 13px; border-bottom: 3px solid transparent; cursor: pointer; }
+        .tabs a:hover { color: #1a0dab; text-decoration: none; }
+        .tabs a.active { color: #1a0dab; border-bottom-color: #1a0dab; }
+
+        .main { max-width: 780px; margin: 0 auto; padding: 20px 20px 60px; margin-left: 150px; }
+        .welcome { font-size: 14px; color: #70757a; padding-bottom: 16px; border-bottom: 1px solid #f5f5f5; margin-bottom: 16px; }
+        .section-title { font-size: 16px; color: #222; margin: 24px 0 12px; }
+        .count { color: #70757a; font-size: 13px; font-weight: normal; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .paper-item { padding: 12px 0; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: flex-start; }
+        .paper-item .title { font-size: 16px; color: #1a0dab; }
+        .paper-item .meta { font-size: 13px; color: #006621; margin-top: 2px; }
+        .remove-btn { background: none; border: 1px solid #dadce0; border-radius: 4px; padding: 4px 12px; font-size: 12px; color: #70757a; cursor: pointer; white-space: nowrap; }
+        .remove-btn:hover { background: #f1f3f4; }
+
+        .author-card { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f5f5f5; }
+        .author-avatar { width: 40px; height: 40px; border-radius: 50%; background: #4285f4; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; flex-shrink: 0; }
+        .author-info { flex: 1; }
+        .author-info .name { font-size: 15px; color: #1a0dab; }
+        .author-info .detail { font-size: 12px; color: #70757a; margin-top: 2px; }
+
+        .empty { color: #70757a; font-size: 14px; padding: 20px 0; }
+
+        @media (max-width: 768px) {
+            .main { margin-left: 0; }
+            .tabs { padding-left: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('academic-paper-db.index') }}" class="logo">
+            <span class="blue">S</span><span class="red">c</span><span class="yellow">h</span><span class="blue">o</span><span class="green">l</span><span class="red">a</span><span class="blue">r</span>
+        </a>
+        <div class="spacer"></div>
+        <a href="{{ url_for('academic-paper-db.index') }}" class="nav">Search</a>
+        <a href="{{ url_for('academic-paper-db.logout') }}" class="nav">Sign out</a>
+        <a href="/" class="nav">MiniWeb</a>
+    </div>
+
+    <div class="tabs">
+        <a href="#" class="active" data-tab="saved">My Library</a>
+        <a href="#" data-tab="authors">Authors</a>
+    </div>
+
+    <div class="main">
+        <div class="welcome">Signed in as <b>{{ user.name }}</b></div>
+
+        <div id="panel-saved" class="tab-panel active">
+            <h2 class="section-title">Saved Papers <span class="count">({{ saved_papers|length }})</span></h2>
+            {% if saved_papers %}
+            {% for p in saved_papers %}
+            <div class="paper-item">
+                <div>
+                    <div class="title"><a href="{{ url_for('academic-paper-db.paper_detail', paper_id=p.id) }}">{{ p.title }}</a></div>
+                    <div class="meta">{{ p.authors_str }} - {{ p.year }}</div>
+                </div>
+                <form method="post" action="{{ url_for('academic-paper-db.form_unsave_paper', paper_id=p.id) }}">
+                    <button type="submit" class="remove-btn">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="empty">No saved papers yet. Use the &#9734; button on search results to save papers.</p>
+            {% endif %}
+        </div>
+
+        <div id="panel-authors" class="tab-panel">
+            <h2 class="section-title">Followed Authors <span class="count">({{ followed_authors|length }})</span></h2>
+            {% if followed_authors %}
+            {% for a in followed_authors %}
+            <div class="author-card">
+                <div class="author-avatar">{{ a[0]|upper }}</div>
+                <div class="author-info">
+                    <div class="name"><a href="{{ url_for('academic-paper-db.author_profile', author_name=a) }}">{{ a }}</a></div>
+                    <div class="detail">View publications</div>
+                </div>
+                <form method="post" action="{{ url_for('academic-paper-db.form_unfollow_author', author_name=a) }}">
+                    <button type="submit" class="remove-btn">Unfollow</button>
+                </form>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="empty">No followed authors yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    document.querySelectorAll('.tabs a').forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.tabs a').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+            tab.classList.add('active');
+            document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+            
+        });
+    });
+    // Auto-switch to authors tab if hash is #authors
+    if (window.location.hash === '#authors') {
+        document.querySelector('[data-tab="authors"]').click();
+    }
+    </script>
+</body>
+</html>

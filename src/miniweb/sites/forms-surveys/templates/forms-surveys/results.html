@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormFlow - Results: {{ form.title }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #202124; }
+        .header { background: #673ab7; color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.3rem; font-weight: 700; }
+        .header-nav { display: flex; gap: 1.2rem; align-items: center; }
+        .header-nav a { color: #e1bee7; text-decoration: none; font-size: .9rem; }
+        .header-nav a:hover { color: #fff; }
+        .header-nav .user-info { color: #ce93d8; font-size: .85rem; }
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+        .form-header { background: #fff; border-radius: 8px; border: 1px solid #dadce0; border-top: 4px solid #673ab7; padding: 1.5rem; margin-bottom: 1rem; }
+        .form-header h2 { font-size: 1.4rem; margin-bottom: .3rem; }
+        .form-header .desc { color: #5f6368; font-size: .9rem; margin-bottom: .5rem; }
+        .form-header .meta { font-size: .82rem; color: #80868b; }
+        .badge { display: inline-block; padding: .15rem .55rem; border-radius: 12px; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+        .badge.active { background: #e8f5e9; color: #2e7d32; }
+        .badge.draft { background: #fff3e0; color: #ef6c00; }
+        .badge.closed { background: #fce4ec; color: #c62828; }
+        .summary-ribbon { display: flex; gap: 0; background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.06); margin-bottom: 1.5rem; overflow: hidden; }
+        .summary-ribbon .stat { flex: 1; padding: .8rem 1rem; text-align: center; border-right: 1px solid #e2e8f0; }
+        .summary-ribbon .stat:last-child { border-right: none; }
+        .summary-ribbon .stat .label { font-size: .7rem; color: #80868b; text-transform: uppercase; letter-spacing: .05em; }
+        .summary-ribbon .stat .value { font-size: 1.3rem; font-weight: 700; color: #673ab7; margin-top: .2rem; }
+        .action-bar { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+        .btn { padding: .5rem 1rem; font-size: .88rem; border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124; text-decoration: none; cursor: pointer; font-weight: 500; }
+        .btn:hover { background: #f1f3f4; }
+        .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid #dadce0; }
+        .tabs button { background: none; border: none; padding: .6rem 1.2rem; font-size: .9rem; cursor: pointer; color: #5f6368; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tabs button.active { color: #673ab7; border-bottom-color: #673ab7; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .stat-card { background: #fff; border-radius: 8px; border: 1px solid #dadce0; padding: 1.2rem 1.5rem; margin-bottom: .75rem; }
+        .stat-card .field-label { font-size: .95rem; font-weight: 600; margin-bottom: .3rem; }
+        .stat-card .field-info { font-size: .78rem; color: #80868b; margin-bottom: .8rem; }
+        .stat-card .average { font-size: 1.5rem; font-weight: 700; color: #673ab7; margin-bottom: .5rem; }
+        .bar-chart { width: 100%; }
+        .bar-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+        .bar-row .bar-label { width: 140px; font-size: .82rem; color: #5f6368; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-row .bar-track { flex: 1; background: #f1f3f4; border-radius: 4px; height: 22px; overflow: hidden; }
+        .bar-row .bar-fill { height: 100%; background: #673ab7; border-radius: 4px; display: flex; align-items: center; padding-left: .4rem; min-width: 0; }
+        .bar-row .bar-count { font-size: .78rem; color: #5f6368; width: 40px; text-align: right; flex-shrink: 0; }
+        .text-responses { list-style: none; }
+        .text-responses li { background: #f8f9fa; border-radius: 6px; padding: .6rem 1rem; margin-bottom: .4rem; font-size: .88rem; border-left: 3px solid #673ab7; }
+        .response-table { width: 100%; border-collapse: collapse; }
+        .response-table th, .response-table td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid #e2e8f0; font-size: .85rem; }
+        .response-table th { background: #f8f9fa; color: #5f6368; font-weight: 600; font-size: .78rem; text-transform: uppercase; position: sticky; top: 0; }
+        .response-table tr:hover td { background: #f3e5f5; }
+        .table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FormFlow</h1>
+        <div class="header-nav">
+            <a href="{{ url_for('forms-surveys.index') }}">My Forms</a>
+            <a href="{{ url_for('forms-surveys.templates_page') }}">Templates</a>
+            <a href="{{ url_for('forms-surveys.create_form_page') }}">Create</a>
+            {% if user %}
+            <span class="user-info">{{ user.name }}</span>
+            <a href="{{ url_for('forms-surveys.logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('forms-surveys.login_page') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="container">
+        <div class="form-header">
+            <h2>{{ form.title }} - Results</h2>
+            <p class="desc">{{ form.description }}</p>
+            <div class="meta">
+                <span class="badge {{ form.status }}">{{ form.status }}</span>
+                {{ form.responses_count }} response{{ 's' if form.responses_count != 1 else '' }}
+            </div>
+        </div>
+
+        <div class="summary-ribbon">
+            <div class="stat">
+                <div class="label">Responses</div>
+                <div class="value">{{ responses|length }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Fields</div>
+                <div class="value">{{ form.fields|length }}</div>
+            </div>
+            <div class="stat">
+                <div class="label">Status</div>
+                <div class="value" style="font-size: 1rem;">{{ form.status|title }}</div>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <a href="{{ url_for('forms-surveys.view_form', form_id=form.id) }}" class="btn">&larr; Back to Form</a>
+        </div>
+
+        <div class="tabs">
+            <button class="active" onclick="switchTab('summary')">Summary</button>
+            <button onclick="switchTab('individual')">Individual Responses</button>
+        </div>
+
+        <div id="tab-summary" class="tab-content active">
+            {% for field in form.fields %}
+            {% set fs = stats.get(field.id, {}) %}
+            <div class="stat-card">
+                <div class="field-label">{{ field.label }}</div>
+                <div class="field-info">{{ fs.get('total_answers', 0) }} answer{{ 's' if fs.get('total_answers', 0) != 1 else '' }} &middot; {{ field.type }}</div>
+
+                {% if field.type == 'rating' and fs.get('average') is not none %}
+                <div class="average">{{ fs.average }} / 5</div>
+                {% endif %}
+
+                {% if fs.get('distribution') %}
+                <div class="bar-chart">
+                    {% set max_count = fs.distribution.values()|max if fs.distribution.values()|list else 1 %}
+                    {% for label, count in fs.distribution.items() %}
+                    <div class="bar-row">
+                        <div class="bar-label" title="{{ label }}">{{ label }}</div>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: {{ (count / max_count * 100)|int }}%;"></div>
+                        </div>
+                        <div class="bar-count">{{ count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if fs.get('sample_answers') %}
+                <ul class="text-responses">
+                    {% for ans in fs.sample_answers %}
+                    <li>{{ ans }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="tab-individual" class="tab-content">
+            {% if responses %}
+            <div class="table-wrapper">
+                <table class="response-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Submitted</th>
+                            {% for field in form.fields %}
+                            <th>{{ field.label[:30] }}{% if field.label|length > 30 %}...{% endif %}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resp in responses %}
+                        <tr>
+                            <td>{{ resp.id }}</td>
+                            <td>{{ resp.submitted_at[:16] | replace('T', ' ') }}</td>
+                            {% for field in form.fields %}
+                            {% set val = resp.answers.get(field.id, '') %}
+                            <td>{% if val is string %}{{ val[:80] }}{% elif val is iterable %}{{ val|join(', ') }}{% else %}{{ val }}{% endif %}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p style="text-align: center; color: #5f6368; padding: 2rem;">No responses yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        event.target.classList.add('active');
+    }
+    </script>
+</body>
+</html>

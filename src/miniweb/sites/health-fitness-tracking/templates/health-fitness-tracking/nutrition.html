@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrition — FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+    <style>
+        /* nutrition-specific: food rows + add-food modal (fittrack palette) */
+        .food-x { color:#cbd5e1; cursor:pointer; }
+        .food-x:hover { color:var(--red); }
+        .add-food { display:block; width:100%; text-align:left; padding:9px 14px; border:none; border-top:1px solid var(--line2); background:#fff; color:var(--blue); font-weight:700; font-size:.8rem; cursor:pointer; font-family:var(--font); }
+        .add-food:hover { background:#eff6ff; }
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:10px; width:100%; max-width:520px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); }
+        .modal-header h3 { font-size:.95rem; font-weight:800; }
+        .modal-close { background:none; border:none; font-size:1.4rem; color:var(--muted); cursor:pointer; }
+        .modal-body { padding:14px 16px; overflow-y:auto; }
+        .search-input { width:100%; padding:9px 12px; border:1px solid var(--blue); border-radius:7px; font-size:.9rem; outline:none; font-family:var(--font); }
+        .search-results { margin-top:10px; max-height:280px; overflow-y:auto; }
+        .search-result { padding:8px 6px; border-bottom:1px solid var(--line2); cursor:pointer; display:flex; justify-content:space-between; gap:10px; }
+        .search-result:hover { background:#eff6ff; }
+        .sr-name { font-size:.82rem; font-weight:600; flex:1; }
+        .sr-meta { font-size:.78rem; color:var(--muted); text-align:right; }
+        .sr-macros { font-size:.7rem; color:var(--faint); }
+        .search-empty { padding:18px; text-align:center; color:var(--faint); font-size:.82rem; }
+        .food-confirm { display:none; margin-top:12px; padding:12px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; }
+        .food-confirm.active { display:block; }
+        .food-confirm h4 { font-size:.88rem; font-weight:700; margin-bottom:10px; }
+        .confirm-macros { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px; }
+        .confirm-macro { text-align:center; padding:8px; background:#fff; border:1px solid var(--line); border-radius:6px; }
+        .confirm-macro .cm-val { font-size:1rem; font-weight:800; }
+        .confirm-macro .cm-label { font-size:.62rem; color:var(--faint); text-transform:uppercase; }
+        .servings-row { display:flex; align-items:center; gap:12px; margin-bottom:10px; font-size:.85rem; }
+        .servings-row input { width:80px; padding:6px; border:1px solid var(--line); border-radius:6px; text-align:center; font-family:var(--font); }
+        .servings-row .serving-note { font-size:.72rem; color:var(--faint); }
+        .n-datenav { display:flex; align-items:center; gap:8px; }
+        .n-datenav a { width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line); background:#fff; border-radius:5px; color:var(--muted); text-decoration:none; }
+        .n-datenav a:hover { border-color:var(--blue); color:var(--blue); }
+    </style>
+</head>
+<body>
+    {% set active_page = 'nutrition' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
+
+    <div class="ft-shell">
+        <div class="ft-page-title">
+            <div><h1>Nutrition</h1><div class="sub">Food diary &amp; macros</div></div>
+            <div class="n-datenav">
+                <a href="{{ url_for('health-fitness-tracking.nutrition_page', date=prev_date) }}">&#8249;</a>
+                <span style="font-weight:700;">{{ date_filter }}</span>
+                <a href="{{ url_for('health-fitness-tracking.nutrition_page', date=next_date) }}">&#8250;</a>
+            </div>
+        </div>
+
+        {% set consumed = day_totals.calories|int %}
+        {% set c = 339.3 %}
+        {% set pct = ([consumed / calorie_goal, 1]|min) if calorie_goal else 0 %}
+
+        <div class="ft-grid">
+            <div class="col">
+                <!-- meal sections -->
+                {% for meal_type in ["breakfast", "lunch", "dinner", "snack"] %}
+                {% set foods = meals_by_type.get(meal_type, []) %}
+                <div class="panel">
+                    <div class="meal-head">
+                        <span class="mt">{{ meal_type }}</span>
+                        <span class="mc">{{ meal_totals.get(meal_type, {}).get('calories', 0) }} cal · P {{ meal_totals.get(meal_type, {}).get('protein_g', 0) }} · C {{ meal_totals.get(meal_type, {}).get('carbs_g', 0) }} · F {{ meal_totals.get(meal_type, {}).get('fat_g', 0) }}</span>
+                    </div>
+                    {% if foods %}
+                    <table class="dt">
+                        {% for food in foods %}
+                        <tr>
+                            <td style="width:100%;">{{ food.description }}</td>
+                            <td style="text-align:right;font-weight:700;">{{ food.calories }}</td>
+                            <td class="muted" style="text-align:right;">P{{ food.protein_g }}</td>
+                            <td class="muted" style="text-align:right;">C{{ food.carbs_g }}</td>
+                            <td class="muted" style="text-align:right;">F{{ food.fat_g }}</td>
+                            <td style="text-align:center;"><span class="food-x" title="Remove" onclick="deleteFood({{ food.id }})">&#10005;</span></td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                    {% else %}
+                    <div style="padding:10px 14px;color:var(--faint);font-size:.8rem;font-style:italic;">No foods logged</div>
+                    {% endif %}
+                    <button class="add-food" onclick="openFoodModal('{{ meal_type }}')">+ Add Food</button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="col">
+                <!-- calorie ring -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Calories</h3></div>
+                    <div class="panel-b">
+                        <div class="ring-wrap">
+                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                <circle class="ring-bg" cx="70" cy="70" r="54"/>
+                                <circle class="ring-fg" cx="70" cy="70" r="54" stroke-dasharray="{{ (pct*c)|round(1) }} {{ c }}" transform="rotate(-90 70 70)"/>
+                            </svg>
+                            <div class="ring-center">
+                                <div class="big">{{ calorie_goal - consumed }}</div>
+                                <div class="lbl">kcal left</div>
+                            </div>
+                        </div>
+                        <div class="cal-row">
+                            <div><div class="n">{{ calorie_goal }}</div><div class="l">Goal</div></div>
+                            <div><div class="n">{{ consumed }}</div><div class="l">Food</div></div>
+                            <div><div class="n">{{ (pct*100)|round|int }}<span style="font-size:.7rem;">%</span></div><div class="l">Of Goal</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- macros -->
+                <div class="panel">
+                    <div class="panel-h"><h3>Macronutrients</h3></div>
+                    <div class="panel-b">
+                        {% for key, cur, goal in [('protein', day_totals.protein_g, protein_goal), ('carbs', day_totals.carbs_g, carbs_goal), ('fat', day_totals.fat_g, fat_goal), ('fiber', day_totals.fiber_g, 30)] %}
+                        <div class="macro">
+                            <div class="m-top"><span class="m-name" style="text-transform:capitalize;">{{ key }}</span><span class="m-val">{{ cur|int }} / {{ goal }} g</span></div>
+                            <div class="m-track"><div class="m-fill {{ key }}" style="width:{{ ([cur/goal*100, 100]|min)|round if goal else 0 }}%;"></div></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Food Search Modal -->
+    <div class="modal-overlay" id="food-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Food to <span id="modal-meal-type">Breakfast</span></h3>
+                <button class="modal-close" onclick="closeFoodModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="search-input" id="food-search" placeholder="Search foods (e.g. chicken breast, rice, apple...)" autocomplete="off">
+                <div class="search-results" id="search-results"><div class="search-empty">Type to search the food database</div></div>
+                <div class="food-confirm" id="food-confirm">
+                    <h4 id="confirm-food-name"></h4>
+                    <div class="confirm-macros">
+                        <div class="confirm-macro"><div class="cm-val" id="confirm-cal" style="color:var(--orange);">0</div><div class="cm-label">Calories</div></div>
+                        <div class="confirm-macro"><div class="cm-val" id="confirm-pro" style="color:var(--green);">0g</div><div class="cm-label">Protein</div></div>
+                        <div class="confirm-macro"><div class="cm-val" id="confirm-carb" style="color:var(--amber);">0g</div><div class="cm-label">Carbs</div></div>
+                        <div class="confirm-macro"><div class="cm-val" id="confirm-fat" style="color:var(--red);">0g</div><div class="cm-label">Fat</div></div>
+                    </div>
+                    <div class="servings-row">
+                        <label for="servings">Servings:</label>
+                        <input type="number" id="servings" value="1" min="0.25" step="0.25">
+                        <span class="serving-note">per 100g serving</span>
+                    </div>
+                    <button class="ft-btn" style="width:100%;" onclick="logFood()">Log Food</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard</div>
+
+    <script>
+        let currentMealType = 'breakfast';
+        let selectedFood = null;
+        const viewDate = '{{ date_filter }}';
+        const userId = {{ (user.id if user else 1) | int }};
+
+        function openFoodModal(mealType) {
+            currentMealType = mealType;
+            document.getElementById('modal-meal-type').textContent = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+            document.getElementById('food-modal').classList.add('active');
+            document.getElementById('food-search').value = '';
+            document.getElementById('search-results').innerHTML = '<div class="search-empty">Type to search the food database</div>';
+            document.getElementById('food-confirm').classList.remove('active');
+            selectedFood = null;
+            setTimeout(() => document.getElementById('food-search').focus(), 100);
+        }
+        function closeFoodModal() { document.getElementById('food-modal').classList.remove('active'); }
+        document.getElementById('food-modal').addEventListener('click', function(e) { if (e.target === this) closeFoodModal(); });
+
+        let searchTimeout;
+        document.getElementById('food-search').addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const q = this.value.trim();
+            if (q.length < 2) {
+                document.getElementById('search-results').innerHTML = '<div class="search-empty">Type at least 2 characters to search</div>';
+                document.getElementById('food-confirm').classList.remove('active');
+                return;
+            }
+            searchTimeout = setTimeout(() => {
+                fetch('{{ url_for("health-fitness-tracking.api_food_search") }}?q=' + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(results => {
+                        const container = document.getElementById('search-results');
+                        if (!results.length) { container.innerHTML = '<div class="search-empty">No foods found for "' + q + '"</div>'; return; }
+                        container.innerHTML = results.map(f => {
+                            const cal = Math.round(f.calories || 0), pro = Math.round(f.protein || 0), carb = Math.round(f.carbs || 0), fat = Math.round(f.fat || 0);
+                            return '<div class="search-result" onclick=\'selectFood(' + JSON.stringify(f).replace(/'/g, "\\'") + ')\'>' +
+                                '<div class="sr-name">' + escapeHtml(f.description || '') + '</div>' +
+                                '<div><div class="sr-meta">' + cal + ' cal</div><div class="sr-macros">P:' + pro + 'g C:' + carb + 'g F:' + fat + 'g</div></div></div>';
+                        }).join('');
+                    })
+                    .catch(() => { document.getElementById('search-results').innerHTML = '<div class="search-empty">Search error. Try again.</div>'; });
+            }, 300);
+        });
+        function escapeHtml(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
+        function selectFood(food) {
+            selectedFood = food;
+            document.getElementById('food-confirm').classList.add('active');
+            document.getElementById('confirm-food-name').textContent = food.description || '';
+            document.getElementById('servings').value = 1;
+            updateConfirmMacros();
+        }
+        document.getElementById('servings').addEventListener('input', updateConfirmMacros);
+        function updateConfirmMacros() {
+            if (!selectedFood) return;
+            const s = parseFloat(document.getElementById('servings').value) || 1;
+            document.getElementById('confirm-cal').textContent = Math.round((selectedFood.calories || 0) * s);
+            document.getElementById('confirm-pro').textContent = Math.round((selectedFood.protein || 0) * s) + 'g';
+            document.getElementById('confirm-carb').textContent = Math.round((selectedFood.carbs || 0) * s) + 'g';
+            document.getElementById('confirm-fat').textContent = Math.round((selectedFood.fat || 0) * s) + 'g';
+        }
+        function logFood() {
+            if (!selectedFood) return;
+            const s = parseFloat(document.getElementById('servings').value) || 1;
+            const payload = { user_id: userId, date: viewDate, meal_type: currentMealType,
+                description: selectedFood.description || '',
+                calories: Math.round((selectedFood.calories || 0) * s), protein_g: Math.round((selectedFood.protein || 0) * s),
+                carbs_g: Math.round((selectedFood.carbs || 0) * s), fat_g: Math.round((selectedFood.fat || 0) * s),
+                fiber_g: Math.round((selectedFood.fiber || 0) * s) };
+            fetch('{{ url_for("health-fitness-tracking.api_nutrition_create") }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload),
+            }).then(r => r.json()).then(() => { closeFoodModal(); window.location.reload(); })
+              .catch(err => alert('Error logging food: ' + err));
+        }
+        function deleteFood(mealId) {
+            if (!confirm('Remove this food entry?')) return;
+            fetch('{{ url_for("health-fitness-tracking.api_nutrition_delete", meal_id=0) }}'.replace('/0', '/' + mealId), { method: 'DELETE' })
+                .then(r => r.json()).then(() => window.location.reload()).catch(err => alert('Error: ' + err));
+        }
+    </script>
+</body>
+</html>

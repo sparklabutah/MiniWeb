@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore - MeridianGit</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.5; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .top-nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; height: 62px; }
+        .nav-logo { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; font-size: 18px; margin-right: 16px; }
+        .nav-logo svg { fill: #f0f6fc; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #f0f6fc; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .nav-links a:hover { background: #21262d; text-decoration: none; }
+        .nav-links a.active { font-weight: 600; border-bottom: 2px solid #f78166; }
+        .nav-user { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-user .user-name { color: #e6edf3; font-weight: 500; font-size: 14px; }
+        .nav-user .btn-signin { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 16px; border-radius: 6px; font-size: 14px; }
+        .nav-user .btn-logout { color: #8b949e; font-size: 13px; }
+
+        .main-container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; display: flex; gap: 24px; }
+
+        /* Sidebar filters */
+        .filter-sidebar { width: 256px; flex-shrink: 0; }
+        .filter-section { margin-bottom: 24px; }
+        .filter-section h3 { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; }
+        .filter-langs { list-style: none; }
+        .filter-langs li { margin-bottom: 2px; }
+        .filter-langs li a { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 6px; font-size: 14px; color: #c9d1d9; }
+        .filter-langs li a:hover { background: #21262d; text-decoration: none; }
+        .filter-langs li a.active-lang { background: #1f6feb33; color: #58a6ff; font-weight: 600; }
+        .filter-lang-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+        /* Main content */
+        .explore-content { flex: 1; min-width: 0; }
+
+        /* Hero */
+        .explore-hero { background: linear-gradient(135deg, #161b22 0%, #0d1117 100%); border: 1px solid #30363d; border-radius: 12px; padding: 32px; margin-bottom: 24px; text-align: center; }
+        .explore-hero h1 { font-size: 32px; font-weight: 700; color: #e6edf3; margin-bottom: 8px; }
+        .explore-hero p { font-size: 16px; color: #8b949e; margin-bottom: 20px; }
+        .explore-search { display: flex; gap: 8px; max-width: 600px; margin: 0 auto; }
+        .explore-search input { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 8px 16px; font-size: 16px; }
+        .explore-search input:focus { outline: none; border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,0.3); }
+        .explore-search input::placeholder { color: #484f58; }
+        .explore-search select { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 8px 12px; font-size: 14px; }
+        .explore-search button { background: #238636; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; color: #fff; padding: 8px 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .explore-search button:hover { background: #2ea043; }
+
+        /* Trending header */
+        .trending-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+        .trending-header h2 { font-size: 20px; font-weight: 600; color: #e6edf3; display: flex; align-items: center; gap: 8px; }
+        .trending-header h2 svg { fill: #e3b341; }
+        .sort-links { display: flex; gap: 4px; }
+        .sort-links a { font-size: 13px; color: #8b949e; padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; }
+        .sort-links a:hover { text-decoration: none; background: #21262d; }
+        .sort-links a.active-sort { color: #e6edf3; background: #21262d; border-color: #30363d; font-weight: 600; }
+
+        /* Repo cards */
+        .repo-list { list-style: none; }
+        .repo-card { padding: 20px 0; border-bottom: 1px solid #21262d; display: flex; gap: 16px; }
+        .repo-rank { font-size: 18px; font-weight: 600; color: #484f58; width: 28px; text-align: right; padding-top: 2px; flex-shrink: 0; }
+        .repo-card-content { flex: 1; min-width: 0; }
+        .repo-card-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+        .repo-card-name a { color: #58a6ff; }
+        .repo-card-name .namespace { font-weight: 400; color: #8b949e; }
+        .repo-card-desc { font-size: 14px; color: #8b949e; margin: 4px 0 8px; line-height: 1.5; max-width: 640px; }
+        .repo-card-meta { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #8b949e; flex-wrap: wrap; }
+        .repo-card-meta .lang-item { display: flex; align-items: center; gap: 4px; }
+        .lang-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .repo-card-meta .stat { display: flex; align-items: center; gap: 3px; }
+        .repo-card-meta .stat svg { fill: #8b949e; width: 14px; height: 14px; }
+        .repo-card-meta .owner { color: #8b949e; }
+        .repo-card-tags { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+        .tech-tag { font-size: 12px; background: #1f6feb22; color: #58a6ff; padding: 1px 8px; border-radius: 12px; }
+
+        .repo-card-star { flex-shrink: 0; }
+        .btn-star { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 3px 12px; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .btn-star:hover { background: #30363d; border-color: #8b949e; text-decoration: none; }
+        .btn-star svg { fill: #8b949e; }
+
+        .lang-python { background: #3572A5; }
+        .lang-go { background: #00ADD8; }
+        .lang-typescript { background: #3178c6; }
+        .lang-javascript { background: #f1e05a; }
+        .lang-terraform { background: #5c4ee5; }
+        .lang-hcl { background: #5c4ee5; }
+        .lang-rust { background: #dea584; }
+        .lang-default { background: #8b949e; }
+
+        .empty-state { text-align: center; padding: 48px 0; color: #8b949e; }
+        .empty-state h3 { font-size: 20px; color: #e6edf3; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+<nav class="top-nav">
+    <a href="{{ url_for('version-control.index') }}" class="nav-logo">
+        <svg height="28" width="28" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path></svg>
+        MeridianGit
+    </a>
+    <div class="nav-links">
+        <a href="{{ url_for('version-control.index') }}">Dashboard</a>
+        <a href="{{ url_for('version-control.repos_page') }}">Repositories</a>
+        <a href="{{ url_for('version-control.projects_page') }}">Projects</a>
+        <a href="{{ url_for('version-control.issues_page') }}">Issues</a>
+        <a href="{{ url_for('version-control.merge_requests_page') }}">Merge Requests</a>
+        <a href="{{ url_for('version-control.explore_page') }}" class="active">Explore</a>
+    </div>
+    <div class="nav-user">
+        {% if session.get('vc_username') %}
+        <a class="user-name" href="{{ url_for('version-control.user_profile', user_id=session.vc_user_id) }}" style="text-decoration:none;">{{ session.vc_name }}</a>
+        <a href="{{ url_for('version-control.logout') }}" class="btn-logout">Sign out</a>
+        {% else %}
+        <a href="{{ url_for('version-control.login_page') }}" class="btn-signin" style="text-decoration:none;">Sign in</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="main-container">
+    <!-- Language filter sidebar -->
+    <div class="filter-sidebar">
+        <div class="filter-section">
+            <h3>Languages</h3>
+            <ul class="filter-langs">
+                <li>
+                    <a href="{{ url_for('version-control.explore_page', sort=sort_by, q=search) }}" class="{% if not search %}active-lang{% endif %}">
+                        All languages
+                    </a>
+                </li>
+                {% for lang in all_languages %}
+                <li>
+                    <a href="{{ url_for('version-control.explore_page', sort=sort_by, q=lang) }}">
+                        <span class="filter-lang-dot lang-{{ lang|lower|replace(' ', '-') }}"></span>
+                        {{ lang }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="explore-content">
+        <div class="explore-hero">
+            <h1>Explore MeridianGit</h1>
+            <p>Discover repositories across the Meridian engineering organization</p>
+            <form method="get" action="{{ url_for('version-control.explore_page') }}" class="explore-search">
+                <input type="text" name="q" placeholder="Search repositories..." value="{{ search }}">
+                <select name="sort">
+                    <option value="stars" {% if sort_by == 'stars' %}selected{% endif %}>Most stars</option>
+                    <option value="updated" {% if sort_by == 'updated' %}selected{% endif %}>Recently updated</option>
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+                </select>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        <div class="trending-header">
+            <h2>
+                <svg width="18" height="18" viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
+                {% if search %}Search results{% else %}Trending repositories{% endif %}
+            </h2>
+            <div class="sort-links">
+                <a href="{{ url_for('version-control.explore_page', sort='stars', q=search) }}" class="{% if sort_by == 'stars' %}active-sort{% endif %}">Stars</a>
+                <a href="{{ url_for('version-control.explore_page', sort='updated', q=search) }}" class="{% if sort_by == 'updated' %}active-sort{% endif %}">Updated</a>
+                <a href="{{ url_for('version-control.explore_page', sort='name', q=search) }}" class="{% if sort_by == 'name' %}active-sort{% endif %}">Name</a>
+            </div>
+        </div>
+
+        {% if repos %}
+        <ul class="repo-list">
+            {% for r in repos %}
+            <li class="repo-card">
+                <div class="repo-rank">{{ loop.index }}</div>
+                <div class="repo-card-content">
+                    <div class="repo-card-name">
+                        <span class="namespace">{{ r.namespace }} / </span>
+                        <a href="{{ url_for('version-control.repo_detail', repo_id=r.id) }}">{{ r.name }}</a>
+                    </div>
+                    {% if r.description %}
+                    <p class="repo-card-desc">{{ r.description }}</p>
+                    {% endif %}
+                    <div class="repo-card-meta">
+                        {% if r.tech_stack %}
+                        <span class="lang-item">
+                            <span class="lang-dot lang-{{ r.tech_stack[0]|lower|replace(' ', '-') }}"></span>
+                            {{ r.tech_stack[0] }}
+                        </span>
+                        {% endif %}
+                        <span class="stat">
+                            <svg viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
+                            {{ r.stars }}
+                        </span>
+                        <span class="stat">
+                            <svg viewBox="0 0 16 16"><path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path></svg>
+                            {{ r.forks }}
+                        </span>
+                        <span class="owner">by {{ r.owner_name }}</span>
+                    </div>
+                    {% if r.tech_stack and r.tech_stack|length > 1 %}
+                    <div class="repo-card-tags">
+                        {% for tech in r.tech_stack %}
+                        <span class="tech-tag">{{ tech }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="repo-card-star">
+                    <span class="btn-star">
+                        <svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path></svg>
+                        Star
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+            <h3>No repositories found</h3>
+            <p>Try a different search query or browse all repositories.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>

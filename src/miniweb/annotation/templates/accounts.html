@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniWeb — Account Lookup</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+.header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.06); position: sticky; top: 0; z-index: 10; }
+.header h1 { font-size: 1.4rem; color: #0f172a; }
+.header a { color: #2563eb; text-decoration: none; margin-left: 1.5rem; font-weight: 500; }
+.header a:hover { text-decoration: underline; }
+.main { max-width: 1100px; margin: 1.5rem auto; padding: 0 2rem; }
+.searchbar { display: flex; gap: .8rem; align-items: center; margin-bottom: 1.2rem; }
+.searchbar input { flex: 1; padding: .55rem .9rem; border: 1px solid #cbd5e1; border-radius: .5rem; font-size: .9rem; background: #fff; }
+.searchbar input:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
+.searchbar .count { font-size: .8rem; color: #64748b; white-space: nowrap; }
+.site-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .6rem; margin-bottom: 1rem; overflow: hidden; }
+.site-card .site-head { display: flex; align-items: center; gap: .6rem; padding: .6rem .9rem; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+.site-card .site-head .sname { font-weight: 600; font-size: .92rem; color: #0f172a; }
+.site-card .site-head .sid { font-size: .72rem; color: #94a3b8; font-family: ui-monospace, monospace; }
+.site-card .site-head a { margin-left: auto; font-size: .75rem; color: #2563eb; text-decoration: none; }
+.site-card .site-head a:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+th { text-align: left; padding: .4rem .9rem; color: #64748b; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid #e2e8f0; }
+td { padding: .4rem .9rem; border-bottom: 1px solid #f1f5f9; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f8fafc; }
+.mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: .8rem; }
+.pw { cursor: pointer; color: #0f172a; background: #f1f5f9; padding: .1rem .45rem; border-radius: .3rem; }
+.pw:hover { background: #dbeafe; }
+.pw.copied { background: #d1fae5; color: #065f46; }
+.pw.none { background: none; color: #cbd5e1; cursor: default; }
+.badge { display: inline-block; font-size: .62rem; font-weight: 600; padding: .08rem .4rem; border-radius: 1rem; background: #eff6ff; color: #2563eb; margin-left: .4rem; vertical-align: 1px; }
+.role { font-size: .75rem; color: #64748b; }
+.empty { text-align: center; color: #94a3b8; padding: 3rem 0; display: none; }
+.note { font-size: .75rem; color: #94a3b8; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>Account Lookup</h1>
+    <div>
+        <a href="{{ url_for('annotation.index') }}">&larr; Home</a>
+    </div>
+</div>
+
+<div class="main">
+    <div class="searchbar">
+        <input id="q" type="search" placeholder="Filter by site, username, email, password, role&hellip;" autofocus>
+        <span class="count" id="count"></span>
+    </div>
+    <div class="note">Click a password to copy it. <span class="badge">auto-login</span> marks user&nbsp;1 — the account the portal signs you into automatically on <code>/sites/*</code>.</div>
+
+    {% for s in sites %}
+    <div class="site-card" data-site="{{ s.name|lower }} {{ s.id|lower }}">
+        <div class="site-head">
+            <span class="sname">{{ s.name }}</span>
+            <span class="sid">{{ s.id }}</span>
+            <a href="{{ s.url }}" target="_blank">open site &nearr;</a>
+        </div>
+        <table>
+            <thead><tr><th style="width:36px">ID</th><th>Username</th><th>Password</th><th>Email</th><th>Name</th><th>Role</th></tr></thead>
+            <tbody>
+            {% for u in s.users %}
+            <tr data-search="{{ (s.name ~ ' ' ~ s.id ~ ' ' ~ u.username ~ ' ' ~ u.email ~ ' ' ~ u.password ~ ' ' ~ u.name ~ ' ' ~ u.role)|lower }}">
+                <td class="mono">{{ u.id if u.id is not none else '' }}</td>
+                <td class="mono">{{ u.username }}{% if u.id == 1 %}<span class="badge">auto-login</span>{% endif %}</td>
+                <td>{% if u.password %}<span class="mono pw" onclick="copyPw(this)" title="Click to copy">{{ u.password }}</span>{% else %}<span class="mono pw none">&mdash;</span>{% endif %}</td>
+                <td class="mono">{{ u.email }}</td>
+                <td>{{ u.name }}</td>
+                <td class="role">{{ u.role }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+
+    <div class="empty" id="empty">No accounts match.</div>
+</div>
+
+<script>
+function copyPw(el) {
+    navigator.clipboard.writeText(el.textContent).then(() => {
+        el.classList.add('copied');
+        setTimeout(() => el.classList.remove('copied'), 800);
+    });
+}
+
+const q = document.getElementById('q');
+const cards = Array.from(document.querySelectorAll('.site-card'));
+const countEl = document.getElementById('count');
+const emptyEl = document.getElementById('empty');
+
+function applyFilter() {
+    const terms = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let shownRows = 0, shownSites = 0;
+    for (const card of cards) {
+        const siteHay = card.dataset.site;
+        let visible = 0;
+        for (const tr of card.querySelectorAll('tbody tr')) {
+            const hay = siteHay + ' ' + tr.dataset.search;
+            const show = terms.every(t => hay.includes(t));
+            tr.style.display = show ? '' : 'none';
+            if (show) visible++;
+        }
+        card.style.display = visible ? '' : 'none';
+        if (visible) { shownSites++; shownRows += visible; }
+    }
+    countEl.textContent = shownRows + ' accounts · ' + shownSites + ' sites';
+    emptyEl.style.display = shownRows ? 'none' : 'block';
+}
+q.addEventListener('input', applyFilter);
+applyFilter();
+</script>
+</body>
+</html>

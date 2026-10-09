@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle {{ vehicle.registration_id }} - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'vehicles' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <a class="back" href="{{ url_for('tax-filing-dmv-permits.vehicles_page') }}">&larr; Back to Vehicles</a>
+        <div class="detail-card">
+            <h2>{{ vehicle.vehicle.year }} {{ vehicle.vehicle.make }} {{ vehicle.vehicle.model }}</h2>
+            <div class="detail-grid">
+                <div><div class="field-label">Registration ID</div><div class="field-value">{{ vehicle.registration_id }}</div></div>
+                <div><div class="field-label">Owner</div><div class="field-value">{{ vehicle.owner_name }}</div></div>
+                <div><div class="field-label">Plate</div><div class="field-value">{{ vehicle.plate_number }} ({{ vehicle.plate_state }})</div></div>
+                <div><div class="field-label">VIN</div><div class="field-value">{{ vehicle.vehicle.vin }}</div></div>
+                <div><div class="field-label">Color</div><div class="field-value">{{ vehicle.vehicle.color }}</div></div>
+                <div><div class="field-label">Body Type</div><div class="field-value">{{ vehicle.vehicle.body_type|title }}</div></div>
+                <div><div class="field-label">Engine</div><div class="field-value">{{ vehicle.vehicle.engine }}</div></div>
+                <div><div class="field-label">Fuel Type</div><div class="field-value">{{ vehicle.vehicle.fuel_type|title }}</div></div>
+                <div><div class="field-label">Registration Date</div><div class="field-value">{{ vehicle.registration_date }}</div></div>
+                <div><div class="field-label">Expiration</div><div class="field-value">{{ vehicle.expiration_date }}</div></div>
+                <div><div class="field-label">Renewal Status</div><div class="field-value"><span class="badge badge-{{ vehicle.renewal_status }}">{{ vehicle.renewal_status|title }}</span></div></div>
+                <div><div class="field-label">Renewal Fee</div><div class="field-value">${{ "%.2f"|format(vehicle.renewal_fee) }}{% if vehicle.late_penalty > 0 %} + ${{ "%.2f"|format(vehicle.late_penalty) }} late{% endif %}</div></div>
+                <div>
+                    <div class="field-label">Insurance Verified</div>
+                    <div class="field-value">
+                        <button class="toggle-btn {% if vehicle.insurance_verified %}active{% endif %}" id="insurance-toggle" onclick="toggleInsurance({{ vehicle.id }})">
+                            {{ 'Verified' if vehicle.insurance_verified else 'Not Verified' }}
+                        </button>
+                    </div>
+                </div>
+                {% if vehicle.lien_holder %}<div><div class="field-label">Lien Holder</div><div class="field-value">{{ vehicle.lien_holder }}</div></div>{% endif %}
+            </div>
+        </div>
+        {% if payments %}
+        <div class="payments-section">
+            <h3>Related Payments</h3>
+            <table>
+                <thead><tr><th>Payment ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr><td>{{ p.payment_id }}</td><td>${{ "%.2f"|format(p.amount) }}</td><td>{{ p.method|replace("_"," ")|title }}</td><td>{{ p.payment_date }}</td><td>{{ p.status|title }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+
+    <script>
+    function toggleInsurance(vehicleId) {
+        var btn = document.getElementById('insurance-toggle');
+        var current = btn.classList.contains('active');
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/vehicles/' + vehicleId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({insurance_verified: !current})
+        }).then(function() { location.reload(); });
+    }
+    </script>
+</body>
+</html>

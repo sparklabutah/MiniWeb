@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }} - LakeportWiki</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #202122; }
+        .site-header { background: #fff; border-bottom: 2px solid #2563eb; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .site-header h1 { font-size: 1.4rem; color: #1e3a5f; }
+        .site-header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; gap: 1rem; align-items: center; }
+        .header-nav a { font-size: .88rem; color: #475569; text-decoration: none; }
+        .header-nav a:hover { color: #2563eb; }
+        .search-bar { display: flex; gap: .4rem; }
+        .search-bar input { padding: .4rem .7rem; border: 1px solid #cbd5e1; border-radius: .3rem; font-size: .88rem; width: 200px; }
+        .search-bar button { padding: .4rem .8rem; background: #2563eb; color: #fff; border: none; border-radius: .3rem; cursor: pointer; font-size: .85rem; }
+        .main { max-width: 960px; margin: 1.5rem auto; padding: 0 1.5rem; }
+        .article-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+        .article-header h2 { font-size: 1.5rem; color: #1e3a5f; }
+        .article-actions a { font-size: .85rem; color: #2563eb; text-decoration: none; margin-left: 1rem; }
+        .article-meta { font-size: .82rem; color: #64748b; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid #e2e8f0; }
+        .article-meta span { margin-right: 1.5rem; }
+        .article-content { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1.5rem; line-height: 1.7; font-size: .95rem; margin-bottom: 1.5rem; }
+        .article-content h2 { font-size: 1.15rem; margin-top: 1.2rem; margin-bottom: .5rem; color: #1e3a5f; border-bottom: 1px solid #e2e8f0; padding-bottom: .2rem; }
+        .article-content p { margin-bottom: .8rem; }
+        .article-content ul, .article-content ol { margin: .5rem 0 .8rem 1.5rem; }
+        .article-content li { margin-bottom: .3rem; }
+        .article-content table { border-collapse: collapse; margin: .8rem 0; width: 100%; }
+        .article-content th, .article-content td { border: 1px solid #e2e8f0; padding: .4rem .6rem; font-size: .88rem; text-align: left; }
+        .article-content th { background: #f8fafc; }
+        .sidebar { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .sidebar-section { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: 1rem; }
+        .sidebar-section h4 { font-size: .9rem; color: #1e3a5f; margin-bottom: .5rem; }
+        .sidebar-section ul { list-style: none; }
+        .sidebar-section li { padding: .25rem 0; font-size: .85rem; }
+        .sidebar-section li a { color: #2563eb; text-decoration: none; }
+        .sidebar-section li a:hover { text-decoration: underline; }
+        .rev-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .rev-table th, .rev-table td { padding: .4rem .6rem; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        .rev-table th { background: #f8fafc; color: #1e3a5f; }
+        .category-badge { display: inline-block; background: #eff6ff; color: #2563eb; padding: .2rem .6rem; border-radius: .25rem; font-size: .82rem; text-decoration: none; }
+        .category-badge:hover { background: #dbeafe; }
+        .rev-table td a { color: #2563eb; text-decoration: none; }
+        .rev-table td a:hover { text-decoration: underline; }
+        .rev-actions a, .rev-actions button { font-size: .78rem; margin-right: .5rem; color: #2563eb; background: none; border: none; padding: 0; cursor: pointer; text-decoration: none; }
+        .rev-actions button:hover, .rev-actions a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="site-header">
+        <h1><a href="{{ url_for('wikis.index') }}">LakeportWiki</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('wikis.index') }}">Main Page</a>
+            <a href="{{ url_for('wikis.recent_changes') }}">Recent Changes</a>
+            <a href="{{ url_for('wikis.compare_page') }}">Compare Pages</a>
+            <a href="{{ url_for('wikis.create_page') }}">Create Article</a>
+            {% if user %}
+            <a href="{{ url_for('wikis.logout') }}">Logout ({{ user.display_name }})</a>
+            {% else %}
+            <a href="{{ url_for('wikis.login_page') }}">Login</a>
+            {% endif %}
+            <form class="search-bar" action="{{ url_for('wikis.search') }}" method="get">
+                <input type="text" name="q" placeholder="Search wiki...">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="article-header">
+            <div>
+                <h2>{{ page.title }}</h2>
+                {% for cat in categories if cat.name == page.category %}
+                <a class="category-badge" href="{{ url_for('wikis.category_page', cat_id=cat.id) }}">{{ page.category }}</a>
+                {% endfor %}
+            </div>
+            <div class="article-actions">
+                <a href="{{ url_for('wikis.edit_page', slug=page.slug) }}">Edit</a>
+            </div>
+        </div>
+
+        <div class="article-meta">
+            <span>Author: {{ author.display_name if author else 'Unknown' }}</span>
+            <span>Created: {{ page.created_at[:10] }}</span>
+            <span>Last edited: {{ page.updated_at[:10] }}</span>
+            <span>Views: {{ page.views }}</span>
+        </div>
+
+        <div class="article-content" id="article-body">
+            {% if '<' in page.content and '>' in page.content %}
+                {# Content is HTML (e.g. from Wikipedia/ZIM articles) — render directly #}
+                {{ page.content|safe }}
+            {% else %}
+                {# Content is simple markdown-like text (overlay pages) — parse manually #}
+                {% for paragraph in page.content.split('\n\n') %}
+                    {% if paragraph.startswith('## ') %}
+                        <h2>{{ paragraph[3:] }}</h2>
+                    {% elif paragraph.startswith('- ') %}
+                        <ul>
+                        {% for line in paragraph.split('\n') %}
+                            {% if line.startswith('- ') %}
+                            <li>{{ line[2:] }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        </ul>
+                    {% elif paragraph.startswith('| ') %}
+                        <table>
+                        {% for line in paragraph.split('\n') %}
+                            {% if line.startswith('|') and '---' not in line %}
+                            <tr>
+                                {% for cell in line.split('|')[1:-1] %}
+                                {% if loop.parent.loop.first %}
+                                <th>{{ cell.strip() }}</th>
+                                {% else %}
+                                <td>{{ cell.strip() }}</td>
+                                {% endif %}
+                                {% endfor %}
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>{{ paragraph }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="sidebar">
+            {% if linked %}
+            <div class="sidebar-section">
+                <h4>Linked Pages</h4>
+                <ul>
+                    {% for lp in linked %}
+                    <li><a href="{{ url_for('wikis.wiki_page', slug=lp.slug) }}">{{ lp.title }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if revisions %}
+            <div class="sidebar-section">
+                <h4>Revision History ({{ revisions|length }})</h4>
+                <table class="rev-table">
+                    <thead><tr><th>Date</th><th>Summary</th></tr></thead>
+                    <tbody>
+                    {% for rev in revisions[:5] %}
+                    <tr>
+                        <td>{{ rev.timestamp[:10] }}</td>
+                        <td>
+                            <a href="{{ url_for('wikis.view_revision', slug=page.slug, rev_id=rev.id) }}">{{ rev.summary }}</a>
+                            <div class="rev-actions">
+                                <a href="{{ url_for('wikis.view_revision', slug=page.slug, rev_id=rev.id) }}">view</a>
+                                <a href="{{ url_for('wikis.diff_revision', slug=page.slug, rev_id=rev.id) }}">diff</a>
+                                {% if not loop.first %}
+                                <form method="post" action="{{ url_for('wikis.revert_revision', slug=page.slug, rev_id=rev.id) }}" style="display:inline;">
+                                    <button type="submit">revert to this</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

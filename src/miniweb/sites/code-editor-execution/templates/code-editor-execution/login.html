@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In -- CodeRunner</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #1e1e2e; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
+        a { color: #89b4fa; text-decoration: none; }
+        .header { background: #181825; border-bottom: 1px solid #313244; padding: .6rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; color: #89b4fa; font-family: monospace; }
+        .nav-bar { background: #181825; border-bottom: 1px solid #313244; padding: .3rem 2rem; display: flex; align-items: center; gap: 1rem; }
+        .nav-bar a { font-size: .85rem; color: #a6adc8; padding: .2rem .5rem; border-radius: .3rem; }
+        .nav-bar a:hover { background: #313244; text-decoration: none; }
+        .login-wrapper { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 100px); padding: 2rem; }
+        .login-form { width: 100%; max-width: 420px; padding: 2.5rem; background: #181825; border: 1px solid #313244; border-radius: .5rem; }
+        .login-form h2 { margin: 0 0 .5rem; font-size: 1.5rem; color: #cdd6f4; font-family: monospace; text-align: center; }
+        .login-form .subtitle { text-align: center; color: #6c7086; font-size: .9rem; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; color: #a6adc8; margin-bottom: .4rem; font-weight: 600; }
+        .form-group input { width: 100%; padding: .7rem .9rem; background: #313244; border: 1px solid #45475a; border-radius: .3rem; font-size: 1rem; color: #cdd6f4; }
+        .form-group input:focus { border-color: #89b4fa; outline: none; }
+        .btn-login { width: 100%; padding: .8rem; background: #89b4fa; color: #1e1e2e; border: none; border-radius: .3rem; cursor: pointer; font-size: 1.1rem; font-weight: 700; margin-top: .5rem; }
+        .btn-login:hover { background: #74c7ec; }
+        .error { color: #f38ba8; font-size: .9rem; margin-bottom: 1rem; background: rgba(243,139,168,.1); padding: .6rem .8rem; border-radius: .3rem; text-align: center; }
+        .back-link { text-align: center; margin-top: 1.2rem; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('code-editor-execution.index') }}" style="color:inherit">&gt;_ CodeRunner</a></h1>
+    </div>
+
+    <div class="nav-bar">
+        <a href="{{ url_for('code-editor-execution.index') }}">Gallery</a>
+        <a href="{{ url_for('code-editor-execution.editor') }}">Editor</a>
+    </div>
+
+    <div class="login-wrapper">
+        <form class="login-form" method="post" action="{{ url_for('code-editor-execution.login_submit') }}">
+            <h2>Sign In</h2>
+            <div class="subtitle">Log in to save snippets and track history</div>
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required autocomplete="off" placeholder="e.g. dev_alice">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn-login">Sign In</button>
+            <div class="back-link">
+                <a href="{{ url_for('code-editor-execution.index') }}">Back to Gallery</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

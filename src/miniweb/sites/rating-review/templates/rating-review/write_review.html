@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write a Review - {{ business.name }} - LakeReview</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #333; }
+        a { color: #d32323; text-decoration: none; }
+        .header { background: #d32323; color: #fff; padding: 12px 20px; }
+        .header .inner { max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .header .logo { font-size: 24px; font-weight: 700; color: #fff; }
+        .container { max-width: 700px; margin: 30px auto; padding: 0 20px; }
+        h1 { font-size: 24px; margin-bottom: 8px; }
+        .biz-name { font-size: 16px; color: #666; margin-bottom: 24px; }
+        .form-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-family: inherit; }
+        .form-group textarea { height: 150px; resize: vertical; }
+        .rating-selector { display: flex; gap: 4px; margin-bottom: 4px; }
+        .rating-selector .star { font-size: 32px; cursor: pointer; color: #ddd; transition: color 0.2s; }
+        .rating-selector .star.active { color: #f5a623; }
+        .rating-selector .star:hover { color: #f5a623; }
+        .btn-submit { padding: 12px 32px; background: #d32323; color: #fff; border: none; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { background: #b41c1c; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="inner">
+            <a href="{{ url_for('rating-review.index') }}" class="logo">LakeReview</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>Write a Review</h1>
+        <p class="biz-name">{{ business.name }}</p>
+        <div class="form-card">
+            <form id="review-form">
+                <div class="form-group">
+                    <label>Your Rating</label>
+                    <div class="rating-selector" id="rating-selector">
+                        {% for i in range(1, 6) %}
+                        <span class="star" data-value="{{ i }}" onclick="setRating({{ i }})">&#9733;</span>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="rating" id="rating-input" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="title">Review Title</label>
+                    <input type="text" name="title" id="title" placeholder="Summarize your experience">
+                </div>
+                <div class="form-group">
+                    <label for="text">Your Review</label>
+                    <textarea name="text" id="text" placeholder="Tell others about your experience..."></textarea>
+                </div>
+                <button type="button" class="btn-submit" onclick="submitReview()">Submit Review</button>
+            </form>
+        </div>
+
+        <div class="form-card" style="margin-top:20px;">
+            <h2 style="font-size:18px;margin-bottom:12px;">Report a Problem</h2>
+            <p style="font-size:13px;color:#888;margin-bottom:16px;">See something wrong with this business listing? Let us know.</p>
+            <form id="report-form">
+                <div class="form-group">
+                    <label for="report-reason">Reason</label>
+                    <select name="reason" id="report-reason" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:4px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="Incorrect information">Incorrect information</option>
+                        <option value="Closed or moved">Closed or moved</option>
+                        <option value="Duplicate listing">Duplicate listing</option>
+                        <option value="Inappropriate content">Inappropriate content</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="report-description">Details</label>
+                    <input type="text" name="description" id="report-description" placeholder="Tell us more (optional)">
+                </div>
+                <button type="button" class="btn-submit" style="background:#555;" onclick="submitReport()">Submit Report</button>
+                <span id="report-feedback" style="margin-left:12px;font-size:13px;"></span>
+            </form>
+        </div>
+    </div>
+    <script>
+        let selectedRating = 0;
+        function setRating(val) {
+            selectedRating = val;
+            document.getElementById('rating-input').value = val;
+            document.querySelectorAll('.star').forEach(s => {
+                s.classList.toggle('active', parseInt(s.dataset.value) <= val);
+            });
+        }
+        function submitReview() {
+            if (selectedRating === 0) { alert('Please select a rating'); return; }
+            fetch('{{ url_for("rating-review.api_reviews_create") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    business_id: {{ business.id }},
+                    rating: selectedRating,
+                    title: document.getElementById('title').value,
+                    text: document.getElementById('text').value,
+                })
+            }).then(r => r.json()).then(d => {
+                if (d.id) {
+                    alert('Review submitted!');
+                    window.location.href = '{{ url_for("rating-review.business_detail", business_id=business.id) }}';
+                } else {
+                    alert(d.error || 'Error submitting review');
+                }
+            });
+        }
+        function submitReport() {
+            const feedback = document.getElementById('report-feedback');
+            fetch('{{ url_for("rating-review.api_report") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    target_type: 'business',
+                    target_id: {{ business.id }},
+                    reason: document.getElementById('report-reason').value,
+                    description: document.getElementById('report-description').value,
+                })
+            }).then(r => r.json().then(d => ({ok: r.ok, data: d})))
+            .then(res => {
+                if (res.ok) {
+                    feedback.style.color = '#2e7d32';
+                    feedback.textContent = 'Report submitted. Thank you!';
+                    document.getElementById('report-description').value = '';
+                } else {
+                    feedback.style.color = '#d32323';
+                    feedback.textContent = res.data.error || 'Error submitting report';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

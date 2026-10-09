@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - DocEdit</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #202124; }
+        .header { background: #fff; border-bottom: 1px solid #dadce0; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 1.3rem; font-weight: 500; color: #1a73e8; text-decoration: none; }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a { font-size: 0.85rem; color: #5f6368; text-decoration: none; padding: 0.4rem 0.7rem; border-radius: 4px; }
+        .header-nav a:hover { background: #f1f3f4; }
+
+        .login-card { max-width: 420px; margin: 4rem auto; padding: 2.5rem 2rem; background: #fff; border: 1px solid #dadce0; border-radius: 8px; }
+        .login-card h2 { font-size: 1.3rem; font-weight: 500; color: #202124; margin-bottom: 0.3rem; }
+        .login-card .subtitle { font-size: 0.9rem; color: #5f6368; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.85rem; color: #5f6368; margin-bottom: 0.3rem; font-weight: 500; }
+        .form-group input { width: 100%; padding: 0.65rem 0.8rem; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.95rem; color: #202124; outline: none; }
+        .form-group input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+        .btn-login { width: 100%; padding: 0.7rem; background: #1a73e8; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: 500; }
+        .btn-login:hover { background: #1557b0; }
+        .error { color: #d93025; font-size: 0.85rem; margin-bottom: 1rem; padding: 0.5rem; background: #fce8e6; border-radius: 4px; }
+
+        .accounts { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #dadce0; }
+        .accounts h3 { font-size: 0.85rem; color: #5f6368; margin-bottom: 0.6rem; }
+        .account-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; font-size: 0.82rem; color: #202124; border-bottom: 1px solid #f1f3f4; }
+        .account-row:last-child { border-bottom: none; }
+        .account-username { font-weight: 500; }
+        .account-password { color: #80868b; font-family: monospace; }
+
+        .api-note { margin-top: 1rem; font-size: 0.8rem; color: #80868b; }
+        .api-note code { background: #f1f3f4; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('documents.index') }}" class="logo">DocEdit</a>
+        <div class="header-nav">
+            <a href="{{ url_for('documents.index') }}">All Documents</a>
+            <a href="{{ url_for('documents.starred') }}">Starred</a>
+            <a href="{{ url_for('documents.trash') }}">Trash</a>
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <form class="login-card" method="post" action="{{ url_for('documents.login_submit') }}">
+        <h2>Sign in</h2>
+        <p class="subtitle">Use your DocEdit account to create, edit, share, star, and manage documents.</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" name="username" id="username" required autocomplete="off" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" required placeholder="Enter your password">
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
+
+        <div class="accounts">
+            <h3>Available Accounts</h3>
+            <div class="account-row">
+                <span class="account-username">alice_writer</span>
+                <span>Alice Nakamura (ID 1)</span>
+                <span class="account-password">pass123</span>
+            </div>
+            <div class="account-row">
+                <span class="account-username">bob_editor</span>
+                <span>Bob Fernandez (ID 2)</span>
+                <span class="account-password">pass456</span>
+            </div>
+            <div class="account-row">
+                <span class="account-username">carol_pm</span>
+                <span>Carol Zhang (ID 3)</span>
+                <span class="account-password">pass789</span>
+            </div>
+            <div class="account-row">
+                <span class="account-username">dan_dev</span>
+                <span>Dan Okafor (ID 4)</span>
+                <span class="account-password">pass321</span>
+            </div>
+            <div class="account-row">
+                <span class="account-username">eve_design</span>
+                <span>Eve Johansson (ID 5)</span>
+                <span class="account-password">pass654</span>
+            </div>
+        </div>
+
+        <div class="api-note">
+            API login: <code>POST /sites/documents/api/login</code> with JSON <code>{"username": "...", "password": "..."}</code>
+        </div>
+    </form>
+</body>
+</html>

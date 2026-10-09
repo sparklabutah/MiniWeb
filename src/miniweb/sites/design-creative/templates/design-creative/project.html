@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project.title }} - DesignFlow</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+        .header { background: #fff; border-bottom: 1px solid #e8e8ef; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.4rem; color: #7c3aed; font-weight: 800; letter-spacing: -.5px; }
+        .header h1 a { color: inherit; text-decoration: none; }
+        .header-nav { display: flex; align-items: center; gap: 1rem; }
+        .header-nav a { font-size: .9rem; color: #64748b; text-decoration: none; padding: .3rem .6rem; border-radius: .3rem; transition: background .15s; }
+        .header-nav a:hover { background: #f1f0ff; color: #7c3aed; }
+        .header-nav .btn-primary { background: #7c3aed; color: #fff; padding: .4rem 1rem; border-radius: .4rem; }
+        .header-nav .btn-primary:hover { background: #6d28d9; }
+
+        .detail { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #94a3b8; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #7c3aed; text-decoration: none; }
+
+        .project-layout { display: grid; grid-template-columns: 1.2fr .8fr; gap: 2rem; }
+
+        /* Canvas preview */
+        .canvas-wrapper { background: #fff; border-radius: .6rem; border: 1px solid #e8e8ef; padding: 1rem; }
+        .canvas-wrapper h3 { font-size: .9rem; color: #64748b; margin-bottom: .8rem; }
+        .canvas { position: relative; background: #e5e7eb; border-radius: .4rem; overflow: hidden; margin: 0 auto; }
+        .canvas-element { position: absolute; display: flex; align-items: center; justify-content: center; font-size: .75rem; color: #fff; border-radius: .2rem; overflow: hidden; }
+        .el-text { background: rgba(124, 58, 237, .7); border: 1px dashed rgba(255,255,255,.4); }
+        .el-shape { background: rgba(236, 72, 153, .6); border: 1px solid rgba(255,255,255,.3); }
+        .el-image { background: rgba(14, 165, 233, .6); border: 1px solid rgba(255,255,255,.3); }
+        .empty-canvas { display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: .9rem; height: 100%; min-height: 200px; }
+
+        /* Info panel */
+        .info-panel { display: flex; flex-direction: column; gap: 1.2rem; }
+        .info-card { background: #fff; border-radius: .6rem; border: 1px solid #e8e8ef; padding: 1.2rem; }
+        .info-card h3 { font-size: 1rem; margin-bottom: .8rem; color: #1a1a2e; }
+        .info-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid #f1f5f9; font-size: .88rem; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #94a3b8; }
+        .info-value { color: #1a1a2e; font-weight: 500; }
+        .status-badge { font-size: .72rem; padding: .15rem .5rem; border-radius: .2rem; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+
+        /* Actions */
+        .action-group { display: flex; flex-wrap: wrap; gap: .5rem; }
+        .btn { padding: .55rem 1rem; border: none; border-radius: .4rem; cursor: pointer; font-size: .85rem; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; text-align: center; }
+        .btn-edit { background: #7c3aed; color: #fff; }
+        .btn-edit:hover { background: #6d28d9; }
+        .btn-dup { background: #fff; color: #7c3aed; border: 1px solid #7c3aed; }
+        .btn-dup:hover { background: #f1f0ff; }
+        .btn-outline { background: #fff; color: #475569; border: 1px solid #d1d5db; }
+        .btn-outline:hover { border-color: #7c3aed; color: #7c3aed; }
+
+        /* Update form */
+        .update-form { margin-top: .5rem; }
+        .update-form .form-group { margin-bottom: .8rem; }
+        .update-form label { display: block; font-size: .82rem; color: #64748b; margin-bottom: .3rem; }
+        .update-form input, .update-form select { width: 100%; padding: .45rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .88rem; }
+        .update-form input:focus, .update-form select:focus { outline: 2px solid #7c3aed; border-color: transparent; }
+
+        /* Element list */
+        .element-list { list-style: none; }
+        .element-item { display: flex; align-items: center; gap: .6rem; padding: .5rem .6rem; border-bottom: 1px solid #f1f5f9; font-size: .85rem; }
+        .element-item:last-child { border-bottom: none; }
+        .el-icon { width: 28px; height: 28px; border-radius: .3rem; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: #fff; font-weight: 600; flex-shrink: 0; }
+        .el-icon-text { background: #7c3aed; }
+        .el-icon-shape { background: #ec4899; }
+        .el-icon-image { background: #0ea5e9; }
+        .el-details { flex: 1; min-width: 0; }
+        .el-type { font-weight: 600; color: #1a1a2e; text-transform: capitalize; }
+        .el-pos { font-size: .75rem; color: #94a3b8; }
+        .no-elements { color: #94a3b8; font-size: .88rem; text-align: center; padding: 1rem 0; }
+
+        /* Template link */
+        .template-link { display: inline-flex; align-items: center; gap: .3rem; color: #7c3aed; text-decoration: none; font-size: .85rem; }
+        .template-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('design-creative.index') }}">DesignFlow</a></h1>
+        <div class="header-nav">
+            <a href="{{ url_for('design-creative.index') }}">Templates</a>
+            <a href="{{ url_for('design-creative.assets_page') }}">Assets</a>
+            {% if user %}
+            <a href="{{ url_for('design-creative.projects_page') }}">My Projects</a>
+            <a href="{{ url_for('design-creative.logout') }}">Logout ({{ user.name }})</a>
+            {% else %}
+            <a href="{{ url_for('design-creative.login_page') }}" class="btn-primary">Sign In</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="detail">
+        <div class="breadcrumb">
+            {% if user %}
+            <a href="{{ url_for('design-creative.projects_page') }}">My Projects</a> /
+            {% endif %}
+            {{ project.title }}
+        </div>
+
+        <div class="project-layout">
+            <!-- Canvas Preview -->
+            <div class="canvas-wrapper">
+                <h3>Canvas Preview ({{ project.dimensions }})</h3>
+                {% set dims = project.dimensions.split('x') %}
+                {% set w = dims[0]|int %}
+                {% set h = dims[1]|int %}
+                {% set scale = 500 / w if w > h else 400 / h %}
+                {% set cw = (w * scale)|int %}
+                {% set ch = (h * scale)|int %}
+                <div class="canvas" style="width: {{ cw }}px; height: {{ ch }}px;">
+                    {% if project.elements %}
+                        {% for el in project.elements %}
+                        {% set props = el.get('properties', {}) %}
+                        <div class="canvas-element el-{{ el.type }}"
+                             style="left: {{ ((props.get('x', 0)) * scale)|int }}px;
+                                    top: {{ ((props.get('y', 0)) * scale)|int }}px;
+                                    width: {{ ((props.get('width', 120)) * scale)|int }}px;
+                                    height: {{ ((props.get('height', 40)) * scale)|int }}px;
+                                    {% if props.get('color') %}background: {{ props.color }};{% endif %}
+                                    {% if props.get('fontSize') %}font-size: {{ (props.fontSize * scale)|int }}px;{% endif %}">
+                            {% if el.type == 'text' %}{{ props.get('text', 'Text') }}{% elif el.type == 'image' %}IMG{% else %}{{ el.type[:3]|upper }}{% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-canvas">No elements yet -- open the editor to start designing</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info Panel -->
+            <div class="info-panel">
+                <div class="info-card">
+                    <h3>Project Details</h3>
+                    <div class="info-row">
+                        <span class="info-label">Title</span>
+                        <span class="info-value">{{ project.title }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Status</span>
+                        <span class="status-badge status-{{ project.status }}">{{ project.status }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Dimensions</span>
+                        <span class="info-value">{{ project.dimensions }} px</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Created</span>
+                        <span class="info-value">{{ project.created_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Modified</span>
+                        <span class="info-value">{{ project.modified_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Elements</span>
+                        <span class="info-value">{{ project.elements|length }}</span>
+                    </div>
+                    {% if template %}
+                    <div class="info-row">
+                        <span class="info-label">Template</span>
+                        <span class="info-value">
+                            <a class="template-link" href="{{ url_for('design-creative.template_detail', template_id=template.id) }}">{{ template.title }}</a>
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Actions -->
+                <div class="info-card">
+                    <h3>Actions</h3>
+                    <div class="action-group">
+                        {% if user and user.id == project.owner_id %}
+                        <a href="{{ url_for('design-creative.editor', project_id=project.id) }}" class="btn btn-edit">Open Editor</a>
+                        <form method="post" action="{{ url_for('design-creative.form_duplicate_project', project_id=project.id) }}" style="display:inline">
+                            <button type="submit" class="btn btn-dup">Duplicate</button>
+                        </form>
+                        {% endif %}
+                        <button class="btn btn-outline" onclick="var b=this;navigator.clipboard.writeText(window.location.href).then(function(){b.textContent='Copied!';setTimeout(function(){b.textContent='Share Link'},2000)});">Share Link</button>
+                        <a class="btn btn-dup" href="{{ url_for('design-creative.export_project', project_id=project.id) }}" download>Download SVG</a>
+                        <button class="btn btn-outline" onclick="window.print()">Print</button>
+                    </div>
+                </div>
+
+                <!-- Invite collaborator -->
+                <div class="info-card">
+                    <h3>Collaborators</h3>
+                    {% set collaborators = project.get('collaborators', []) %}
+                    {% if collaborators %}
+                    <ul class="element-list" style="margin-bottom:.8rem;">
+                        {% for c in collaborators %}
+                        <li class="element-item">
+                            <div class="el-icon el-icon-text">{{ (c.name or c.email)[:1]|upper }}</div>
+                            <div class="el-details">
+                                <div class="el-type">{{ c.name or c.email }}</div>
+                                <div class="el-pos">{{ c.email }} -- {{ c.role or 'editor' }} ({{ c.status or 'invited' }})</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="no-elements" style="padding:.4rem 0 .8rem;">No collaborators yet</div>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('design-creative.form_invite', project_id=project.id) }}" style="display:flex;gap:.4rem;">
+                        <input type="email" name="email" placeholder="Enter email to invite" required style="flex:1;padding:.4rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;font-size:.85rem;">
+                        <button type="submit" class="btn btn-edit">Invite</button>
+                    </form>
+                </div>
+
+                <!-- Update form for owner -->
+                {% if user and user.id == project.owner_id %}
+                <div class="info-card">
+                    <h3>Update Project</h3>
+                    <form class="update-form" method="post" action="{{ url_for('design-creative.form_update_project', project_id=project.id) }}">
+                        <div class="form-group">
+                            <label for="title">Title</label>
+                            <input type="text" id="title" name="title" value="{{ project.title }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status" name="status">
+                                <option value="draft" {{ 'selected' if project.status == 'draft' }}>Draft</option>
+                                <option value="completed" {{ 'selected' if project.status == 'completed' }}>Completed</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-edit" style="margin-top:.3rem">Save Changes</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <!-- Element List -->
+                <div class="info-card">
+                    <h3>Elements ({{ project.elements|length }})</h3>
+                    {% if project.elements %}
+                    <ul class="element-list">
+                        {% for el in project.elements %}
+                        <li class="element-item">
+                            <div class="el-icon el-icon-{{ el.type }}">{{ el.type[:1]|upper }}</div>
+                            <div class="el-details">
+                                <div class="el-type">{{ el.type }}</div>
+                                <div class="el-pos">
+                                    {% set props = el.get('properties', {}) %}
+                                    x: {{ props.get('x', 0) }}, y: {{ props.get('y', 0) }}
+                                    {% if props.get('text') %} -- "{{ props.text[:30] }}"{% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="no-elements">No elements added yet</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card Transactions - SecureBank Online</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #2d3748; }
+        .header { background: linear-gradient(135deg, #0a2463, #1e3a6e); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 1.2rem; }
+        .header h1 a { color: #fff; text-decoration: none; }
+        .header h1 a span { color: #4da6ff; }
+        nav.topnav { max-width: 1200px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav.topnav a { color: #0a2463; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav.topnav a:hover { background: #f0f4ff; }
+        nav.topnav a.active { font-weight: 700; background: #dbeafe; }
+        nav.topnav .btn-login { background: #0a2463; color: #fff; padding: .4rem 1rem; border-radius: .3rem; margin-left: auto; }
+        nav.topnav .btn-logout { color: #dc2626; margin-left: auto; }
+        .cc-subnav { max-width: 1200px; margin: 0 auto; padding: .4rem 2rem; background: #f7fafc; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1rem; }
+        .cc-subnav a { color: #4a5568; text-decoration: none; font-size: .85rem; padding: .3rem .5rem; border-radius: .3rem; }
+        .cc-subnav a:hover { background: #edf2f7; }
+        .cc-subnav a.active { font-weight: 700; color: #0a2463; background: #dbeafe; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+        h2 { font-size: 1.1rem; color: #0a2463; margin-bottom: .8rem; }
+        .filters { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: .75rem; color: #718096; font-weight: 600; text-transform: uppercase; margin-bottom: .2rem; }
+        .filter-group input, .filter-group select { padding: .4rem .5rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: .85rem; }
+        .btn-filter { padding: .45rem .8rem; background: #3182ce; color: #fff; border: none; border-radius: 4px; font-size: .85rem; cursor: pointer; }
+        .btn-clear { padding: .45rem .8rem; background: #edf2f7; color: #4a5568; border: none; border-radius: 4px; font-size: .85rem; cursor: pointer; text-decoration: none; }
+        .summary { font-size: .9rem; color: #4a5568; margin-bottom: .8rem; }
+        .summary strong { color: #0a2463; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #edf2f7; font-size: .88rem; }
+        th { background: #f7fafc; color: #718096; font-weight: 600; font-size: .78rem; text-transform: uppercase; }
+        td.amount { text-align: right; font-weight: 600; }
+        .badge { display: inline-block; padding: .1rem .4rem; border-radius: 3px; font-size: .72rem; font-weight: 600; text-transform: uppercase; }
+        .badge.posted { background: #c6f6d5; color: #276749; }
+        .badge.pending { background: #fefcbf; color: #975a16; }
+        .badge.disputed { background: #fed7d7; color: #c53030; }
+        .dispute-btn { padding: .2rem .4rem; font-size: .75rem; border: 1px solid #e53e3e; color: #e53e3e; background: none; border-radius: 3px; cursor: pointer; }
+        .dispute-btn.active { background: #e53e3e; color: #fff; }
+        .pagination { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; justify-content: center; }
+        .pagination a, .pagination span { padding: .4rem .8rem; border-radius: 4px; font-size: .88rem; text-decoration: none; }
+        .pagination a { background: #fff; color: #3182ce; border: 1px solid #e2e8f0; }
+        .pagination a:hover { background: #edf2f7; }
+        .pagination span.current { background: #3182ce; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('banking.index') }}">Secure<span>Bank</span> Online</a></h1>
+    </div>
+
+    {% set nav_active = 'creditcard' %}
+    {% include 'banking/_nav.html' %}
+    <div class="cc-subnav">
+        <a href="{{ url_for('banking.cc_index') }}">Overview</a>
+        <a href="{{ url_for('banking.cc_transactions') }}" class="active">Transactions</a>
+        <a href="{{ url_for('banking.cc_statements') }}">Statements</a>
+        <a href="{{ url_for('banking.cc_payments') }}">Payments</a>
+        <a href="{{ url_for('banking.cc_rewards') }}">Rewards</a>
+        <a href="{{ url_for('banking.cc_settings') }}">Card Settings</a>
+    </div>
+
+    <div class="container">
+        <h2>Credit Card Transactions</h2>
+
+        <form class="filters" method="GET" action="{{ url_for('banking.cc_transactions') }}">
+            <div class="filter-group">
+                <label>Search</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Merchant...">
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
+                <select name="category">
+                    <option value="">All</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {{ 'selected' if category == cat else '' }}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select name="status">
+                    <option value="">All</option>
+                    <option value="posted" {{ 'selected' if status == 'posted' else '' }}>Posted</option>
+                    <option value="pending" {{ 'selected' if status == 'pending' else '' }}>Pending</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>From</label>
+                <input type="date" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="filter-group">
+                <label>To</label>
+                <input type="date" name="date_to" value="{{ date_to }}">
+            </div>
+            <button type="submit" class="btn-filter">Filter</button>
+            <a href="{{ url_for('banking.cc_transactions') }}" class="btn-clear">Clear</a>
+        </form>
+
+        <div class="summary">
+            <strong>{{ total_count }}</strong> transactions | Total: <strong>${{ "%.2f"|format(total_amount) }}</strong> | Page {{ page }} of {{ total_pages }}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Amount</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.date }}</td>
+                    <td>{{ t.merchant }}</td>
+                    <td>{{ t.category }}</td>
+                    <td>
+                        <span class="badge {{ t.status }}">{{ t.status }}</span>
+                        {% if t.disputed %}<span class="badge disputed">Disputed</span>{% endif %}
+                    </td>
+                    <td class="amount">${{ "%.2f"|format(t.amount) }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('banking.cc_form_dispute_transaction', txn_id=t.id) }}" style="display:inline;">
+                            <button type="submit" class="dispute-btn {{ 'active' if t.disputed else '' }}">
+                                {{ 'Undispute' if t.disputed else 'Dispute' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('banking.cc_transactions', page=page-1, category=category, status=status, date_from=date_from, date_to=date_to, q=q) }}">Previous</a>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <span class="current">{{ p }}</span>
+                {% else %}
+                <a href="{{ url_for('banking.cc_transactions', page=p, category=category, status=status, date_from=date_from, date_to=date_to, q=q) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('banking.cc_transactions', page=page+1, category=category, status=status, date_from=date_from, date_to=date_to, q=q) }}">Next</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

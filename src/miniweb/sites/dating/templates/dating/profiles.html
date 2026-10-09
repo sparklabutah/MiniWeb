@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Profiles - HeartLink</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f0ff; }
+.navbar { background: #fff; padding: 0.8rem 1.5rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
+.navbar .brand { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+.navbar .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+.navbar .nav-links a { text-decoration: none; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 0.4rem; }
+.navbar .nav-links a:hover { background: #f0ebff; color: #667eea; }
+.navbar .nav-links a.active { background: #667eea; color: #fff; }
+.login-btn { display: inline-block; background: linear-gradient(135deg, #667eea, #f093fb); color: #fff !important; padding: 0.5rem 1.2rem !important; border-radius: 2rem; font-weight: 600; text-decoration: none; font-size: 0.95rem; }
+.main { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+h2 { margin-bottom: 0.5rem; color: #1a1a2e; }
+.subtitle { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
+.filters { background: #fff; border-radius: 0.8rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.filters form { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 0.2rem; }
+.filter-group label { font-size: 0.75rem; color: #888; font-weight: 500; }
+.filter-group input, .filter-group select { padding: 0.4rem 0.6rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; }
+.filter-group input:focus, .filter-group select:focus { border-color: #667eea; outline: none; }
+.filter-btn { padding: 0.4rem 1rem; background: #667eea; color: #fff; border: none; border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+.filter-btn:hover { background: #5a6fd6; }
+.clear-btn { padding: 0.4rem 0.8rem; background: #f1f1f1; color: #666; border: none; border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-block; }
+.profile-list { list-style: none; }
+.profile-item { background: #fff; border-radius: 0.8rem; padding: 1rem 1.5rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+.profile-item:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.profile-avatar { width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #f093fb); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.2rem; flex-shrink: 0; overflow: hidden; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-info { flex: 1; }
+.profile-info h3 { font-size: 1rem; margin-bottom: 0.2rem; }
+.profile-info h3 a { color: #1a1a2e; text-decoration: none; }
+.profile-info h3 a:hover { color: #667eea; }
+.profile-meta { font-size: 0.85rem; color: #888; }
+.profile-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+.profile-tags span { background: #f0ebff; color: #667eea; padding: 0.1rem 0.5rem; border-radius: 1rem; font-size: 0.7rem; }
+.verified-mark { color: #22c55e; font-weight: 600; font-size: 0.75rem; }
+.pagination { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem; }
+.pagination a, .pagination span { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 0.4rem; text-decoration: none; font-size: 0.9rem; }
+.pagination a { color: #667eea; background: #fff; border: 1px solid #ddd; }
+.pagination a:hover { background: #f0ebff; }
+.pagination span.current { background: #667eea; color: #fff; border: 1px solid #667eea; }
+.empty { text-align: center; color: #888; padding: 3rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+    <a href="{{ url_for('dating.index') }}" class="brand">HeartLink</a>
+    <div class="nav-links">
+        <a href="{{ url_for('dating.index') }}">Discover</a>
+        <a href="{{ url_for('dating.profiles_list') }}" class="active">Browse Profiles</a>
+        {% if user %}
+        <a href="{{ url_for('dating.likes_page') }}">Likes You</a>
+        <a href="{{ url_for('dating.matches_page') }}">Matches</a>
+        <a href="{{ url_for('dating.edit_profile') }}">Profile</a>
+        <a href="{{ url_for('dating.logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('dating.login_page') }}" class="login-btn">Sign In</a>
+        {% endif %}
+    </div>
+</nav>
+<div class="main">
+<h2>Browse Profiles</h2>
+<p class="subtitle">{{ total }} profile{{ 's' if total != 1 else '' }} found</p>
+
+<div class="filters">
+<form method="get" action="{{ url_for('dating.profiles_list') }}">
+    <div class="filter-group" style="flex:1;min-width:180px;">
+        <label for="f_q">Search</label>
+        <input type="search" name="q" id="f_q" value="{{ q }}" placeholder="Name, bio, keyword&hellip;">
+    </div>
+    <div class="filter-group">
+        <label for="f_gender">Gender</label>
+        <select name="gender" id="f_gender">
+            <option value="">All</option>
+            <option value="male" {{ 'selected' if gender == 'male' }}>Male</option>
+            <option value="female" {{ 'selected' if gender == 'female' }}>Female</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label for="f_looking_for">Looking for</label>
+        <select name="looking_for" id="f_looking_for">
+            <option value="">All</option>
+            <option value="relationship" {{ 'selected' if looking_for == 'relationship' }}>Relationship</option>
+            <option value="casual" {{ 'selected' if looking_for == 'casual' }}>Casual</option>
+            <option value="friendship" {{ 'selected' if looking_for == 'friendship' }}>Friendship</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label for="f_interest">Interest</label>
+        <input type="text" name="interest" id="f_interest" value="{{ interest }}" placeholder="e.g. hiking">
+    </div>
+    <div class="filter-group">
+        <label>Interests</label>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+            {% for hobby in ['hiking', 'cooking', 'reading', 'travel', 'music', 'fitness', 'photography', 'gaming'] %}
+            <label style="font-size:.82rem;display:flex;align-items:center;gap:.2rem;cursor:pointer;">
+                <input type="checkbox" name="interests" value="{{ hobby }}" {% if hobby in request.args.getlist('interests') %}checked{% endif %} style="accent-color:#667eea;">
+                {{ hobby|capitalize }}
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="filter-group">
+        <label for="f_min_age">Min age</label>
+        <input type="number" name="min_age" id="f_min_age" value="{{ min_age }}" placeholder="18" style="width:70px">
+    </div>
+    <div class="filter-group">
+        <label for="f_max_age">Max age</label>
+        <input type="number" name="max_age" id="f_max_age" value="{{ max_age }}" placeholder="99" style="width:70px">
+    </div>
+    {% if user %}
+    <div class="filter-group">
+        <label for="f_within">Within (miles)</label>
+        <input type="number" name="within" id="f_within" value="{{ within }}" placeholder="any" style="width:80px">
+    </div>
+    {% endif %}
+    <div class="filter-group">
+        <label for="f_sort">Sort by</label>
+        <select name="sort" id="f_sort">
+            <option value="">Default</option>
+            <option value="name" {{ 'selected' if sort == 'name' }}>Name A-Z</option>
+            <option value="age" {{ 'selected' if sort == 'age' }}>Age</option>
+            <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest members</option>
+            <option value="nearest" {{ 'selected' if sort == 'nearest' }}>Nearest</option>
+        </select>
+    </div>
+    <button type="submit" class="filter-btn">Filter</button>
+    <a href="{{ url_for('dating.profiles_list') }}" class="clear-btn">Clear</a>
+</form>
+</div>
+
+{% if profiles %}
+<ul class="profile-list">
+{% for p in profiles %}
+<li class="profile-item">
+    <div class="profile-avatar">
+        {% if p.photos %}<img src="{{ p.photos[0] }}" alt="{{ p.name }}">{% else %}{{ p.name[0] }}{% endif %}
+    </div>
+    <div class="profile-info">
+        <h3>
+            <a href="{{ url_for('dating.profile_detail', profile_id=p.id) }}">{{ p.name }}</a>
+            {% if p.verified %}<span class="verified-mark">[Verified]</span>{% endif %}
+        </h3>
+        <div class="profile-meta">{{ p.age }} -- {{ p.gender | capitalize }} -- {{ p.location }}{% if user and p.id != user.id and distances.get(p.id) is not none %} (~{{ distances[p.id] | round | int }} mi away){% endif %} -- Looking for: {{ p.looking_for }}</div>
+        <div class="profile-tags">
+            {% for i in p.interests[:5] %}<span>{{ i }}</span>{% endfor %}
+            {% if p.interests|length > 5 %}<span>+{{ p.interests|length - 5 }} more</span>{% endif %}
+        </div>
+    </div>
+</li>
+{% endfor %}
+</ul>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="{{ url_for('dating.profiles_list', page=page-1, **filter_args) }}">Previous</a>
+    {% endif %}
+    {% for p_num in range(1, total_pages+1) %}
+        {% if p_num == page %}
+        <span class="current">{{ p_num }}</span>
+        {% else %}
+        <a href="{{ url_for('dating.profiles_list', page=p_num, **filter_args) }}">{{ p_num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="{{ url_for('dating.profiles_list', page=page+1, **filter_args) }}">Next</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty">No profiles match your filters. Try different criteria.</div>
+{% endif %}
+</div>
+</body></html>

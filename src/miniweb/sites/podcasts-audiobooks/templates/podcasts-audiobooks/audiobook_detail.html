@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ audiobook.title }} - SoundShelf</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f1a; color: #e0e0e0; font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; }
+        a { color: #8b5cf6; text-decoration: none; }
+        a:hover { color: #a78bfa; }
+
+        .top-bar { background: #1a1a2e; padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #2d2d44; }
+        .top-bar .logo { font-size: 1.4rem; font-weight: 800; color: #8b5cf6; }
+        .top-bar .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .top-bar .nav-links a { color: #b0b0c0; font-size: .9rem; }
+        .top-bar .nav-links a:hover { color: #fff; }
+
+        .container { max-width: 800px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+        .back-link { display: inline-block; margin-bottom: 1rem; font-size: .85rem; color: #8b5cf6; }
+
+        .book-header { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 2rem; }
+        .book-header .cover { width: 180px; height: 220px; border-radius: .8rem; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff; font-weight: 600; padding: 1rem; text-align: center; background: #2d2d44; flex-shrink: 0; line-height: 1.3; }
+        .book-header .meta { flex: 1; }
+        .book-header .meta h1 { font-size: 1.5rem; color: #f0f0f0; margin-bottom: .2rem; }
+        .book-header .meta .author { font-size: 1rem; color: #aaa; margin-bottom: .1rem; }
+        .book-header .meta .narrator { font-size: .9rem; color: #888; margin-bottom: .8rem; }
+        .book-header .meta .desc { font-size: .9rem; color: #aaa; line-height: 1.7; margin-bottom: .8rem; }
+        .book-header .meta .stats-row { display: flex; gap: 1.2rem; font-size: .85rem; color: #888; flex-wrap: wrap; margin-bottom: .8rem; }
+        .book-header .meta .price-tag { display: inline-block; background: #064e3b; color: #10b981; font-weight: 700; font-size: 1.2rem; padding: .4rem 1rem; border-radius: .4rem; margin-right: .5rem; }
+        .book-header .meta .genre-badge { display: inline-block; background: #2d2d44; color: #8b5cf6; font-size: .8rem; padding: .2rem .6rem; border-radius: .3rem; }
+
+        .btn-row { display: flex; gap: .6rem; margin-top: .8rem; flex-wrap: wrap; }
+        .btn-purchase { display: inline-block; padding: .6rem 1.8rem; border-radius: 1.5rem; font-size: .95rem; font-weight: 600; cursor: pointer; border: none; }
+        .btn-purchase.buy { background: #10b981; color: #fff; }
+        .btn-purchase.buy:hover { background: #059669; }
+        .btn-purchase.owned { background: #2d2d44; color: #10b981; border: 1px solid #10b981; cursor: default; }
+
+        .btn-like { display: inline-block; padding: .5rem 1.2rem; border-radius: 1.5rem; font-size: .85rem; font-weight: 600; cursor: pointer; border: 1px solid #2d2d44; background: #1a1a2e; color: #b0b0c0; }
+        .btn-like:hover { border-color: #ef4444; color: #ef4444; }
+        .btn-like.active { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+        #action-msg { display: none; margin-top: .5rem; font-size: .85rem; color: #10b981; }
+
+        .section-title { font-size: 1.2rem; color: #f0f0f0; margin: 2rem 0 1rem; border-bottom: 1px solid #2d2d44; padding-bottom: .5rem; }
+
+        .review-list { display: flex; flex-direction: column; gap: .8rem; }
+        .review-card { background: #1a1a2e; border-radius: .5rem; padding: .8rem 1rem; }
+        .review-card .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .3rem; }
+        .review-card .review-header .reviewer { font-size: .85rem; color: #8b5cf6; }
+        .review-card .review-header .review-rating { font-size: .85rem; color: #eab308; }
+        .review-card .review-text { font-size: .85rem; color: #aaa; }
+        .review-card .review-date { font-size: .7rem; color: #666; margin-top: .3rem; }
+
+        .review-form { background: #1a1a2e; border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
+        .review-form h3 { font-size: 1rem; color: #f0f0f0; margin-bottom: .8rem; }
+        .review-form .rating-slider { display: flex; align-items: center; gap: .8rem; margin-bottom: .8rem; }
+        .review-form .rating-slider label { font-size: .85rem; color: #888; }
+        .review-form .rating-slider input[type="range"] { flex: 1; accent-color: #8b5cf6; }
+        .review-form .rating-slider .rating-val { font-size: .9rem; color: #eab308; font-weight: 600; min-width: 2rem; }
+        .review-form textarea { width: 100%; padding: .6rem; border: 1px solid #2d2d44; border-radius: .4rem; background: #0f0f1a; color: #e0e0e0; font-size: .9rem; resize: vertical; min-height: 60px; }
+        .review-form textarea:focus { border-color: #8b5cf6; outline: none; }
+        .review-form button { margin-top: .5rem; padding: .5rem 1.2rem; background: #8b5cf6; color: #fff; border: none; border-radius: .4rem; cursor: pointer; font-size: .9rem; font-weight: 600; }
+        .review-form button:hover { background: #7c3aed; }
+
+        .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+        .related-card { background: #1a1a2e; border-radius: .5rem; overflow: hidden; border: 1px solid transparent; transition: border-color .2s; }
+        .related-card:hover { border-color: #8b5cf6; }
+        .related-card .cover { height: 100px; display: flex; align-items: center; justify-content: center; font-size: .85rem; color: #fff; padding: .5rem; text-align: center; background: #2d2d44; }
+        .related-card .info { padding: .6rem; }
+        .related-card .info h4 { font-size: .8rem; color: #f0f0f0; margin-bottom: .1rem; }
+        .related-card .info .author { font-size: .7rem; color: #888; }
+
+        @media (max-width: 600px) {
+            .book-header { flex-direction: column; align-items: center; text-align: center; }
+            .book-header .meta .stats-row { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('podcasts-audiobooks.index') }}" class="logo">SoundShelf</a>
+        <div class="nav-links">
+            <a href="{{ url_for('podcasts-audiobooks.index') }}">Discover</a>
+            <a href="{{ url_for('podcasts-audiobooks.podcasts_list') }}">Podcasts</a>
+            <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}">Audiobooks</a>
+            {% if user %}
+            <a href="{{ url_for('podcasts-audiobooks.library_page') }}">Library</a>
+            {% else %}
+            <a href="{{ url_for('podcasts-audiobooks.login_page') }}">Sign In</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="{{ url_for('podcasts-audiobooks.audiobooks_list') }}" class="back-link">&larr; All Audiobooks</a>
+
+        <div class="book-header">
+            <div class="cover">{{ audiobook.title }}</div>
+            <div class="meta">
+                <h1>{{ audiobook.title }}</h1>
+                <div class="author">by {{ audiobook.author }}</div>
+                <div class="narrator">Narrated by {{ audiobook.narrator }}</div>
+                <div class="desc">{{ audiobook.description }}</div>
+                <div class="stats-row">
+                    <span>{{ audiobook.rating }}/5 rating</span>
+                    <span>{{ audiobook.duration_hours }} hours</span>
+                    <span>{{ audiobook.chapters }} chapters</span>
+                    <span id="like-count">{{ audiobook.liked_by|length if audiobook.liked_by else 0 }} likes</span>
+                </div>
+                <span class="price-tag">${{ "%.2f"|format(audiobook.price) }}</span>
+                <span class="genre-badge">{{ audiobook.genre }}</span>
+
+                <div class="btn-row">
+                    {% if purchased %}
+                    <button class="btn-purchase owned" disabled>Purchased</button>
+                    {% else %}
+                    <button id="btn-purchase" class="btn-purchase buy" onclick="purchaseAudiobook({{ audiobook.id }})">
+                        Buy for ${{ "%.2f"|format(audiobook.price) }}
+                    </button>
+                    {% endif %}
+                    <button id="btn-like" class="btn-like {{ 'active' if liked else '' }}" onclick="toggleLike({{ audiobook.id }})">
+                        {{ 'Liked' if liked else 'Like' }}
+                    </button>
+                </div>
+                <div id="action-msg"></div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Reviews ({{ reviews|length }})</h2>
+        {% if reviews %}
+        <div class="review-list">
+            {% for r in reviews %}
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="reviewer">User {{ r.user_id }}</span>
+                    <span class="review-rating">{{ r.rating }}/5</span>
+                </div>
+                <div class="review-text">{{ r.text }}</div>
+                <div class="review-date">{{ r.date }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if user %}
+        <div class="review-form">
+            <h3>Write a Review</h3>
+            <div class="rating-slider">
+                <label for="review-rating">Rating:</label>
+                <input type="range" id="review-rating" min="1" max="5" step="0.5" value="4">
+                <span class="rating-val" id="rating-display">4</span>
+            </div>
+            <textarea id="review-text" placeholder="Share your thoughts about this audiobook..."></textarea>
+            <button onclick="submitReview({{ audiobook.id }}, 'audiobook')">Post Review</button>
+        </div>
+        {% endif %}
+
+        {% if related %}
+        <h2 class="section-title">More in {{ audiobook.genre }}</h2>
+        <div class="related-grid">
+            {% for r in related %}
+            <a href="{{ url_for('podcasts-audiobooks.audiobook_detail', audiobook_id=r.id) }}" class="related-card" style="text-decoration:none;color:inherit;">
+                <div class="cover">{{ r.title }}</div>
+                <div class="info">
+                    <h4>{{ r.title }}</h4>
+                    <div class="author">{{ r.author }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    // Rating slider display
+    const ratingSlider = document.getElementById('review-rating');
+    if (ratingSlider) {
+        ratingSlider.addEventListener('input', function() {
+            document.getElementById('rating-display').textContent = this.value;
+        });
+    }
+
+    function purchaseAudiobook(audiobookId) {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/audiobooks/${audiobookId}/purchase`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('btn-purchase');
+            const msg = document.getElementById('action-msg');
+            if (data.action === 'purchased') {
+                btn.textContent = 'Purchased';
+                btn.className = 'btn-purchase owned';
+                btn.disabled = true;
+                msg.textContent = 'Purchase successful! Added to your library.';
+            } else if (data.error) {
+                msg.textContent = data.error;
+                msg.style.color = '#ef4444';
+            }
+            msg.style.display = 'block';
+        })
+        .catch(() => {
+            window.location.href = '{{ url_for("podcasts-audiobooks.login_page") }}';
+        });
+    }
+
+    function toggleLike(audiobookId) {
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/audiobooks/${audiobookId}/like`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('btn-like');
+            const msg = document.getElementById('action-msg');
+            if (data.action === 'liked') {
+                btn.textContent = 'Liked';
+                btn.classList.add('active');
+                msg.textContent = 'Audiobook liked!';
+            } else {
+                btn.textContent = 'Like';
+                btn.classList.remove('active');
+                msg.textContent = 'Like removed.';
+            }
+            document.getElementById('like-count').textContent = data.likes + ' likes';
+            msg.style.color = '#10b981';
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        })
+        .catch(() => {
+            window.location.href = '{{ url_for("podcasts-audiobooks.login_page") }}';
+        });
+    }
+
+    function submitReview(itemId, itemType) {
+        const rating = parseFloat(document.getElementById('review-rating').value);
+        const text = document.getElementById('review-text').value;
+        fetch(`{{ url_for('podcasts-audiobooks.index') }}api/reviews`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_type: itemType, item_id: itemId, rating: rating, text: text})
+        })
+        .then(r => r.json())
+        .then(data => {
+            const msg = document.getElementById('action-msg');
+            if (data.id) {
+                msg.textContent = 'Review posted!';
+                msg.style.color = '#10b981';
+                document.getElementById('review-text').value = '';
+            } else {
+                msg.textContent = data.error || 'Error posting review';
+                msg.style.color = '#ef4444';
+            }
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        });
+    }
+    </script>
+</body>
+</html>

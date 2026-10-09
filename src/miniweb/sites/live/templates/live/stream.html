@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stream.title }} - PulseLive</title>
+    <link rel="stylesheet" href="/static/twitch.css">
+    <style>
+        /* align-items:flex-start so the player column keeps its own (aspect-ratio)
+           height and never stretches to match the tall chat column as messages
+           accumulate. */
+        .tw-stream-layout { display: flex; flex: 1; min-width: 0; align-items: flex-start; }
+        .tw-chat-col { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; height: calc(100vh - var(--topnav-h)); position: sticky; top: var(--topnav-h); }
+        .tw-chat-col .tw-chat { flex: 1; min-height: 0; }
+        /* min-height:0 lets the message list actually scroll inside its fixed-height
+           column instead of expanding it (and, with the row no longer stretching,
+           the video player can't grow vertically as chat fills up). */
+        .tw-chat-col .tw-chat-msgs { min-height: 0; }
+        /* Pin the player to its 16:9 box — never grow/shrink via flex. */
+        .tw-stream-main > .tw-player { flex: 0 0 auto; }
+        .tw-player.playing .poster { cursor: default; }
+        .wave-bars { display: none; position: absolute; bottom: 1.4rem; left: 50%; transform: translateX(-50%); gap: 4px; align-items: flex-end; height: 54px; z-index: 2; }
+        .tw-player.playing .wave-bars { display: flex; }
+        .wave-bars b { width: 4px; background: #fff; border-radius: 2px; animation: wv 1.2s ease-in-out infinite; }
+        .wave-bars b:nth-child(2){animation-delay:.15s} .wave-bars b:nth-child(3){animation-delay:.3s}
+        .wave-bars b:nth-child(4){animation-delay:.45s} .wave-bars b:nth-child(5){animation-delay:.6s}
+        .wave-bars b:nth-child(6){animation-delay:.75s} .wave-bars b:nth-child(7){animation-delay:.9s}
+        @keyframes wv { 0%,100%{height:8px;opacity:.5} 50%{height:46px;opacity:1} }
+        .elapsed { display: none; position: absolute; bottom: .7rem; right: 1rem; font-size: .74rem; color: #ddd; font-variant-numeric: tabular-nums; z-index: 3; }
+        .tw-player.playing .elapsed { display: block; }
+        .report-box { background: var(--surface); border-radius: .5rem; padding: 1rem 1.2rem; margin-top: 1rem; }
+        .report-box select, .report-box input { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: .45rem .55rem; border-radius: .28rem; font-size: .82rem; outline: none; }
+        .tip-feedback { font-size: .75rem; margin-top: .35rem; min-height: 1em; }
+        @media (max-width: 1000px) { .tw-chat-col { width: 300px; } }
+        @media (max-width: 820px) { .tw-stream-layout { flex-direction: column; } .tw-chat-col { width: 100%; height: 360px; position: static; border-left: none; border-top: 1px solid var(--border); } }
+    </style>
+</head>
+<body>
+    {% include "live/_topnav.html" %}
+
+    <div class="tw-shell">
+        {% include "live/_sidebar.html" %}
+
+        <div class="tw-stream-layout">
+            <main class="tw-stream-main">
+                <!-- Player -->
+                <div class="tw-player" id="videoPlayer" onclick="startPlayback()">
+                    <div class="poster" style="background: {{ stream.thumb_css }};">
+                        <span class="play-glyph">&#9654;</span>
+                    </div>
+                    <span class="status-badge {{ stream.status }}">{% if stream.status == 'live' %}LIVE{% else %}VOD{% endif %}</span>
+                    {% if stream.status == 'live' %}
+                    <span class="uptime-badge" title="Stream uptime"><span class="tw-dot"></span> <span id="uptimeText">0:00:00</span></span>
+                    {% endif %}
+                    <div class="wave-bars"><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+                    <div class="elapsed" id="elapsed">0:00</div>
+                </div>
+
+                <div class="tw-under">
+                    <!-- Seek bar: click/drag to scrub. Live defaults to the live edge (100%). -->
+                    <div class="tw-seek">
+                        <span class="t" id="seek-current">0:00</span>
+                        <input type="range" id="seek-bar" min="0" max="100" value="100" step="1"
+                               oninput="seekTo(parseInt(this.value, 10))" aria-label="Seek">
+                        <span class="t" id="seek-total"></span>
+                        <button class="tw-btn tw-btn-sm" id="go-live-btn" onclick="goLive()" style="display:none;background:var(--red);">&#9679; GO LIVE</button>
+                    </div>
+                    <div class="tw-jump">
+                        <label for="jump-input">Jump to</label>
+                        <input type="text" id="jump-input" placeholder="mm:ss" autocomplete="off"
+                               onkeydown="if(event.key==='Enter'){jumpToTimestamp();}">
+                        <button class="tw-btn-2 tw-btn-sm" onclick="jumpToTimestamp()">Go</button>
+                    </div>
+
+                    <!-- Channel info bar -->
+                    <div class="tw-info-bar">
+                        <a href="{{ url_for('live.channel_page', user_id=stream.channel_id) }}">
+                            <span class="tw-info-av" style="background: {{ streamer.avatar_color if streamer else '#9147ff' }};">{{ streamer.display_name[0]|upper if streamer else '?' }}</span>
+                        </a>
+                        <div class="tw-info-main">
+                            <div class="tw-info-chan">
+                                <a href="{{ url_for('live.channel_page', user_id=stream.channel_id) }}">{{ streamer.display_name if streamer else 'Unknown' }}</a>
+                                {% if streamer and streamer.is_partner %}<span style="color:var(--purple-2);font-size:.75rem;" title="Partner">&#10003;</span>{% endif %}
+                            </div>
+                            <div class="tw-info-title">{{ stream.title }}</div>
+                            <a class="tw-info-cat" href="{{ url_for('live.index', category=stream.category) }}">{{ stream.category }}</a>
+                            {% if stream.tags %}
+                            <div class="tw-pills">{% for tag in stream.tags[:5] %}<span class="tw-pill">{{ tag }}</span>{% endfor %}</div>
+                            {% endif %}
+                        </div>
+                        <div class="tw-info-actions">
+                            <button class="tw-btn" id="followBtn" onclick="toggleFollow()">
+                                <span id="followIcon">{% if is_following %}&#10003;{% else %}&#9829;{% endif %}</span>
+                                <span id="followLabel">{% if is_following %}Following{% else %}Follow{% endif %}</span>
+                            </button>
+                            <button class="tw-btn-2" onclick="navigator.clipboard.writeText(window.location.href);this.querySelector('span').textContent='Copied!';var b=this;setTimeout(function(){b.querySelector('span').textContent='Share'},1500)"><span>Share</span></button>
+                        </div>
+                    </div>
+
+                    <div class="tw-stat-row">
+                        <div class="tw-stat"><div class="v">{{ fmt_count(stream.peak_viewers) }}</div><div class="l">Peak Viewers</div></div>
+                        <div class="tw-stat"><div class="v">{{ fmt_count(stream.average_viewers) }}</div><div class="l">Avg Viewers</div></div>
+                        <div class="tw-stat"><div class="v">{{ fmt_count(stream.total_views) }}</div><div class="l">Total Views</div></div>
+                        {% if stream.status == 'live' %}
+                        <div class="tw-stat"><div class="v" id="uptimeStat">0:00:00</div><div class="l">Uptime</div></div>
+                        {% else %}
+                        <div class="tw-stat"><div class="v">{{ stream.duration_minutes }}m</div><div class="l">Duration</div></div>
+                        {% endif %}
+                    </div>
+
+                    <!-- About -->
+                    <div class="tw-about">
+                        <h3>About {{ streamer.display_name if streamer else 'this channel' }}</h3>
+                        <p>{{ streamer.bio if streamer and streamer.bio else 'No channel description yet.' }}</p>
+                        {% if streamer %}
+                        <p style="margin-top:.6rem;color:var(--text-dim);font-size:.82rem;">{{ "{:,}".format(streamer.subscriber_count) }} subscribers{% if streamer.is_partner %} &middot; Partner{% elif streamer.is_affiliate %} &middot; Affiliate{% endif %}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Report -->
+                    <div class="report-box">
+                        <div style="font-weight:700;font-size:.9rem;margin-bottom:.6rem;">Report Stream</div>
+                        {% if logged_in %}
+                        <form id="reportForm" onsubmit="submitReport(event)" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+                            <select id="reportReason">
+                                <option value="harassment">Harassment</option>
+                                <option value="spam">Spam</option>
+                                <option value="hate_speech">Hate speech</option>
+                                <option value="nudity">Nudity</option>
+                                <option value="violence">Violence</option>
+                                <option value="misinformation">Misinformation</option>
+                                <option value="copyright">Copyright</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <input type="text" id="reportDescription" placeholder="Describe the issue (optional)" style="flex:1;min-width:180px;">
+                            <button type="submit" class="tw-btn tw-btn-sm" style="background:var(--red);">Report</button>
+                            <div id="reportFeedback" style="width:100%;font-size:.75rem;min-height:1em;"></div>
+                        </form>
+                        {% else %}
+                        <p style="color:var(--text-dim);font-size:.83rem;"><a href="{{ url_for('live.login_page') }}" style="color:var(--purple-2);">Log in</a> to report this stream</p>
+                        {% endif %}
+                    </div>
+
+                    {% if ad %}
+                    <a class="tw-ad" href="/sites/{{ ad.site }}/" style="margin-top:1.2rem;margin-bottom:0;">
+                        <div class="l"><span><span class="label">Ad</span><span class="brand">{{ ad.brand }}</span></span><span class="tag">{{ ad.tagline }}</span></div>
+                        <span class="tw-btn tw-btn-sm">Visit {{ ad.domain }} &rarr;</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </main>
+
+            <!-- Chat column -->
+            <div class="tw-chat-col">
+                <div class="tw-chat">
+                    <div class="tw-chat-head">Stream Chat {% if stream.status == 'live' %}<span class="live-badge">LIVE</span>{% endif %}</div>
+                    <div class="tw-chat-msgs" id="chatMessages"></div>
+                    <div class="tw-chat-input">
+                        <form id="chatForm" onsubmit="sendChat(event)">
+                            <div class="box">
+                                <input type="text" id="chatMessage" placeholder="Send a message" autocomplete="off">
+                                <button type="submit" class="tw-btn tw-btn-sm">Chat</button>
+                            </div>
+                        </form>
+                        {% if logged_in %}
+                        <div class="bottom" style="margin-top:.6rem;">
+                            <div class="tw-cheer-row">
+                                <select id="tipAmount" title="Cheer amount (channel points)">
+                                    <option value="100">Cheer 100</option>
+                                    <option value="500">Cheer 500</option>
+                                    <option value="1000">Cheer 1,000</option>
+                                    <option value="5000">Cheer 5,000</option>
+                                </select>
+                                <button type="button" class="tw-btn-2 tw-btn-sm" onclick="sendTip()">Cheer</button>
+                            </div>
+                        </div>
+                        <div class="tip-feedback" id="tipFeedback"></div>
+                        {% else %}
+                        <div class="bottom" style="margin-top:.5rem;"><span class="hint"><a href="{{ url_for('live.login_page') }}">Log in</a> to cheer and post as yourself</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login-required modal -->
+    <div class="tw-modal-bg" id="loginModal">
+        <div class="tw-modal">
+            <h3>Log in to chat</h3>
+            <p>You need to be logged in to send messages in Stream Chat.</p>
+            <div class="acts">
+                <button type="button" class="tw-btn-2" onclick="document.getElementById('loginModal').classList.remove('show')">Not now</button>
+                <a class="tw-btn" href="{{ url_for('live.login_page') }}">Log In</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var chatBox   = document.getElementById('chatMessages');
+        var streamId  = {{ stream.id | tojson }};
+        var chatCount = {{ chat_count }};
+        var loggedIn  = {{ logged_in | tojson }};
+        var nextOffset = 0;
+        var seenIds = {};
+
+        function escapeHtml(t) { var d = document.createElement('div'); d.appendChild(document.createTextNode(t)); return d.innerHTML; }
+        function nameHue(name) { var h = 0; for (var i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i); return Math.abs(h) % 360; }
+
+        /* ---- Live stream uptime clock (ticks up every second) ---------- */
+        var uptimeSec = {{ uptime_seconds | tojson }};
+        if (uptimeSec !== null) {
+            var upText = document.getElementById('uptimeText');
+            var upStat = document.getElementById('uptimeStat');
+            var fmtUptime = function(s) {
+                var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+                return h + ':' + (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+            };
+            (function tickUptime() {
+                var t = fmtUptime(uptimeSec);
+                if (upText) upText.textContent = t;
+                if (upStat) upStat.textContent = t;
+                uptimeSec++;
+                setTimeout(tickUptime, 1000);
+            })();
+        }
+
+        function appendMsg(msg) {
+            var div = document.createElement('div');
+            div.className = 'tw-msg' + (msg.tip_amount ? ' cheer' : '');
+            var badges = '';
+            var bl = msg.badges;
+            if (typeof bl === 'string') { try { bl = JSON.parse(bl); } catch(e) { bl = []; } }
+            if (bl && bl.length) { for (var i = 0; i < bl.length; i++) { badges += '<span class="badge ' + bl[i] + '">' + bl[i].substring(0,3) + '</span>'; } }
+            var ts = (msg.timestamp || '').substring(11, 16);
+            div.innerHTML = (ts ? '<span class="ts">' + ts + '</span>' : '') + badges +
+                '<span class="u" style="color:hsl(' + nameHue(msg.username) + ',70%,66%)">' + escapeHtml(msg.username) + '</span>: ' +
+                '<span class="t">' + escapeHtml(msg.message) + '</span>';
+            chatBox.appendChild(div);
+            while (chatBox.children.length > 80) chatBox.removeChild(chatBox.firstChild);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        /* Chat pace scales with viewer count: busier => faster + bigger bursts. */
+        var streamViewers = {{ stream.average_viewers or 0 }};
+        function chatPace(viewers) {
+            var v = Math.max(1, viewers);
+            var perSec = Math.min(6, 0.25 + Math.sqrt(v) / 22);
+            var delay  = (1000 / perSec) * (0.4 + Math.random() * 1.9);
+            delay = Math.max(250, Math.min(6000, delay));
+            var batch = 1, r = Math.random();
+            if (v > 5000 && r > 0.45) batch = 3;
+            else if (v > 1000 && r > 0.55) batch = 2;
+            else if (v > 200 && r > 0.75) batch = 2;
+            return { delay: delay, batch: batch };
+        }
+
+        function fetchChat() {
+            var pace = chatPace(streamViewers);
+            var url = '{{ url_for("live.api_chat_live") }}';
+            if (chatCount > 0) url += '?stream_id=' + encodeURIComponent(streamId) + '&offset=' + nextOffset + '&limit=' + pace.batch;
+            else url += '?offset=' + nextOffset + '&limit=' + pace.batch;
+            fetch(url).then(function(r){ return r.json(); }).then(function(data){
+                if (data.messages && data.messages.length) {
+                    for (var i = 0; i < data.messages.length; i++) {
+                        var m = data.messages[i];
+                        if (m.id && seenIds[m.id]) continue;
+                        if (m.id) seenIds[m.id] = true;
+                        appendMsg(m);
+                    }
+                    nextOffset = data.next_offset;
+                }
+            }).catch(function(){}).finally(function(){ setTimeout(fetchChat, pace.delay); });
+        }
+        fetchChat();
+
+        var chatInput = document.getElementById('chatMessage');
+        window.sendChat = function(e) {
+            e.preventDefault();
+            var text = chatInput.value.trim();
+            if (!text) return;
+            if (!loggedIn) { document.getElementById('loginModal').classList.add('show'); return; }
+            chatInput.value = '';
+            fetch('{{ url_for("live.api_stream_chat_post", stream_id=stream.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: text})
+            }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+              .then(function(res){
+                  if (res.ok && res.data.id) { seenIds[res.data.id] = true; appendMsg(res.data); }
+                  else if (res.data && res.data.error) { document.getElementById('loginModal').classList.add('show'); }
+              }).catch(function(){});
+        };
+
+        /* Follow toggle (login-gated) */
+        window.toggleFollow = function() {
+            if (!loggedIn) { document.getElementById('loginModal').classList.add('show'); return; }
+            fetch('{{ url_for("live.api_channel_follow", user_id=stream.channel_id) }}', { method: 'POST', headers: {'Content-Type': 'application/json'} })
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    var following = d.status === 'followed';
+                    document.getElementById('followLabel').textContent = following ? 'Following' : 'Follow';
+                    document.getElementById('followIcon').innerHTML = following ? '&#10003;' : '&#9829;';
+                }).catch(function(){});
+        };
+
+        {% if logged_in %}
+        window.sendTip = function() {
+            var amount = parseInt(document.getElementById('tipAmount').value, 10);
+            var note = chatInput.value.trim();
+            var feedback = document.getElementById('tipFeedback');
+            fetch('{{ url_for("live.api_stream_tip", stream_id=stream.id) }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({amount: amount, message: note})
+            }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+              .then(function(res){
+                  if (res.ok && res.data.id) {
+                      chatInput.value = ''; seenIds[res.data.id] = true; appendMsg(res.data);
+                      feedback.style.color = 'var(--purple-2)';
+                      feedback.textContent = 'Cheered ' + amount + '! Balance: ' + res.data.remaining_balance;
+                  } else { feedback.style.color = 'var(--red)'; feedback.textContent = res.data.error || 'Could not send cheer.'; }
+              }).catch(function(){ feedback.style.color = 'var(--red)'; feedback.textContent = 'Could not send cheer.'; });
+        };
+
+        window.submitReport = function(e) {
+            e.preventDefault();
+            var reason = document.getElementById('reportReason').value;
+            var description = document.getElementById('reportDescription').value.trim();
+            var feedback = document.getElementById('reportFeedback');
+            fetch('{{ url_for("live.api_report") }}', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target_type: 'stream', target_id: streamId, reason: reason, description: description})
+            }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+              .then(function(res){
+                  if (res.ok) { feedback.style.color = '#00e676'; feedback.textContent = 'Report submitted. Thank you.'; document.getElementById('reportDescription').value = ''; }
+                  else { feedback.style.color = 'var(--red)'; feedback.textContent = res.data.error || 'Could not submit report.'; }
+              }).catch(function(){ feedback.style.color = 'var(--red)'; feedback.textContent = 'Could not submit report.'; });
+        };
+        {% endif %}
+
+        /* ---- Playback / seek ------------------------------------------- */
+        var playing = false;
+        var isLive  = {{ (stream.status == 'live') | tojson }};
+        var DVR_WINDOW = 2 * 60 * 60;
+        var totalSec = isLive ? DVR_WINDOW : ({{ stream.duration_minutes * 60 }} || 0);
+        var elapsedSec = isLive ? totalSec : 0;
+        var elapsedEl = document.getElementById('elapsed');
+        var seekBar   = document.getElementById('seek-bar');
+        var goLiveBtn = document.getElementById('go-live-btn');
+        var totalEl   = document.getElementById('seek-total');
+        var curEl     = document.getElementById('seek-current');
+        seekBar.max = totalSec;
+
+        function fmtTime(sec) { sec = Math.max(0, Math.floor(sec)); var m = Math.floor(sec/60), s = sec%60; return m + ':' + (s<10?'0':'') + s; }
+        function renderTime() {
+            seekBar.value = elapsedSec;
+            if (isLive) {
+                var atEdge = elapsedSec >= totalSec;
+                totalEl.innerHTML = '<span style="color:var(--red);font-weight:700;">LIVE</span>';
+                goLiveBtn.style.display = atEdge ? 'none' : '';
+                if (atEdge) { curEl.innerHTML = '<span style="color:var(--red);font-weight:700;">&#9679; LIVE</span>'; elapsedEl.innerHTML = '<span style="color:var(--red);">&#9679; LIVE</span>'; }
+                else { var behind = totalSec - elapsedSec; curEl.textContent = '-' + fmtTime(behind); elapsedEl.textContent = '-' + fmtTime(behind) + ' behind'; }
+            } else { var t = fmtTime(elapsedSec); elapsedEl.textContent = t; curEl.textContent = t; totalEl.textContent = fmtTime(totalSec); }
+        }
+        renderTime();
+
+        window.startPlayback = function() {
+            if (playing) return;
+            playing = true;
+            document.getElementById('videoPlayer').classList.add('playing');
+            setInterval(function(){ if (elapsedSec < totalSec) { elapsedSec++; renderTime(); } }, 1000);
+        };
+        window.goLive = function() { elapsedSec = totalSec; if (!playing) startPlayback(); renderTime(); };
+        window.seekTo = function(sec) { elapsedSec = Math.max(0, Math.min(totalSec, sec | 0)); if (!playing) startPlayback(); renderTime(); };
+        window.jumpToTimestamp = function() {
+            var raw = document.getElementById('jump-input').value.trim();
+            if (!raw) return;
+            var sec = -1;
+            if (/^\d+:\d{1,2}$/.test(raw)) { var p = raw.split(':'); sec = parseInt(p[0],10)*60 + parseInt(p[1],10); }
+            else if (/^\d+$/.test(raw)) { sec = parseInt(raw,10); }
+            if (sec >= 0) seekTo(sec);
+        };
+    })();
+    </script>
+</body>
+</html>

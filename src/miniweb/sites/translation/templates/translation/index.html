@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguaBridge Translate</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Google Sans', Roboto, -apple-system, sans-serif; background: #f8f9fa; color: #202124; }
+
+        .header { background: #fff; padding: 12px 24px; display: flex; align-items: center; border-bottom: 1px solid #dadce0; }
+        .header .logo { font-size: 22px; color: #5f6368; text-decoration: none; }
+        .header .logo b { color: #4285f4; }
+        .header nav { margin-left: 32px; display: flex; gap: 4px; }
+        .header nav a { font-size: 14px; color: #5f6368; text-decoration: none; padding: 8px 16px; border-radius: 8px; }
+        .header nav a:hover { background: #f1f3f4; }
+        .header nav a.active { color: #1a73e8; background: #e8f0fe; }
+        .header .spacer { flex: 1; }
+        .header .user-area { font-size: 13px; }
+        .header .user-area a { color: #1a73e8; text-decoration: none; margin-left: 12px; }
+
+        .lang-bar { max-width: 900px; margin: 24px auto 0; display: flex; align-items: center; background: #fff; border-radius: 8px 8px 0 0; border: 1px solid #dadce0; border-bottom: none; }
+        .lang-side { flex: 1; display: flex; padding: 0 8px; }
+        .lang-side select { border: none; background: none; font-size: 14px; font-weight: 500; color: #1a73e8; padding: 12px 8px; cursor: pointer; outline: none; min-width: 120px; }
+        .lang-swap { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #5f6368; border: none; background: none; font-size: 20px; border-radius: 50%; }
+        .lang-swap:hover { background: #f1f3f4; }
+
+        .translate-box { max-width: 900px; margin: 0 auto; display: flex; background: #fff; border: 1px solid #dadce0; border-radius: 0 0 8px 8px; min-height: 200px; }
+        .input-side, .output-side { flex: 1; padding: 16px; position: relative; }
+        .input-side { border-right: 1px solid #dadce0; }
+        .input-side textarea { width: 100%; height: 160px; border: none; outline: none; font-size: 20px; font-family: inherit; resize: none; color: #202124; background: transparent; }
+        .input-side textarea::placeholder { color: #9aa0a6; }
+        .input-side .char-count { position: absolute; bottom: 8px; right: 16px; font-size: 12px; color: #9aa0a6; }
+        .input-side .clear-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; color: #5f6368; font-size: 20px; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: none; align-items: center; justify-content: center; }
+        .input-side .clear-btn:hover { background: #f1f3f4; }
+        .output-side { background: #f5f5f5; border-radius: 0 0 8px 0; }
+        .output-text { font-size: 20px; color: #202124; min-height: 120px; line-height: 1.5; white-space: pre-wrap; }
+        .output-text.loading { color: #9aa0a6; }
+        .output-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .output-actions button { background: none; border: none; color: #5f6368; cursor: pointer; padding: 6px; border-radius: 50%; font-size: 16px; }
+        .output-actions button:hover { background: #e8eaed; }
+
+        .history-section { max-width: 900px; margin: 24px auto; }
+        .history-section h3 { font-size: 14px; color: #5f6368; margin-bottom: 12px; font-weight: 500; }
+        .history-item { background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; gap: 16px; cursor: pointer; }
+        .history-item:hover { background: #f8f9fa; }
+        .history-item .src { flex: 1; font-size: 14px; color: #5f6368; }
+        .history-item .tgt { flex: 1; font-size: 14px; color: #202124; }
+        .history-item .meta { font-size: 11px; color: #9aa0a6; white-space: nowrap; }
+
+        @media (max-width: 600px) {
+            .translate-box { flex-direction: column; }
+            .input-side { border-right: none; border-bottom: 1px solid #dadce0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="{{ url_for('translation.index') }}" class="logo"><b>Lingua</b>Bridge</a>
+        <nav>
+            <a href="{{ url_for('translation.index') }}" class="active">Translate</a>
+            <a href="{{ url_for('translation.history_page') }}">History</a>
+            <a href="{{ url_for('translation.saved_page') }}">Saved</a>
+            <a href="{{ url_for('translation.settings_page') }}">Settings</a>
+        </nav>
+        <div class="spacer"></div>
+        <div class="user-area">
+            {% if logged_in %}
+            <a href="{{ url_for('translation.logout') }}">Sign out</a>
+            {% else %}
+            <a href="{{ url_for('translation.login_page') }}">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+
+    <div class="lang-bar">
+        <div class="lang-side">
+            <select id="source-lang">
+                <option value="auto">Detect language</option>
+                {% for lang in languages %}
+                <option value="{{ lang.code }}" {{ 'selected' if lang.code == 'en' }}>{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="lang-swap" onclick="swapLangs()" title="Swap languages">&#8644;</button>
+        <div class="lang-side">
+            <select id="target-lang">
+                {% for lang in languages %}
+                <option value="{{ lang.code }}" {{ 'selected' if lang.code == 'es' }}>{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="translate-box">
+        <div class="input-side">
+            <button class="clear-btn" id="clearBtn" onclick="clearInput()" title="Clear">&times;</button>
+            <textarea id="sourceText" placeholder="Enter text" oninput="onInput()"></textarea>
+            <div class="char-count"><span id="charCount">0</span> / 5,000</div>
+        </div>
+        <div class="output-side">
+            <div class="output-text" id="outputText">Translation</div>
+            <div class="output-actions">
+                <button onclick="copyTranslation()" title="Copy">&#128203;</button>
+                <button onclick="saveTranslation()" title="Save">&#9734;</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        {% set ad_format = 'banner' %}
+        {% set ads = product_ads(4, seed='translation-index') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+    {% if history %}
+    <div class="history-section">
+        <h3>Recent translations</h3>
+        {% for h in history[:5] %}
+        <div class="history-item" onclick="loadHistory(this)" data-text="{{ h.source_text|e }}" data-src="{{ h.source_lang }}" data-tgt="{{ h.target_lang }}">
+            <div class="src">{{ h.source_text[:60] }}{% if h.source_text|length > 60 %}...{% endif %}</div>
+            <div class="tgt">{{ h.translated_text[:60] }}{% if h.translated_text|length > 60 %}...{% endif %}</div>
+            <div class="meta">{{ h.source_lang|upper }} &rarr; {{ h.target_lang|upper }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="history-section">
+        {% set ad_format = 'native' %}
+        {% set ads = product_ads(4, seed='translation-ad2') %}
+        {% include "ads/_product_ads.html" %}
+    </div>
+
+<script>
+var debounceTimer = null, lastText = '';
+
+function onInput() {
+    var text = document.getElementById('sourceText').value;
+    document.getElementById('charCount').textContent = text.length;
+    document.getElementById('clearBtn').style.display = text ? 'flex' : 'none';
+    if (text === lastText) return;
+    lastText = text;
+    clearTimeout(debounceTimer);
+    if (!text.trim()) {
+        document.getElementById('outputText').textContent = 'Translation';
+        document.getElementById('outputText').classList.remove('loading');
+        return;
+    }
+    document.getElementById('outputText').textContent = 'Translating...';
+    document.getElementById('outputText').classList.add('loading');
+    debounceTimer = setTimeout(function() { doTranslate(text); }, 800);
+}
+
+function doTranslate(text) {
+    var src = document.getElementById('source-lang').value;
+    var tgt = document.getElementById('target-lang').value;
+    fetch('{{ url_for("translation.api_translate") }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, source: src === 'auto' ? '' : src, target: tgt})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var out = document.getElementById('outputText');
+        out.textContent = data.translated_text || data.error || 'Translation failed';
+        out.classList.remove('loading');
+    })
+    .catch(function() {
+        document.getElementById('outputText').textContent = 'Translation error';
+        document.getElementById('outputText').classList.remove('loading');
+    });
+}
+
+function swapLangs() {
+    var src = document.getElementById('source-lang'), tgt = document.getElementById('target-lang');
+    if (src.value === 'auto') return;
+    var tmp = src.value; src.value = tgt.value; tgt.value = tmp;
+    var outText = document.getElementById('outputText').textContent;
+    if (outText && outText !== 'Translation' && outText !== 'Translating...') {
+        document.getElementById('sourceText').value = outText;
+        onInput();
+    }
+}
+
+function clearInput() {
+    document.getElementById('sourceText').value = '';
+    document.getElementById('outputText').textContent = 'Translation';
+    document.getElementById('charCount').textContent = '0';
+    document.getElementById('clearBtn').style.display = 'none';
+    lastText = '';
+}
+
+function copyTranslation() {
+    var text = document.getElementById('outputText').textContent;
+    if (text && text !== 'Translation') {
+        navigator.clipboard.writeText(text);
+        var btn = document.querySelector('[onclick="copyTranslation()"]');
+        var orig = btn.innerHTML;
+        btn.textContent = 'Copied!';
+        setTimeout(function(){ btn.innerHTML = orig; }, 1500);
+    }
+}
+
+function saveTranslation() {
+    var src = document.getElementById('sourceText').value;
+    var out = document.getElementById('outputText').textContent;
+    if (!src || out === 'Translation') return;
+    var btn = document.querySelector('[onclick="saveTranslation()"]');
+    fetch('{{ url_for("translation.api_saved_create") }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({source_text: src, translated_text: out,
+            source_lang: document.getElementById('source-lang').value,
+            target_lang: document.getElementById('target-lang').value})
+    }).then(function(){
+        btn.innerHTML = '&#9733;';
+        btn.style.color = '#f59e0b';
+        setTimeout(function(){ btn.innerHTML = '&#9734;'; btn.style.color = ''; }, 2000);
+    });
+}
+
+function loadHistory(el) {
+    document.getElementById('sourceText').value = el.dataset.text;
+    document.getElementById('source-lang').value = el.dataset.src;
+    document.getElementById('target-lang').value = el.dataset.tgt;
+    onInput();
+}
+
+document.getElementById('source-lang').addEventListener('change', function() { if (lastText) doTranslate(lastText); });
+document.getElementById('target-lang').addEventListener('change', function() { if (lastText) doTranslate(lastText); });
+</script>
+</body>
+</html>

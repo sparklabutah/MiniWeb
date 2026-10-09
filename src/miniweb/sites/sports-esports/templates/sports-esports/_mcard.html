@@ -1,0 +1,26 @@
+{# One match card. Expects loop var `m` = enriched match. #}
+{% set sched = m.status == 'scheduled' %}
+{% set hwin = m.status == 'final' and m.home_score > m.away_score %}
+{% set awin = m.status == 'final' and m.away_score > m.home_score %}
+<a class="mcard" href="{{ url_for('sports-esports.match_detail', match_id=m.id) }}">
+    <div class="mc-league">{{ m.league.abbreviation }}</div>
+    <div class="mc-teams">
+        <div class="mc-row {{ 'lose' if hwin }}">
+            <span class="dot" style="background:{{ m.away_team.logo_color }}"></span>
+            <span class="nm">{{ m.away_team.name }}</span>
+            <span class="rec">({{ m.away_team.wins }}-{{ m.away_team.losses }})</span>
+            <span class="sc">{% if sched %}&mdash;{% else %}{{ m.away_score }}{% endif %}</span>
+        </div>
+        <div class="mc-row {{ 'lose' if awin }}">
+            <span class="dot" style="background:{{ m.home_team.logo_color }}"></span>
+            <span class="nm">{{ m.home_team.name }}</span>
+            <span class="rec">({{ m.home_team.wins }}-{{ m.home_team.losses }})</span>
+            <span class="sc">{% if sched %}&mdash;{% else %}{{ m.home_score }}{% endif %}</span>
+        </div>
+    </div>
+    <div class="mc-status">
+        {% if m.status == 'live' %}<span class="live">&#9679; LIVE</span>{% if m.clock %}<br>{{ m.clock }}{% endif %}
+        {% elif m.status == 'final' %}<span class="final">Final</span><br><span class="hl-cue">Highlights &rsaquo;</span>
+        {% else %}{{ m.date[5:] }}<br>{{ m.time }}{% endif %}
+    </div>
+</a>

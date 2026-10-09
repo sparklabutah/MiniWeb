@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Appointment - Lakeport Government Services</title>
+    <link rel="stylesheet" href="/static/lakeport.css">
+</head>
+<body>
+    {% set active_nav = 'appointments' %}
+    {% include "tax-filing-dmv-permits/_chrome.html" %}
+
+    <div class="container">
+        <div class="form-card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0">Book a DMV Appointment</h2>
+                <a href="{{ url_for('tax-filing-dmv-permits.my_appointments_page') }}" style="font-weight:600;color:#1b3a4b">My Appointments &rarr;</a>
+            </div>
+            <div id="success-msg" class="success-msg"></div>
+            <form id="appt-form" onsubmit="return bookAppt(event)">
+                <div class="form-group"><label for="service">Service</label>
+                    <select id="service"><option value="Vehicle Registration">Vehicle Registration</option><option value="License Renewal">License Renewal</option><option value="Title Transfer">Title Transfer</option><option value="Permit Application">Permit Application</option><option value="Tax Filing Assistance">Tax Filing Assistance</option></select>
+                </div>
+                <div class="form-group"><label for="appt_date">Date</label><input type="date" id="appt_date" required></div>
+                <div class="form-group"><label for="time_slot">Time Slot</label>
+                    <select id="time_slot"><option value="9:00 AM">9:00 AM</option><option value="10:00 AM">10:00 AM</option><option value="11:00 AM">11:00 AM</option><option value="1:00 PM">1:00 PM</option><option value="2:00 PM">2:00 PM</option><option value="3:00 PM">3:00 PM</option></select>
+                </div>
+                <div class="form-group"><label for="location">Location</label>
+                    <select id="location"><option value="Lakeport DMV Office">Lakeport DMV Office</option><option value="Lakeport City Hall">Lakeport City Hall</option></select>
+                </div>
+                <button type="submit" class="submit-btn">Book Appointment</button>
+            </form>
+        </div>
+    </div>
+
+    {% include "tax-filing-dmv-permits/_footer.html" %}
+
+    <script>
+    function bookAppt(e) {
+        e.preventDefault();
+        var data = {
+            service: document.getElementById('service').value,
+            date: document.getElementById('appt_date').value,
+            time_slot: document.getElementById('time_slot').value,
+            location: document.getElementById('location').value,
+        };
+        fetch('{{ url_for("tax-filing-dmv-permits.index") }}api/appointments', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            var msg = document.getElementById('success-msg');
+            msg.style.display = 'block';
+            msg.innerHTML = 'Appointment booked! ID: ' + d.appointment_id + ' on ' + d.date + ' at ' + d.time_slot +
+                ' &mdash; <a href="{{ url_for("tax-filing-dmv-permits.my_appointments_page") }}">View My Appointments</a>';
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

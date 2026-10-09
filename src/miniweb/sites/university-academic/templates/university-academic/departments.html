@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Areas - Meridian State University</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #4b2e83, #33006f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #b7a57a; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #4b2e83; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0ecf5; }
+        nav a.active { font-weight: 700; background: #ede9f5; }
+        .container { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
+        h2 { font-size: 1.6rem; color: #1a1a2e; margin-bottom: .5rem; }
+        .dept-overview { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 2rem; }
+        .dept-overview h3 { color: #4b2e83; font-size: 1.2rem; margin-bottom: .5rem; }
+        .dept-overview p { font-size: .9rem; color: #64748b; line-height: 1.6; }
+        .dept-stats { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; }
+        .dept-stats .stat { text-align: center; }
+        .dept-stats .stat-value { font-size: 1.4rem; font-weight: 700; color: #4b2e83; }
+        .dept-stats .stat-label { font-size: .75rem; color: #64748b; }
+        .section-title { font-size: 1.3rem; color: #1a1a2e; margin-bottom: 1.2rem; }
+        .area-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .area-card { background: #fff; border-radius: .5rem; padding: 1.8rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid #4b2e83; transition: box-shadow .2s; }
+        .area-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+        .area-card a { text-decoration: none; color: inherit; }
+        .area-card h4 { color: #4b2e83; font-size: 1.1rem; margin-bottom: .5rem; }
+        .area-card p { font-size: .85rem; color: #64748b; line-height: 1.6; margin-bottom: .8rem; }
+        .area-meta { font-size: .8rem; color: #94a3b8; }
+        .area-meta .lead { color: #334155; font-weight: 500; }
+        .area-labs { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
+        .area-labs .lab-tag { background: #f1f5f9; color: #334155; padding: .2rem .5rem; border-radius: .25rem; font-size: .7rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 3rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('university-academic.index') }}">MSU Computer Science</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('university-academic.index') }}">Home</a>
+        <a href="{{ url_for('university-academic.courses_page') }}">Courses</a>
+        <a href="{{ url_for('university-academic.faculty_page') }}">Faculty</a>
+        <a href="{{ url_for('university-academic.departments_page') }}" class="active">Research</a>
+        <a href="{{ url_for('university-academic.events_page') }}">Events</a>
+        <a href="{{ url_for('university-academic.alumni_page') }}">Alumni</a>
+        <a href="{{ url_for('university-academic.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <h2>{{ department.name | default('Department') }}</h2>
+
+        <div class="dept-overview">
+            <h3>{{ department.university | default('University') }} &mdash; {{ department.college | default('') }}</h3>
+            <p>
+                Located in {{ department.location.building | default('') }},
+                {{ department.location.address | default('') }}.
+                Founded in {{ department.founded | default('') }}.
+                Chaired by {{ department.chair | default('') }}.
+            </p>
+            <div class="dept-stats">
+                <div class="stat">
+                    <div class="stat-value">{{ department.faculty_count | default(0) }}</div>
+                    <div class="stat-label">Faculty</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ department.undergraduate_students | default(0) }}</div>
+                    <div class="stat-label">Undergrads</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ department.graduate_students | default(0) }}</div>
+                    <div class="stat-label">Grad Students</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ department.staff_count | default(0) }}</div>
+                    <div class="stat-label">Staff</div>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="section-title">Research Areas</h3>
+
+        <div class="area-grid">
+            {% for area in research_areas %}
+            <div class="area-card">
+                <a href="{{ url_for('university-academic.department_detail', dept_id=area.id) }}">
+                    <h4>{{ area.name }}</h4>
+                    <p>{{ area.description }}</p>
+                    <div class="area-meta">
+                        <span class="lead">Leads: {{ area.faculty_leads | join(', ') }}</span><br>
+                        {{ area.active_projects }} active projects
+                    </div>
+                    <div class="area-labs">
+                        {% for lab in area.labs %}
+                        <span class="lab-tag">{{ lab }}</span>
+                        {% endfor %}
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; Meridian State University &mdash; School of Computer Science &amp; Engineering</p>
+    </div>
+</body>
+</html>

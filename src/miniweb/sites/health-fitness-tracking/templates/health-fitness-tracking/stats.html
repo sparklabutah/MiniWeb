@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trends — FitTrack</title>
+    <link rel="stylesheet" href="/static/fittrack.css">
+</head>
+<body>
+    {% set active_page = 'trends' %}
+    {% include "health-fitness-tracking/_topnav.html" %}
+
+    <div class="ft-shell">
+        <div class="ft-page-title">
+            <div><h1>Trends</h1>{% if summary %}<div class="sub">{{ summary.date_from }} → {{ summary.date_to }} · {{ summary.days }} days</div>{% endif %}</div>
+            <div class="ft-tabs">
+                <a href="?period=week" class="{{ 'active' if period == 'week' }}">Week</a>
+                <a href="?period=month" class="{{ 'active' if period == 'month' }}">Month</a>
+                <a href="{{ url_for('health-fitness-tracking.stats_editor_page') }}">Edit Log</a>
+            </div>
+        </div>
+
+        {% if summary %}
+        <div class="kpis" style="grid-template-columns:repeat(6,1fr);">
+            <div class="kpi"><div class="k-lbl">Avg Steps</div><div class="k-val">{{ "{:,}".format(summary.avg_steps) }}</div></div>
+            <div class="kpi"><div class="k-lbl">Total Steps</div><div class="k-val">{{ "{:,}".format(summary.total_steps) }}</div></div>
+            <div class="kpi"><div class="k-lbl">Avg Sleep</div><div class="k-val">{{ summary.avg_sleep }}<span class="u"> h</span></div></div>
+            <div class="kpi"><div class="k-lbl">Avg Active</div><div class="k-val">{{ summary.avg_active_min }}<span class="u"> min</span></div></div>
+            <div class="kpi"><div class="k-lbl">Distance</div><div class="k-val">{{ summary.total_distance_km }}<span class="u"> km</span></div></div>
+            <div class="kpi"><div class="k-lbl">Weight Δ</div>
+                <div class="k-val">{% if summary.weight_start and summary.weight_end %}{{ '%+.1f'|format(summary.weight_end - summary.weight_start) }}{% else %}—{% endif %}<span class="u"> kg</span></div></div>
+        </div>
+
+        <div class="ft-grid thirds">
+            {% if charts and charts.weight %}
+            <div class="panel">
+                <div class="panel-h"><h3>Weight</h3><span class="meta">{{ charts.weight.min }}–{{ charts.weight.max }} kg</span></div>
+                <div class="panel-b">
+                    <svg class="chart" viewBox="0 0 {{ charts.weight.W }} {{ charts.weight.H }}">
+                        {% for gy in [0.25,0.5,0.75] %}<line class="grid-line" x1="12" y1="{{ (charts.weight.H*gy)|round(1) }}" x2="{{ charts.weight.W-12 }}" y2="{{ (charts.weight.H*gy)|round(1) }}"/>{% endfor %}
+                        <polygon class="wt-area" points="{{ charts.weight.area }}"/>
+                        <polyline class="wt-line" points="{{ charts.weight.poly }}"/>
+                    </svg>
+                </div>
+            </div>
+            {% endif %}
+            <div class="panel">
+                <div class="panel-h"><h3>Steps</h3><span class="meta">goal 10,000</span></div>
+                <div class="panel-b">
+                    <svg class="chart" viewBox="0 0 {{ charts.steps.W }} {{ charts.steps.H }}">
+                        {% if charts.steps.goal_y %}<line class="goal-line" x1="12" y1="{{ charts.steps.goal_y }}" x2="{{ charts.steps.W-12 }}" y2="{{ charts.steps.goal_y }}"/>{% endif %}
+                        {% for b in charts.steps.bars %}<rect class="bar {{ 'over' if b.v >= 10000 }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="1.5"><title>{{ "{:,}".format(b.v) }} steps</title></rect>{% endfor %}
+                    </svg>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-h"><h3>Sleep (hours)</h3></div>
+                <div class="panel-b">
+                    <svg class="chart" viewBox="0 0 {{ charts.sleep.W }} {{ charts.sleep.H }}">
+                        {% for b in charts.sleep.bars %}<rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="1.5" style="fill:#7c3aed;"><title>{{ b.v }} h</title></rect>{% endfor %}
+                    </svg>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-h"><h3>Active Minutes</h3><span class="meta">goal 30/day</span></div>
+                <div class="panel-b">
+                    <svg class="chart" viewBox="0 0 {{ charts.active.W }} {{ charts.active.H }}">
+                        {% if charts.active.goal_y %}<line class="goal-line" x1="12" y1="{{ charts.active.goal_y }}" x2="{{ charts.active.W-12 }}" y2="{{ charts.active.goal_y }}"/>{% endif %}
+                        {% for b in charts.active.bars %}<rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="1.5" style="{{ 'fill:#16a34a;' if b.v >= 30 else 'fill:#cbd5e1;' }}"><title>{{ b.v }} min</title></rect>{% endfor %}
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+            <div class="panel-h"><h3>Daily Log</h3></div>
+            <table class="dt">
+                <tr><th>Date</th><th>Steps</th><th>Distance</th><th>Cals</th><th>Active</th><th>Floors</th><th>Sleep</th><th>Water</th><th>Weight</th></tr>
+                {% for s in stats %}
+                <tr>
+                    <td>{{ s.date }}</td>
+                    <td>{{ "{:,}".format(s.steps) }}</td>
+                    <td>{{ s.distance_km }} km</td>
+                    <td>{{ s.calories_burned }}</td>
+                    <td>{{ s.active_minutes }} min</td>
+                    <td>{{ s.floors_climbed }}</td>
+                    <td>{{ s.sleep_hours }} h <span class="muted" style="font-size:.66rem;">({{ s.sleep_quality }})</span></td>
+                    <td>{{ (s.water_ml / 1000)|round(1) }} L</td>
+                    <td>{{ s.weight_kg if s.weight_kg else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% else %}
+        <div class="panel"><div class="panel-b" style="text-align:center;color:var(--faint);padding:30px;">No stats available for this period.</div></div>
+        {% endif %}
+    </div>
+
+    <div class="ft-foot">FitTrack — Your Nutrition &amp; Fitness Dashboard</div>
+</body>
+</html>

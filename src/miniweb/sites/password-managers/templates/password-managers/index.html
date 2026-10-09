@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaultGuard - Password Manager</title>
+    <link rel="stylesheet" href="/static/pm.css">
+    <style>
+        .score-banner { display: flex; align-items: center; gap: 1.3rem; }
+        .score-info h3 { font-size: 1.05rem; margin-bottom: .15rem; }
+        .alerts { margin-top: .55rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    {% set active_page = 'vault' %}
+    {% include "password-managers/_topbar.html" %}
+
+    <div class="shell">
+        {% set active_side = 'all' %}
+        {% include "password-managers/_sidebar.html" %}
+
+        <main class="main">
+            <div class="page-head">
+                <h2>My Vault</h2>
+                <a href="/" class="back-link">&larr; Back to MiniWeb</a>
+            </div>
+
+            {% if report and report.overall_score is defined %}
+            <div class="card card-pad score-banner">
+                <a href="{{ url_for('password-managers.security_report_page') }}" title="View full security report"
+                   class="score-circle {% if report.overall_score >= 80 %}score-good{% elif report.overall_score >= 60 %}score-fair{% else %}score-poor{% endif %}">{{ report.overall_score }}</a>
+                <div class="score-info">
+                    <h3>Security Score: {{ report.overall_rating }}</h3>
+                    <p class="muted">{{ stats.total_entries }} items across {{ stats.total_vaults }} vaults</p>
+                    <div class="alerts">
+                        {% if stats.breach_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#breach" class="pill bad" title="Review breach alerts">{{ stats.breach_count }} breach alert{{ 's' if stats.breach_count > 1 }} &rsaquo;</a>{% endif %}
+                        {% if stats.weak_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#weak" class="pill warn" title="Review weak passwords">{{ stats.weak_count }} weak password{{ 's' if stats.weak_count > 1 }} &rsaquo;</a>{% endif %}
+                        {% if stats.fair_count > 0 %}<a href="{{ url_for('password-managers.security_report_page') }}#weak" class="pill warn" title="Review fair passwords">{{ stats.fair_count }} fair password{{ 's' if stats.fair_count > 1 }} &rsaquo;</a>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="stats-grid">
+                <div class="card stat-card"><div class="stat-value">{{ stats.total_entries }}</div><div class="stat-label">Total Items</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.total_vaults }}</div><div class="stat-label">Vaults</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.favorites }}</div><div class="stat-label">Favorites</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.strengths.get('excellent', 0) }}</div><div class="stat-label">Excellent</div></div>
+                <div class="card stat-card"><div class="stat-value">{{ stats.weak_count + stats.fair_count }}</div><div class="stat-label">Need Attention</div></div>
+            </div>
+
+            <div>
+                <div class="page-head" style="margin-bottom:.7rem;">
+                    <div class="section-title" style="border:0;padding:0;">Your Vaults</div>
+                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('password-managers.form_import') }}"
+                          title="Import saved logins from a .csv or .json export (e.g. from another password manager)">
+                        <input type="file" name="file" accept=".csv,.json" id="import-file" style="display:none;" onchange="if(this.files.length){this.form.submit();}">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('import-file').click();">Import logins</button>
+                    </form>
+                </div>
+                <div class="card list">
+                    {% for vault in vaults %}
+                    <a href="{{ url_for('password-managers.vault_detail', vault_id=vault.id) }}" class="list-row">
+                        <div class="row-icon" style="background: {{ vault.color }};">{{ vault.name[0]|upper }}</div>
+                        <div class="row-main"><div class="row-title">{{ vault.name }}</div></div>
+                        <div class="row-meta">
+                            <span class="muted">{{ vault._entry_count }} item{{ 's' if vault._entry_count != 1 }}</span>
+                            <span class="chip {% if vault.shared %}good{% endif %}">{{ vault.type }}</span>
+                            <span class="chev">&rsaquo;</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">Recently Used</div>
+                <div class="card list">
+                    {% for entry in recent_entries %}
+                    <a href="{{ url_for('password-managers.entry_detail', entry_id=entry.id) }}" class="list-row">
+                        <span class="strength-dot strength-{{ entry.strength or 'strong' }}"></span>
+                        <div class="row-main">
+                            <div class="row-title">{{ entry.title }}</div>
+                            <div class="row-sub">{{ entry.username }}{% if entry.url %} &middot; {{ entry.url|truncate(40) }}{% endif %}</div>
+                        </div>
+                        <div class="row-time">{{ entry.last_used[:10] if entry.last_used else '' }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

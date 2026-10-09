@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchases &amp; Receipts - AppVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --gp-green: #01875f; --gp-green-light: #e6f4ea;
+            --gp-blue: #1a73e8; --gp-blue-light: #e8f0fe;
+            --gp-bg: #f8f9fa; --gp-surface: #fff;
+            --gp-text: #202124; --gp-text-secondary: #5f6368;
+            --gp-border: #dadce0; --gp-star: #e8710a;
+            --gp-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gp-bg); color: var(--gp-text); }
+        .topbar { background: var(--gp-surface); border-bottom: 1px solid var(--gp-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .6rem 1.5rem; }
+        .logo { display: flex; align-items: center; gap: .5rem; text-decoration: none; color: var(--gp-text); font-size: 1.25rem; font-weight: 500; white-space: nowrap; }
+        .logo-icon { width: 32px; height: 32px; border-radius: 4px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .9rem; }
+        .nav-links { display: flex; gap: .25rem; align-items: center; margin-left: auto; }
+        .nav-links a { padding: .45rem .85rem; border-radius: 20px; text-decoration: none; font-size: .85rem; font-weight: 500; color: var(--gp-text-secondary); transition: background .15s; white-space: nowrap; }
+        .nav-links a:hover { background: var(--gp-bg); color: var(--gp-text); }
+        .nav-links .login-btn { background: var(--gp-blue); color: #fff; }
+        .nav-links .login-btn:hover { background: #1557b0; color: #fff; }
+        .container { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .page-title { font-size: 1.4rem; margin-bottom: .5rem; }
+        .subtitle { color: #64748b; font-size: .95rem; margin-bottom: 1.25rem; }
+        .summary { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .summary-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1rem 1.25rem; flex: 1; min-width: 160px; }
+        .summary-card .label { color: #64748b; font-size: .8rem; }
+        .summary-card .value { font-size: 1.3rem; font-weight: 700; margin-top: .25rem; }
+        .order-list { display: flex; flex-direction: column; gap: .75rem; }
+        .order-card { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.1rem 1.25rem; display: flex; align-items: center; gap: 1rem; transition: border-color .15s; }
+        .order-card:hover { border-color: #3b82f6; }
+        .app-icon { width: 48px; height: 48px; background: #dbeafe; border-radius: .6rem; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+        .order-details { flex: 1; }
+        .order-details h3 { font-size: 1rem; margin-bottom: .2rem; }
+        .order-details h3 a { text-decoration: none; color: inherit; }
+        .order-details h3 a:hover { color: #2563eb; }
+        .order-details .meta { color: #64748b; font-size: .82rem; }
+        .receipt-no { font-family: monospace; color: #475569; }
+        .price-col { text-align: right; flex-shrink: 0; }
+        .price-col .amount { font-size: 1.05rem; font-weight: 700; }
+        .badge { display: inline-block; padding: .18rem .55rem; border-radius: 20px; font-size: .72rem; font-weight: 600; margin-top: .3rem; }
+        .badge-completed { background: #ecfdf5; color: #059669; }
+        .badge-refunded { background: #fef2f2; color: #dc2626; }
+        .actions { flex-shrink: 0; }
+        .btn { padding: .5rem 1rem; border: none; border-radius: .4rem; font-size: .85rem; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-outline { background: #fff; color: #3b82f6; border: 1px solid #3b82f6; }
+        .btn-outline:hover { background: #eff6ff; }
+        .empty { text-align: center; padding: 3rem; color: #94a3b8; }
+        .empty a { color: #3b82f6; text-decoration: none; }
+        .empty a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="{{ url_for('software-marketplace.index') }}">
+            <div class="logo-icon">A</div>
+            AppVault
+        </a>
+        <div class="nav-links">
+            <a href="{{ url_for('software-marketplace.apps_list') }}">Browse</a>
+            <a href="{{ url_for('software-marketplace.compare_page') }}">Compare</a>
+            {% if user %}
+                <a href="{{ url_for('software-marketplace.my_apps') }}">My Apps</a>
+                <a href="{{ url_for('software-marketplace.purchases_page') }}">Purchases</a>
+                <a href="{{ url_for('software-marketplace.wishlist_page') }}">Wishlist</a>
+                <a href="{{ url_for('software-marketplace.cart_page') }}">Cart</a>
+                <a href="{{ url_for('software-marketplace.settings_page') }}">Settings</a>
+                <a href="{{ url_for('software-marketplace.logout') }}">{{ user.display_name }}</a>
+            {% else %}
+                <a href="{{ url_for('software-marketplace.login_page') }}" class="login-btn">Sign in</a>
+            {% endif %}
+            <a href="/">MiniWeb</a>
+        </div>
+    </div>
+</div>
+    <div class="container">
+        <h2 class="page-title">Purchases &amp; Receipts</h2>
+        <p class="subtitle">{{ purchases|length }} purchase{{ 's' if purchases|length != 1 }} on your account</p>
+
+        {% if purchases %}
+        <div class="summary">
+            <div class="summary-card">
+                <div class="label">Total spent</div>
+                <div class="value">${{ "%.2f"|format(total_spent) }}</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Refunded</div>
+                <div class="value">${{ "%.2f"|format(refunded_total) }}</div>
+            </div>
+        </div>
+
+        <div class="order-list">
+            {% for p in purchases %}
+            <div class="order-card">
+                <div class="app-icon">{{ p.app_name[0] if p.app_name else '?' }}</div>
+                <div class="order-details">
+                    <h3><a href="{{ url_for('software-marketplace.purchase_detail', purchase_id=p.id) }}">{{ p.app_name }}</a></h3>
+                    <div class="meta">
+                        Receipt <span class="receipt-no">{{ p.receipt_id }}</span> &middot;
+                        {{ p.date }}
+                        {% if p.status == 'refunded' %}
+                            <span class="badge badge-refunded">Refunded</span>
+                        {% else %}
+                            <span class="badge badge-completed">Completed</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="price-col">
+                    <div class="amount">${{ "%.2f"|format((p.price or 0) - (p.discount or 0)) }}</div>
+                </div>
+                <div class="actions">
+                    <a href="{{ url_for('software-marketplace.purchase_detail', purchase_id=p.id) }}" class="btn btn-outline">View receipt</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            <p>You have no purchases yet.</p>
+            <p><a href="{{ url_for('software-marketplace.apps_list') }}">Browse apps to get started</a></p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

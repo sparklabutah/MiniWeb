@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ job.title }} - Apex Dynamics Careers</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --card-bg: #fff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg); }
+        a { color: var(--accent); text-decoration: none; }
+        .navbar { background: var(--primary); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .navbar .logo { color: #fff; font-size: 1.3rem; font-weight: 700; }
+        .navbar .logo span { color: #3b82f6; }
+        .navbar nav { display: flex; align-items: center; }
+        .navbar nav a { color: #cbd5e1; margin-left: 1.5rem; font-size: .9rem; text-decoration: none; }
+        .navbar nav a:hover { color: #fff; }
+        .navbar .search-form { display: flex; margin-left: 1.5rem; }
+        .navbar .search-form input { padding: 4px 10px; border: 1px solid #475569; border-radius: 4px 0 0 4px; background: #1e293b; color: #e2e8f0; font-size: .85rem; width: 160px; }
+        .navbar .search-form button { padding: 4px 10px; background: var(--accent); color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: .85rem; }
+        .section { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+        .detail { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; }
+        .detail h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: .75rem; }
+        .badge { display: inline-block; background: #eff6ff; color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: .85rem; margin-right: .3rem; margin-bottom: .5rem; }
+        .detail p { line-height: 1.7; margin-bottom: 1rem; }
+        .salary { font-size: 1.2rem; color: var(--primary); font-weight: 700; margin-bottom: 1rem; }
+        .requirements h3 { margin-bottom: .5rem; }
+        .requirements ul { padding-left: 1.2rem; }
+        .requirements li { padding: .2rem 0; font-size: .9rem; }
+        .footer { background: var(--primary); color: #94a3b8; padding: 2rem; text-align: center; font-size: .85rem; margin-top: 3rem; }
+        .footer a { color: #cbd5e1; margin: 0 .5rem; }
+        .apply-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin-top: 1.5rem; }
+        .apply-card h2 { font-size: 1.2rem; color: var(--primary); margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .3rem; color: var(--primary); }
+        .form-group input, .form-group textarea { width: 100%; padding: .7rem; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; font-family: inherit; }
+        .form-group textarea { height: 110px; resize: vertical; }
+        .form-hint { font-size: .8rem; color: var(--text-light); margin-top: .3rem; }
+        .submit-btn { background: var(--accent); color: #fff; padding: .8rem 2rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        .submit-btn:hover { background: #1d4ed8; }
+        .success-msg { background: #dcfce7; color: #166534; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .error-msg { background: #fef2f2; color: #991b1b; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('business-company.index') }}" class="logo">Apex<span>Dynamics</span></a>
+        <nav>
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+            <a href="{{ url_for('business-company.newsletter_page') }}">Newsletter</a>
+            <form class="search-form" action="{{ url_for('business-company.search_page') }}" method="get">
+                <input type="text" name="q" placeholder="Search..." aria-label="Search">
+                <button type="submit">Go</button>
+            </form>
+        </nav>
+    </div>
+
+    <div class="section">
+        <img src="/static/generated/business-company/apex-office-culture.jpg" alt="Life at Apex Dynamics" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 1.5rem; display: block;">
+        <div class="detail">
+            <h1>{{ job.title }}</h1>
+            <span class="badge">{{ job.department }}</span>
+            <span class="badge">{{ job.location }}</span>
+            <span class="badge">{{ job.type }}</span>
+            <div class="salary" style="margin-top:1rem">${{ "{:,}".format(job.salary_min) }} - ${{ "{:,}".format(job.salary_max) }}</div>
+            <p>{{ job.description }}</p>
+            <p style="font-size:.85rem;color:var(--text-light)">Posted: {{ job.posted_date }}</p>
+            <div class="requirements">
+                <h3>Requirements</h3>
+                <ul>
+                    {% for req in job.requirements %}
+                    <li>{{ req }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        {% if apply_success %}
+        <div class="apply-card" id="apply">
+            <div class="success-msg" data-testid="apply-success">
+                Application submitted! Thank you{% if application %}, {{ application.name }}{% endif %} —
+                we have received your application for <strong>{{ job.title }}</strong>.
+                A confirmation email has been sent to {{ application.email }}.
+            </div>
+            <p>Reference #: <strong>{{ application.id }}</strong></p>
+            <p style="margin-top:1rem"><a href="{{ url_for('business-company.my_applications') }}">View my applications</a> &middot;
+               <a href="{{ url_for('business-company.careers_page') }}">Browse more openings</a></p>
+        </div>
+        {% else %}
+        <div class="apply-card" id="apply">
+            <h2>Apply for this position</h2>
+            {% if error %}
+            <div class="error-msg" data-testid="apply-error">{{ error }}</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('business-company.job_apply', job_id=job.id) }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="resume">Resume (paste text)</label>
+                    <textarea id="resume" name="resume" placeholder="Paste your resume here..."></textarea>
+                    <p class="form-hint">Provide your resume as pasted text or upload a file below.</p>
+                </div>
+                <div class="form-group">
+                    <label for="resume_file">Resume (upload file)</label>
+                    <input type="file" id="resume_file" name="resume_file">
+                </div>
+                <div class="form-group">
+                    <label for="cover_letter">Cover Letter</label>
+                    <textarea id="cover_letter" name="cover_letter" placeholder="Tell us why you're a great fit (optional)..."></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Submit Application</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Apex Dynamics Corp.</p>
+        <p style="margin-top:.5rem">
+            <a href="{{ url_for('business-company.products_page') }}">Products</a>
+            <a href="{{ url_for('business-company.about') }}">Team</a>
+            <a href="{{ url_for('business-company.services_page') }}">Services</a>
+            <a href="{{ url_for('business-company.blog_page') }}">Blog</a>
+            <a href="{{ url_for('business-company.careers_page') }}">Careers</a>
+            <a href="{{ url_for('business-company.contact_page') }}">Contact</a>
+        </p>
+    </div>
+</body>
+</html>

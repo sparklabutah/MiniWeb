@@ -1,0 +1,67 @@
+{% extends "project-mgmt-issue-tracking/base.html" %}
+{% set active = 'dashboard' %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+
+{% macro badge_status(s) %}<span class="badge st-{{ s }}"><span class="bd"></span>{{ s|replace('_',' ')|title }}</span>{% endmacro %}
+{% macro irow(i) %}
+<a class="irow" href="{{ url_for('project-mgmt-issue-tracking.issue_detail', issue_id=i.id) }}">
+    <span class="ikey">{{ i.key }}</span>
+    <span class="ititle">{{ i.title }}</span>
+    <span class="imeta">
+        <span class="badge ty-{{ i.type }}">{{ i.type|title }}</span>
+        <span class="badge pr-{{ i.priority }}">{{ i.priority|title }}</span>
+        {{ badge_status(i.status) }}
+    </span>
+    <span class="idate">{{ (i.updated_at or i.created_at or '')[:10] }}</span>
+</a>
+{% endmacro %}
+
+<!-- KPI stat tiles -->
+<div class="kpi-row">
+    <div class="kpi k-total"><div class="kpi-label"><span class="dot"></span>Total Issues</div><div class="kpi-num">{{ kpis.total }}</div><div class="kpi-sub">across {{ project_stats|length }} projects</div></div>
+    <div class="kpi k-open"><div class="kpi-label"><span class="dot"></span>Open</div><div class="kpi-num">{{ kpis.open }}</div><div class="kpi-sub">to be picked up</div></div>
+    <div class="kpi k-prog"><div class="kpi-label"><span class="dot"></span>In Progress</div><div class="kpi-num">{{ kpis.in_progress }}</div><div class="kpi-sub">being worked on</div></div>
+    <div class="kpi k-review"><div class="kpi-label"><span class="dot"></span>In Review</div><div class="kpi-num">{{ kpis.review }}</div><div class="kpi-sub">awaiting review</div></div>
+    <div class="kpi k-done"><div class="kpi-label"><span class="dot"></span>Done</div><div class="kpi-num">{{ kpis.done }}</div><div class="kpi-sub">completed &amp; closed</div></div>
+    <div class="kpi k-crit"><div class="kpi-label"><span class="dot"></span>Critical Open</div><div class="kpi-num">{{ kpis.critical }}</div><div class="kpi-sub">need attention</div></div>
+    <div class="kpi k-mine"><div class="kpi-label"><span class="dot"></span>Assigned to Me</div><div class="kpi-num">{{ kpis.my_open }}</div><div class="kpi-sub">open on your plate</div></div>
+</div>
+
+<!-- Projects -->
+<div class="sec-h">Projects <span class="count">{{ project_stats|length }}</span></div>
+<div class="proj-grid">
+    {% for ps in project_stats %}
+    {% set pct = (ps.done / ps.total * 100) | round | int if ps.total else 0 %}
+    <a class="proj-card" href="{{ url_for('project-mgmt-issue-tracking.project_board', project_id=ps.project.id) }}">
+        <div class="proj-top">
+            <span class="proj-key">{{ ps.project.key | default(ps.project.name[:2]|upper) }}</span>
+            <div style="min-width:0;">
+                <div class="proj-name">{{ ps.project.name }}</div>
+                <div class="proj-owner">{% if ps.owner %}Lead: {{ ps.owner.name }}{% else %}No lead{% endif %}</div>
+            </div>
+        </div>
+        <div class="proj-desc">{{ ps.project.description | default('') }}</div>
+        <div class="pbar"><div class="pbar-fill" style="width: {{ pct }}%;"></div></div>
+        <div class="proj-stats">
+            <span>{{ pct }}% done</span>
+            <span><b>{{ ps.open }}</b> open</span>
+            <span><b>{{ ps.total }}</b> total</span>
+            {% if ps.critical %}<span class="crit">{{ ps.critical }} critical</span>{% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- My issues + activity -->
+<div class="dash-cols" style="margin-top:26px;">
+    <div class="panel">
+        <div class="panel-h">Assigned to Me <span class="count" style="font-size:.74rem;font-weight:700;color:var(--faint);background:#eef1f5;border-radius:10px;padding:1px 9px;">{{ my_issues|length }}</span></div>
+        {% for i in my_issues[:12] %}{{ irow(i) }}{% else %}<div class="empty">Nothing assigned to you. Nice and clear.</div>{% endfor %}
+    </div>
+    <div class="panel">
+        <div class="panel-h">Recent Activity</div>
+        {% for i in recent_issues %}{{ irow(i) }}{% endfor %}
+    </div>
+</div>
+{% endblock %}

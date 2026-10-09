@@ -1,0 +1,317 @@
+{% extends "brokerage/base.html" %}
+{% block title %}TradeVista - Markets{% endblock %}
+{% block content %}
+<div class="rh-main">
+    <div class="rh-content">
+        <!-- Portfolio Value Hero (if logged in) -->
+        {% if user %}
+        <div style="margin-bottom:32px;">
+            <div class="rh-label" style="margin-bottom:4px;">Investing</div>
+            <div class="rh-price-hero" id="portfolio-hero-value">
+                {% if portfolio_value is defined %}${{ "{:,.2f}".format(portfolio_value) }}{% else %}--{% endif %}
+            </div>
+            <div class="rh-change {% if portfolio_change is defined and portfolio_change >= 0 %}rh-green{% else %}rh-red{% endif %}" id="portfolio-hero-change">
+                {% if portfolio_change is defined %}
+                <span>{{ "+" if portfolio_change >= 0 }}${{ "{:,.2f}".format(portfolio_change|abs) }}</span>
+                <span>({{ "+" if portfolio_change_pct >= 0 }}{{ "%.2f"|format(portfolio_change_pct) }}%)</span>
+                <span class="rh-label" style="margin-left:8px;">Today</span>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div style="margin-bottom:32px;">
+            <div class="rh-price-hero" style="color:#00C805;">Welcome to TradeVista</div>
+            <div class="rh-label" style="margin-top:8px;font-size:16px;">Commission-free investing, plus the tools you need to put your money in motion.</div>
+        </div>
+        {% endif %}
+
+        <!-- Market Movers -->
+        {% set top_gainers = movers_gainers %}
+        {% set top_losers = movers_losers %}
+
+        <div style="margin-bottom:32px;">
+            <h2 class="rh-section-title">Market Movers</h2>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <!-- Top Gainers -->
+                <div style="flex:1;min-width:300px;">
+                    <div style="font-size:13px;font-weight:600;color:#00C805;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Top Gainers</div>
+                    {% for t in top_gainers %}
+                    <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" class="wl-item" style="text-decoration:none;border-radius:8px;border:none;margin-bottom:4px;background:rgba(47,51,54,0.2);">
+                        <div>
+                            <div class="wl-sym">{{ t.symbol }}</div>
+                            <div class="wl-name">{{ t.name }}</div>
+                        </div>
+                        {% if t.sparkline_prices and t.sparkline_prices|length > 1 %}
+                        <div class="wl-sparkline">
+                            {% set sp_min = t.sparkline_prices|min %}
+                            {% set sp_max = t.sparkline_prices|max %}
+                            {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                            <svg class="sparkline-svg" width="60" height="24" viewBox="0 0 60 24">
+                                <polyline fill="none" stroke="#00C805" stroke-width="1.5"
+                                    points="{% for sp in t.sparkline_prices %}{{ (loop.index0 / (t.sparkline_prices|length - 1) * 58 + 1)|round(1) }},{{ (23 - (sp - sp_min) / sp_range * 22)|round(1) }} {% endfor %}"/>
+                            </svg>
+                        </div>
+                        {% endif %}
+                        <div class="wl-right">
+                            <div class="wl-price" data-live-price="{{ t.symbol }}">{{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</div>
+                            <div class="wl-change rh-green" data-live-badge="{{ t.symbol }}">+{{ "%.2f"|format(t.change_pct) }}%</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <!-- Top Losers -->
+                <div style="flex:1;min-width:300px;">
+                    <div style="font-size:13px;font-weight:600;color:#FF5000;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Top Losers</div>
+                    {% for t in top_losers %}
+                    <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" class="wl-item" style="text-decoration:none;border-radius:8px;border:none;margin-bottom:4px;background:rgba(47,51,54,0.2);">
+                        <div>
+                            <div class="wl-sym">{{ t.symbol }}</div>
+                            <div class="wl-name">{{ t.name }}</div>
+                        </div>
+                        {% if t.sparkline_prices and t.sparkline_prices|length > 1 %}
+                        <div class="wl-sparkline">
+                            {% set sp_min = t.sparkline_prices|min %}
+                            {% set sp_max = t.sparkline_prices|max %}
+                            {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                            <svg class="sparkline-svg" width="60" height="24" viewBox="0 0 60 24">
+                                <polyline fill="none" stroke="#FF5000" stroke-width="1.5"
+                                    points="{% for sp in t.sparkline_prices %}{{ (loop.index0 / (t.sparkline_prices|length - 1) * 58 + 1)|round(1) }},{{ (23 - (sp - sp_min) / sp_range * 22)|round(1) }} {% endfor %}"/>
+                            </svg>
+                        </div>
+                        {% endif %}
+                        <div class="wl-right">
+                            <div class="wl-price" data-live-price="{{ t.symbol }}">{{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</div>
+                            <div class="wl-change rh-red" data-live-badge="{{ t.symbol }}">{{ "%.2f"|format(t.change_pct) }}%</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- News / Market Summary -->
+        <div class="rh-card" style="margin-bottom:24px;">
+            <div class="rh-card-header">
+                <h2>Market Summary</h2>
+                <span class="rh-label">{{ sim_time.strftime('%b %d, %Y %I:%M %p') }} ET</span>
+            </div>
+            <div class="rh-card-body" style="padding:0;">
+                <div style="display:flex;flex-wrap:wrap;">
+                    {% for t in summary_funds %}
+                    <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" style="flex:1;min-width:150px;padding:16px 20px;border-right:1px solid rgba(47,51,54,0.5);border-bottom:1px solid rgba(47,51,54,0.5);text-decoration:none;">
+                        <div class="rh-label">{{ t.symbol }}</div>
+                        <div style="font-size:18px;font-weight:700;margin-top:4px;" data-live-price="{{ t.symbol }}">${{ "%.2f"|format(t.current_price) }}</div>
+                        <div class="rh-change-sm {% if t.change >= 0 %}rh-green{% else %}rh-red{% endif %}" data-live-badge="{{ t.symbol }}">
+                            {{ "+" if t.change >= 0 }}{{ "%.2f"|format(t.change_pct) }}%
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- All Securities Table -->
+        <div class="rh-card">
+            <div class="rh-card-header" style="flex-wrap:wrap;gap:12px;">
+                <h2>All Securities <span style="font-size:13px;color:#6F7782;font-weight:400;">({{ total_results }} securities &middot; page {{ page }}/{{ total_pages }})</span></h2>
+                <a href="{{ url_for('brokerage.api_export', format='csv', type='stock') }}" style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;color:#fff;background:#00C805;text-decoration:none;" >Export CSV</a>
+                <form method="GET" action="{{ url_for('brokerage.index') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="hidden" name="q" value="{{ q }}">
+                    <select name="sector" onchange="this.form.submit()" style="padding:6px 12px;border-radius:20px;font-size:13px;">
+                        <option value="">All Sectors</option>
+                        {% for s in sectors %}
+                        <option value="{{ s }}" {% if sec == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="type" onchange="this.form.submit()" style="padding:6px 12px;border-radius:20px;font-size:13px;">
+                        <option value="">All Types</option>
+                        {% for tp in types %}
+                        <option value="{{ tp }}" {% if typ == tp %}selected{% endif %}>{{ tp }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="sort" onchange="this.form.submit()" style="padding:6px 12px;border-radius:20px;font-size:13px;">
+                        <option value="market_cap" {% if sort == 'market_cap' %}selected{% endif %}>Market Cap</option>
+                        <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Price: High-Low</option>
+                        <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Price: Low-High</option>
+                        <option value="change_desc" {% if sort == 'change_desc' %}selected{% endif %}>Top Gainers</option>
+                        <option value="change_asc" {% if sort == 'change_asc' %}selected{% endif %}>Top Losers</option>
+                        <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A-Z</option>
+                    </select>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;color:#6F7782;white-space:nowrap;">Max Price: <span id="price-max-val">{{ price_max if price_max else 'Any' }}</span></label>
+                        <input type="range" name="price_max" min="0" max="5000" step="50" value="{{ price_max if price_max else 5000 }}" oninput="document.getElementById('price-max-val').textContent=this.value=='5000'?'Any':'$'+this.value" style="width:120px;accent-color:#00C805;">
+                    </div>
+                    <button type="submit" style="padding:6px 16px;border-radius:20px;font-size:13px;background:#00C805;color:#fff;border:none;cursor:pointer;">Apply</button>
+                </form>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="rh-table" id="tickers-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th class="right">Price</th>
+                            <th class="right">Today</th>
+                            <th class="right">Market Cap</th>
+                            <th>Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in tickers %}
+                        <tr class="ticker-row" data-symbol="{{ t.symbol }}" onclick="window.location='{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}'" style="cursor:pointer;">
+                            <td>
+                                <div style="font-weight:700;font-size:14px;">{{ t.symbol }}</div>
+                                <div style="font-size:12px;color:#6F7782;margin-top:2px;">{{ t.name }}</div>
+                            </td>
+                            <td><span class="rh-tag rh-tag-{{ t.type }}">{{ t.type }}</span></td>
+                            <td class="right">
+                                <div style="font-weight:600;" data-live-price="{{ t.symbol }}">
+                                    ${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}
+                                </div>
+                            </td>
+                            <td class="right">
+                                <div class="{% if t.change >= 0 %}rh-green{% else %}rh-red{% endif %}" style="font-weight:600;font-size:13px;" data-live-change="{{ t.symbol }}">
+                                    {{ "+" if t.change >= 0 }}${{ "%.2f"|format(t.change|abs) }}
+                                    ({{ "+" if t.change_pct >= 0 }}{{ "%.2f"|format(t.change_pct) }}%)
+                                </div>
+                            </td>
+                            <td class="right">
+                                {% if t.market_cap_b %}
+                                <span style="font-size:13px;color:#C9CACC;">${{ t.market_cap_b }}B</span>
+                                {% else %}
+                                <span style="color:#6F7782;">--</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if t.sparkline_prices and t.sparkline_prices|length > 1 %}
+                                {% set sp_min = t.sparkline_prices|min %}
+                                {% set sp_max = t.sparkline_prices|max %}
+                                {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                                <svg class="sparkline-svg" width="80" height="28" viewBox="0 0 80 28">
+                                    <polyline fill="none" stroke="{% if t.change >= 0 %}#00C805{% else %}#FF5000{% endif %}" stroke-width="1.5"
+                                        points="{% for sp in t.sparkline_prices %}{{ (loop.index0 / (t.sparkline_prices|length - 1) * 78 + 1)|round(1) }},{{ (27 - (sp - sp_min) / sp_range * 26)|round(1) }} {% endfor %}"/>
+                                </svg>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if total_pages > 1 %}
+                <div style="display:flex;justify-content:center;gap:12px;padding:14px;align-items:center;">
+                    {% if page > 1 %}<a href="{{ url_for('brokerage.index', page=page-1, q=q, sector=sec, type=typ, sort=sort) }}" class="rh-btn rh-btn-outline" style="padding:6px 18px;font-size:13px;">&larr; Prev</a>{% endif %}
+                    <span style="font-size:13px;color:#6F7782;">Page {{ page }} of {{ total_pages }}</span>
+                    {% if page < total_pages %}<a href="{{ url_for('brokerage.index', page=page+1, q=q, sector=sec, type=typ, sort=sort) }}" class="rh-btn rh-btn-outline" style="padding:6px 18px;font-size:13px;">Next &rarr;</a>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: Watchlist -->
+    <div class="rh-sidebar">
+        {% if user %}
+        <div class="rh-card" style="position:sticky;top:80px;">
+            <div class="rh-card-header">
+                <h2 style="font-size:16px;">Lists</h2>
+            </div>
+            {% if watchlist_symbols %}
+            {% for t in watchlist_tickers %}
+            <a href="{{ url_for('brokerage.ticker_detail', symbol=t.symbol) }}" class="wl-item" style="text-decoration:none;">
+                <div>
+                    <div class="wl-sym">{{ t.symbol }}</div>
+                    <div class="wl-name">{{ t.name }}</div>
+                </div>
+                {% if t.sparkline_prices and t.sparkline_prices|length > 1 %}
+                <div class="wl-sparkline">
+                    {% set sp_min = t.sparkline_prices|min %}
+                    {% set sp_max = t.sparkline_prices|max %}
+                    {% set sp_range = sp_max - sp_min if sp_max != sp_min else 1 %}
+                    <svg class="sparkline-svg" width="48" height="20" viewBox="0 0 48 20">
+                        <polyline fill="none" stroke="{% if t.change >= 0 %}#00C805{% else %}#FF5000{% endif %}" stroke-width="1.5"
+                            points="{% for sp in t.sparkline_prices %}{{ (loop.index0 / (t.sparkline_prices|length - 1) * 46 + 1)|round(1) }},{{ (19 - (sp - sp_min) / sp_range * 18)|round(1) }} {% endfor %}"/>
+                    </svg>
+                </div>
+                {% endif %}
+                <div class="wl-right">
+                    <div class="wl-price" data-live-price="{{ t.symbol }}">${{ "%.2f"|format(t.current_price) if t.current_price >= 1 else "%.4f"|format(t.current_price) }}</div>
+                    <div class="wl-change {% if t.change >= 0 %}rh-green{% else %}rh-red{% endif %}" data-live-badge="{{ t.symbol }}">
+                        {{ "+" if t.change_pct >= 0 }}{{ "%.2f"|format(t.change_pct) }}%
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+            {% else %}
+            <div style="padding:20px;text-align:center;">
+                <div class="rh-label" style="margin-bottom:8px;">Your lists are empty</div>
+                <a href="{{ url_for('brokerage.watchlist_page') }}" class="rh-btn rh-btn-outline rh-btn-sm">Create a List</a>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="rh-card">
+            <div class="rh-card-body" style="text-align:center;">
+                <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Start Trading</div>
+                <div class="rh-label" style="margin-bottom:16px;">Log in to track your portfolio and manage your watchlist.</div>
+                <a href="{{ url_for('brokerage.login_page') }}" class="rh-btn rh-btn-primary" style="width:100%;">Log In</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    // Collect all symbols on the page
+    var symbols = [];
+    document.querySelectorAll('[data-live-price]').forEach(function(el) {
+        var sym = el.getAttribute('data-live-price');
+        if (symbols.indexOf(sym) === -1) symbols.push(sym);
+    });
+
+    function updateUI(data) {
+        for (var sym in data) {
+            var d = data[sym];
+            // Update all price elements for this symbol
+            document.querySelectorAll('[data-live-price="' + sym + '"]').forEach(function(el) {
+                var oldText = el.textContent.replace(/[^0-9.\-]/g, '');
+                var oldPrice = parseFloat(oldText) || 0;
+                var newText = d.price >= 1 ? '$' + d.price.toFixed(2) : '$' + d.price.toFixed(4);
+                el.textContent = newText;
+
+                if (d.price > oldPrice) {
+                    el.classList.remove('tick-up', 'tick-down');
+                    void el.offsetWidth;
+                    el.classList.add('tick-up');
+                } else if (d.price < oldPrice) {
+                    el.classList.remove('tick-up', 'tick-down');
+                    void el.offsetWidth;
+                    el.classList.add('tick-down');
+                }
+            });
+
+            // Update change displays
+            document.querySelectorAll('[data-live-change="' + sym + '"]').forEach(function(el) {
+                var sign = d.change >= 0 ? '+' : '';
+                el.textContent = sign + '$' + Math.abs(d.change).toFixed(2) + ' (' + sign + d.change_pct.toFixed(2) + '%)';
+                el.className = (d.change >= 0 ? 'rh-green' : 'rh-red');
+                el.style.fontWeight = '600';
+                el.style.fontSize = '13px';
+            });
+
+            // Update badge displays
+            document.querySelectorAll('[data-live-badge="' + sym + '"]').forEach(function(el) {
+                var sign = d.change_pct >= 0 ? '+' : '';
+                el.textContent = sign + d.change_pct.toFixed(2) + '%';
+                el.className = 'wl-change ' + (d.change_pct >= 0 ? 'rh-green' : 'rh-red');
+            });
+        }
+    }
+
+    RH.startPolling(symbols, updateUI, 2000);
+})();
+</script>
+{% endblock %}

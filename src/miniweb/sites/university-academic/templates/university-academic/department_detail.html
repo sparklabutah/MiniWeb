@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ area.name }} - Meridian State University</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1a1a2e; }
+        .header { background: linear-gradient(135deg, #4b2e83, #33006f); padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 a { color: #fff; text-decoration: none; font-size: 1.2rem; }
+        .header h1 a span { color: #b7a57a; }
+        nav { max-width: 1100px; margin: 0 auto; padding: .6rem 2rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+        nav a { color: #4b2e83; text-decoration: none; font-size: .9rem; font-weight: 500; padding: .3rem .5rem; border-radius: .3rem; }
+        nav a:hover { background: #f0ecf5; }
+        nav a.active { font-weight: 700; background: #ede9f5; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 0 2rem; }
+        .breadcrumb { font-size: .85rem; color: #64748b; margin-bottom: 1.5rem; }
+        .breadcrumb a { color: #4b2e83; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .area-header { background: #fff; border-radius: .5rem; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem; border-left: 5px solid #4b2e83; }
+        .area-header h2 { font-size: 1.6rem; color: #4b2e83; margin-bottom: .5rem; }
+        .area-header p { font-size: .95rem; color: #334155; line-height: 1.7; }
+        .area-stats { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; }
+        .area-stats .stat { text-align: center; }
+        .area-stats .stat-value { font-size: 1.4rem; font-weight: 700; color: #4b2e83; }
+        .area-stats .stat-label { font-size: .75rem; color: #64748b; }
+        .detail-card { background: #fff; border-radius: .5rem; padding: 1.5rem 2rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.2rem; }
+        .detail-card h3 { font-size: 1rem; color: #4b2e83; margin-bottom: .8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: .5rem; }
+        .labs-list { list-style: none; display: flex; gap: .5rem; flex-wrap: wrap; }
+        .labs-list li { background: #ede9f5; color: #4b2e83; padding: .3rem .8rem; border-radius: .3rem; font-size: .85rem; font-weight: 500; }
+        .faculty-list { list-style: none; }
+        .faculty-list li { padding: .6rem 0; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .faculty-list li:last-child { border-bottom: none; }
+        .faculty-list a { color: #4b2e83; text-decoration: none; font-weight: 600; }
+        .faculty-list a:hover { text-decoration: underline; }
+        .faculty-list .title { font-size: .8rem; color: #64748b; }
+        .course-list { list-style: none; }
+        .course-list li { padding: .6rem 0; border-bottom: 1px solid #f1f5f9; }
+        .course-list li:last-child { border-bottom: none; }
+        .course-list a { color: #4b2e83; text-decoration: none; font-weight: 600; }
+        .course-list a:hover { text-decoration: underline; }
+        .course-list .code { font-size: .8rem; color: #64748b; margin-right: .5rem; }
+        .footer { text-align: center; padding: 2rem; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 3rem; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('university-academic.index') }}">MSU Computer Science</a></h1>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('university-academic.index') }}">Home</a>
+        <a href="{{ url_for('university-academic.courses_page') }}">Courses</a>
+        <a href="{{ url_for('university-academic.faculty_page') }}">Faculty</a>
+        <a href="{{ url_for('university-academic.departments_page') }}" class="active">Research</a>
+        <a href="{{ url_for('university-academic.events_page') }}">Events</a>
+        <a href="{{ url_for('university-academic.alumni_page') }}">Alumni</a>
+        <a href="{{ url_for('university-academic.login_page') }}">Sign In</a>
+    </nav>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="{{ url_for('university-academic.departments_page') }}">Research Areas</a> &rarr; {{ area.name }}
+        </div>
+
+        <div class="area-header">
+            <h2>{{ area.name }}</h2>
+            <p>{{ area.description }}</p>
+            <div class="area-stats">
+                <div class="stat">
+                    <div class="stat-value">{{ area.active_projects }}</div>
+                    <div class="stat-label">Active Projects</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ faculty | length }}</div>
+                    <div class="stat-label">Faculty</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ courses | length }}</div>
+                    <div class="stat-label">Courses</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-card">
+            <h3>Labs & Groups</h3>
+            <ul class="labs-list">
+                {% for lab in area.labs %}
+                <li>{{ lab }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="detail-card">
+            <h3>Faculty Leads</h3>
+            <p style="font-size:.9rem; color:#64748b; margin-bottom:.5rem;">{{ area.faculty_leads | join(', ') }}</p>
+        </div>
+
+        {% if faculty %}
+        <div class="detail-card">
+            <h3>Faculty in this Area</h3>
+            <ul class="faculty-list">
+                {% for f in faculty %}
+                <li>
+                    <a href="{{ url_for('university-academic.faculty_detail', faculty_id=f.id) }}">{{ f.name }}</a>
+                    <span class="title">{{ f.title }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if courses %}
+        <div class="detail-card">
+            <h3>Related Courses</h3>
+            <ul class="course-list">
+                {% for c in courses %}
+                <li>
+                    <span class="code">{{ c.code }}</span>
+                    <a href="{{ url_for('university-academic.course_detail', course_id=c.id) }}">{{ c.title }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>&copy; Meridian State University &mdash; School of Computer Science &amp; Engineering</p>
+    </div>
+</body>
+</html>
