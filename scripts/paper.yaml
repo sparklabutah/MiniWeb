@@ -1,10 +1,10 @@
 # How every number in the paper is produced (read by scripts/reproduce.py).
 #
-# Which run folders the paper reads is recorded by the figure configs: the named runs of
-# docs/figures/tables/tables_config.yaml (one list per benchmark; mean over the list) and the run lists of
-# docs/figures/rq1/rq1_config.yaml, rq3/data_config.yaml and scaling/scaling_wv_config.yaml. This file says how to make
-# each of them: the model server, the agent configuration on each benchmark, the grading, and the trained adapters.
-# `python scripts/reproduce.py status` checks every run the paper reads; `python scripts/reproduce.py show <arm>` prints its commands.
+# Each arm lists the run folders the paper reads (one list per benchmark, one run per seed; the paper reports the mean
+# over the list) and the paper's numbers, so `python scripts/reproduce.py table` sets a reproduction next to them. This
+# file says how to make each run: the model server, the agent configuration on each benchmark, the grading, and the
+# trained adapters. `python scripts/reproduce.py status` checks every run; `python scripts/reproduce.py show <arm>`
+# prints its commands. (The figure scripts' own configs, not part of the public repository, list the same runs.)
 
 paper_dir: docs/paper/MiniWeb            # LaTeX source; `scripts/reproduce.py figures` copies generated figures/tables into it
 
@@ -20,16 +20,16 @@ server:
 # n: tasks per run. MiniWeb needs the app on ports 8300-8320 (the runner starts them); WebArena-Lite needs the four
 # WebArena instances and src/miniwebagent/scripts/webarena/ready.sh; live web needs only a browser and the judges' API keys.
 benchmarks:
-  single:  {kind: miniweb, n: 103, runner: "-m miniwebagent.evaluate --tasks data/webmix/valgen/val_v2.jsonl",
+  single:  {kind: miniweb, n: 103, primitives: final_set, runner: "-m miniwebagent.evaluate --tasks data/webmix/valgen/val_v2.jsonl",
             about: "generated single-primitive tasks of the 13 held-out sites (103 of 115 are of well-covered primitives)"}
   heldout: {kind: miniweb, n: 63, runner: "-m miniwebagent.evaluate --human",
             about: "human tasks of the 13 held-out sites (data/datagen/site_split.json)"}
   wa:      {kind: webarena, n: 154, runner: "-m miniwebagent.wa --split all --instances 1,2,3,4",
             about: "WebArena-Lite (ScaleCUA's 154-task release), benchmark evaluators; fuzzy matches by gemini-3.5-flash-lite"}
-  wv:      {kind: webvoyager, n: 536, runner: "-m miniwebagent.om2w --bench webvoyager --tasks data/webmix/webvoyager/WebVoyager_reduced_536.jsonl",
+  wv:      {kind: webvoyager, n: 536, runner: "-m miniwebagent.om2w --bench webvoyager --tasks scripts/benchmarks/WebVoyager_reduced_536.jsonl", tasks: scripts/benchmarks/WebVoyager_reduced_536.jsonl,
             judge: "-m miniwebagent.om2w_judge {run} --bench webvoyager --workers 4", judged: "{run}_wvjudge",
             about: "WebVoyager, normalized set (536 of 643: time-sensitive dates moved, unreachable sites dropped)"}
-  om2w:    {kind: om2w, n: 280, runner: "-m miniwebagent.om2w --bench om2w --tasks data/webmix/om2w/Online_Mind2Web_reduced_280.json",
+  om2w:    {kind: om2w, n: 280, runner: "-m miniwebagent.om2w --bench om2w --tasks scripts/benchmarks/Online_Mind2Web_reduced_280.json", tasks: scripts/benchmarks/Online_Mind2Web_reduced_280.json,
             judge: "-m miniwebagent.om2w_judge {run} --bench om2w --workers 4", judged: "{run}_webjudge",
             about: "Online-Mind2Web, normalized set (280 of 300), WebJudge (o4-mini)"}
 
@@ -48,18 +48,50 @@ configs:
 
 # ── arms: the paper's agents (names as in tables_config.yaml `runs:` where they appear there) ───────────────────────
 arms:
-  base:           {config: single, executor: qwen35-4b, label: "Single agent, untrained"}
-  pooled:         {config: single, executor: pooled_v4, label: "Single agent, trained"}
-  planner:        {config: planner, executor: qwen35-4b, label: "Planner, untrained executor"}
-  planner_pooled: {config: planner, executor: pooled_v4, label: "MiniWebAgent (planner + trained executor)"}
+  base:           {config: single, executor: qwen35-4b, label: "Single agent, untrained",
+                   paper: {single: 55.3, heldout: 37.0, wa: 27.1, wv: 45.5, om2w: 17.9},
+                   runs: {single: [data/webmix/eval/val2_rq2_base, data/webmix/eval/val2_rq2_base_s2, data/webmix/eval/val2_rq2_base_s3],
+                          heldout: [data/webmix/eval/human_base, data/webmix/eval/seeds/base_s2, data/webmix/eval/seeds/base_s3],
+                          wa: [data/webmix/wa/seeds/base_s1, data/webmix/wa/seeds/base_s2, data/webmix/wa/seeds/base_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_base_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_base_webjudge]}}
+  pooled:         {config: single, executor: pooled_v4, label: "Single agent, trained",
+                   paper: {single: 80.3, heldout: 37.0, wa: 20.3, wv: 32.8, om2w: 8.6},
+                   runs: {single: [data/webmix/eval/val2_rq2_pooled, data/webmix/eval/val2_rq2_pooled_s2, data/webmix/eval/val2_rq2_pooled_s3],
+                          heldout: [data/webmix/eval/human_pooled_v4, data/webmix/eval/seeds/pooled_v4_s2, data/webmix/eval/seeds/pooled_v4_s3],
+                          wa: [data/webmix/wa/seeds/single_pooled_s1, data/webmix/wa/seeds/single_pooled_s2, data/webmix/wa/seeds/single_pooled_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_single_pooled_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_single_pooled_webjudge]}}
+  planner:        {config: planner, executor: qwen35-4b, label: "Planner, untrained executor",
+                   paper: {single: 54.0, heldout: 42.3, wa: 30.7, wv: 59.9, om2w: 21.8},
+                   runs: {single: [data/webmix/eval/val2_rq2_planner_base, data/webmix/eval/val2_rq2_planner_base_s2, data/webmix/eval/val2_rq2_planner_base_s3],
+                          heldout: [data/webmix/eval/seeds/pagent_v6_baseexec_s1, data/webmix/eval/seeds/pagent_v6_baseexec_s2, data/webmix/eval/seeds/pagent_v6_baseexec_s3],
+                          wa: [data/webmix/wa/seeds/agent_base_s1, data/webmix/wa/seeds/agent_base_s2, data/webmix/wa/seeds/agent_base_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_planner_base_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_agent_planner_base_webjudge]}}
+  planner_pooled: {config: planner, executor: pooled_v4, label: "MiniWebAgent (planner + trained executor)",
+                   paper: {single: 71.5, heldout: 54.5, wa: 36.4, wv: 65.5, om2w: 33.9},
+                   runs: {single: [data/webmix/eval/val2_pagent_pooled_s1, data/webmix/eval/val2_pagent_pooled_s2, data/webmix/eval/val2_pagent_pooled_s3],
+                          heldout: [data/webmix/eval/pagent_pooled_s1, data/webmix/eval/pagent_pooled_s2, data/webmix/eval/pagent_pooled_s3],
+                          wa: [data/webmix/wa/seeds/agent_pooled31k_s1, data/webmix/wa/seeds/agent_pooled31k_s2, data/webmix/wa/seeds/agent_pooled31k_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_pooled31k_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_agent_pooled31k_webjudge]}}
   taskcentric:    {config: planner, executor: taskgen_pooled, label: "Planner + executor trained on task-centric trajectories (Tab. 3)",
+                   paper: {heldout: 45.5, wa: 34.2, wv: 62.1, om2w: 23.2},
                    runs: {heldout: [data/webmix/eval/pagent_taskgen_s1, data/webmix/eval/pagent_taskgen_s2, data/webmix/eval/pagent_taskgen_s3],
                           wa: [data/webmix/wa/seeds/agent_taskgen_s1, data/webmix/wa/seeds/agent_taskgen_s2, data/webmix/wa/seeds/agent_taskgen_s3],
                           wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_taskgen_wvjudge],
                           om2w: [data/webmix/om2w/runs/granite/om2w100_agent_taskgen_webjudge]}}
   agent:          {config: planner, executor: pooled_v4, adapters: "drag,io,select,rest,reasoning",
-                   label: "Planner + family specialists (Supp.)", server_loras: [drag_v5b, io_v5b, select_v5b, rest_v5b, reasoning_v4]}
+                   label: "Planner + family specialists (Supp.)", server_loras: [drag=drag_v5b, io=io_v5b, select=select_v5b, rest=rest_v5b, reasoning=reasoning_v4],
+                   paper: {single: 70.9, heldout: 51.3, wa: 34.2, wv: 69.2, om2w: 26.1},
+                   runs: {single: [data/webmix/eval/val2_rq2_planner_v5, data/webmix/eval/val2_rq2_planner_v5_s2, data/webmix/eval/val2_rq2_planner_v5_s3],
+                          heldout: [data/webmix/eval/seeds/pagent_v6_v5b_s1, data/webmix/eval/seeds/pagent_v6_v5b_s2, data/webmix/eval/seeds/pagent_v6_v5b_s3],
+                          wa: [data/webmix/wa/seeds/agent_v5b_s1, data/webmix/wa/seeds/agent_v5b_s2, data/webmix/wa/seeds/agent_v5b_s3],
+                          wv: [data/webmix/om2w/runs/granite/webvoyager100_agent_v5bspec_wvjudge],
+                          om2w: [data/webmix/om2w/runs/granite/om2w100_agent_v5bspec_webjudge]}}
   nodone:         {config: single, executor: pooled_nodone, label: "Stop-early control: trained without final done steps",
+                   paper: {heldout: 33.9, wa: 22.5},
                    runs: {heldout: [data/webmix/eval/r1_control_nodone_s1, data/webmix/eval/r1_control_nodone_s2, data/webmix/eval/r1_control_nodone_s3],
                           wa: [data/webmix/wa/seeds/nodone_s1, data/webmix/wa/seeds/nodone_s2, data/webmix/wa/seeds/nodone_s3]}}
 

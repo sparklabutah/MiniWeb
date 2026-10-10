@@ -162,17 +162,23 @@ python src/miniweb/evaluation/run_agent_verify.py --task-id crm_bf9346 --model m
 python -m miniwebagent.evaluate --human --arm base --base-name qwen35-4b --vllm http://127.0.0.1:8400/v1 --out runs/base
 ```
 
+MiniWebAgent's trained executor is on the Hub as well
+([huggingface.co/miniweb/MiniWebAgent](https://huggingface.co/miniweb/MiniWebAgent)); `python scripts/fetch_adapters.py`
+puts it in `data/webmix/adapters/`. **[GUIDE.md](GUIDE.md)** covers the common jobs: hosting MiniWeb, running the 376
+tasks with your agent, per-primitive failure reports, choosing a grader, generating more data for a primitive or a
+skill family, and training an executor.
+
 ### Reproduce the paper
 
 ```bash
-python scripts/reproduce.py status                  # every run and adapter the paper reads: present and complete?
 python scripts/reproduce.py show planner_pooled     # MiniWebAgent: model server, run and grading commands per benchmark
-python scripts/reproduce.py train pooled_v4         # the executor's training set from its id list, and the torchrun line
+python scripts/reproduce.py run planner_pooled --bench heldout --seed 1 --execute
+python scripts/reproduce.py table                   # your runs next to the paper's numbers
 python -m pytest                                    # tests
 ```
 
-`scripts/paper.yaml` is the registry of every run, adapter and benchmark setting; [scripts/README.md](scripts/README.md)
-explains it.
+**[REPRODUCE.md](REPRODUCE.md)** walks through every table: what each needs (environments, keys, compute, cost), the
+commands, and how close to expect. `scripts/paper.yaml` is the registry of every run, adapter and benchmark setting.
 
 ### Generate the data
 
@@ -206,9 +212,10 @@ src/miniwebgen/     the data pipeline (python -m miniwebgen), replay into traini
 src/miniwebagent/   the harness, the planner agent, LoRA training, the evaluators for MiniWeb, WebArena-Lite and
                     the live web, scripts/ (vLLM serving, cluster wrappers)
 src/helpers/        shared utilities: LLM routing, the repository root
-scripts/            the paper's entry points: reproduce.py, generate_data.py, paper.yaml, pools/; the data
-                    release: restore_site_db.py, fetch_tasks.py, build_release.py, build_hf_dataset.py,
-                    export_site_db.py, fetch_site_media.py
+scripts/            the paper's entry points: reproduce.py, generate_data.py, paper.yaml, pools/, benchmarks/
+                    (the live-web task sets), skill_report.py (per-skill results of a run); the data release:
+                    restore_site_db.py, fetch_tasks.py, fetch_training_data.py, fetch_adapters.py,
+                    build_release.py, build_hf_dataset.py, export_site_db.py, fetch_site_media.py
 data/               macros.yaml, macro_locations.yaml, final_set.yaml, sites.yaml (tracked); the database,
                     annotations, generated data and runs (not tracked)
 assets/readme/      the figures above

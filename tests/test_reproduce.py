@@ -1,4 +1,5 @@
-"""The reproduction registry (scripts/paper.yaml) stays consistent with the CLI and the figure configs."""
+"""The reproduction registry (scripts/paper.yaml) stays consistent with the CLI, the released checkpoints and (where
+present) the figure configs."""
 import os
 import unittest
 
@@ -8,6 +9,9 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import reproduce as R  # noqa: E402  (scripts/reproduce.py)
+import fetch_adapters as F  # noqa: E402  (scripts/fetch_adapters.py)
+
+FIGURE_SCRIPTS = os.path.isdir(os.path.join(R.ROOT, "docs", "figures"))     # not in the public repository
 
 
 class ReproduceRegistryTests(unittest.TestCase):
@@ -35,11 +39,37 @@ class ReproduceRegistryTests(unittest.TestCase):
         n = sum(1 for _ in open(os.path.join(R.ROOT, "scripts/pools/pool3k_plain_ids.txt")))
         self.assertEqual(n, 3128)                                           # the paper's generated trajectories
 
+    def test_paper_numbers_have_runs(self):
+        for arm, a in self.reg["arms"].items():
+            runs = R.arm_runs(self.reg, self.named, arm)
+            for bench in a.get("paper", {}):
+                self.assertIn(bench, self.benches, (arm, bench))
+                self.assertTrue(runs.get(bench), f"{arm}: a paper number on {bench} but no runs")
+        for b in self.benches.values():
+            if b.get("tasks"):
+                self.assertTrue(os.path.exists(os.path.join(R.ROOT, b["tasks"])), b["tasks"])
+
+    def test_released_adapters_cover_every_arm(self):
+        released = set(F.MAIN.values()) | set(F.ABLATIONS.values())
+        for arm, a in self.reg["arms"].items():
+            needed = [x.partition("=")[2] or x for x in a.get("server_loras", [])]
+            if a["executor"] != self.reg["server"]["served"]:
+                needed.append(a["executor"])
+            for name in needed:
+                self.assertIn(name, released, arm)
+
+    def test_specialists_are_served_by_family(self):
+        cmd = R.server_cmd(self.reg, self.reg["arms"]["agent"]["server_loras"])
+        for fam in self.reg["arms"]["agent"]["adapters"].split(","):
+            self.assertIn(f"{fam}=data/webmix/adapters/", cmd)
+
+    @unittest.skipUnless(FIGURE_SCRIPTS, "the figure scripts are not in this checkout")
     def test_figure_generators_exist(self):
         for f in self.reg["figures"]:
             script = f["cmd"].split()[0]
             self.assertTrue(os.path.exists(os.path.join(R.ROOT, script)), script)
 
+    @unittest.skipUnless(FIGURE_SCRIPTS, "the figure scripts are not in this checkout")
     def test_rq1_agents_match_the_figure_config(self):
         cfg = yaml.safe_load(open(os.path.join(R.ROOT, "docs/figures/rq1/rq1_config.yaml")))
         judged = {os.path.basename(os.path.dirname(m["judge"])) for m in cfg["models"]}

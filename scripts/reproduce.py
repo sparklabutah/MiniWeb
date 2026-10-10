@@ -1,6 +1,7 @@
 """Reproduce the paper: one entry point for its runs, adapters, figures and tables (registry: scripts/paper.yaml).
 
     python scripts/reproduce.py status                      # every run the paper reads: present, complete?
+    python scripts/reproduce.py table                       # task success of the runs present, next to the paper's
     python scripts/reproduce.py show planner_pooled         # the commands behind an arm (server, runs, grading)
     python scripts/reproduce.py show rq1                    # the ten RQ1 agents
     python scripts/reproduce.py run pooled --bench heldout --seed 1 [--execute]
@@ -33,7 +34,8 @@ LIVE_WORKERS = 24          # at most 24 browsers per model server (more made LLM
 
 def load():
     reg = yaml.safe_load(open(REG))
-    named = yaml.safe_load(open(TABLES)).get("runs", {})
+    # the paper's named run folders come with the figure scripts, which are not part of every checkout
+    named = yaml.safe_load(open(TABLES)).get("runs", {}) if os.path.exists(TABLES) else {}
     benches = {**reg["benchmarks"], **reg.get("extra_benchmarks", {})}
     return reg, named, benches
 
@@ -105,12 +107,66 @@ def status(args):
     return 1 if bad else 0
 
 
+# ── table ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _jl(path):
+    return [json.loads(l) for l in open(path) if l.strip()] if os.path.exists(path) else []
+
+
+def rate(bench, run):
+    """Task success (%) of one run, as the paper computes it, or None when the run is missing. MiniWeb: the task
+    verifiers (results_regraded.jsonl when present); WebArena-Lite: the benchmark's evaluator scores; live web: the
+    judge's labels, a task missing from the judged folder counting as failed."""
+    p = os.path.join(ROOT, run)
+    if not os.path.isdir(p):
+        return None
+    kind = bench["kind"]
+    if kind in ("miniweb", "webarena"):
+        rows = _jl(os.path.join(p, "results_regraded.jsonl")) or _jl(os.path.join(p, "results.jsonl"))
+        recs = {r["task_id"]: r for r in rows}
+        if bench.get("primitives") == "final_set":           # the single-primitive set: the 103 of well-covered primitives
+            keep = set(yaml.safe_load(open(os.path.join(ROOT, "data", "final_set.yaml")))["primitives"])
+            recs = {k: r for k, r in recs.items() if r.get("macro") in keep}
+        if not recs:
+            return None
+        if kind == "miniweb":
+            return 100 * sum(bool(r.get("ok")) for r in recs.values()) / len(recs)
+        return 100 * sum(float(r["score"]) for r in recs.values()) / len(recs)
+    tasks = os.path.join(ROOT, bench["tasks"])
+    if kind == "webvoyager":
+        ids = [json.loads(l)["id"] for l in open(tasks) if l.strip()]
+        lab = {}
+        for f in glob.glob(os.path.join(p, "*--*.json")):
+            d = json.load(open(f))
+            lab[d["task_id"]] = str(d.get("predicted_label")) == "1"
+    else:
+        ids = [t["task_id"] for t in json.load(open(tasks))]
+        lab = {r.get("task_id"): int(r.get("predicted_label", 0)) == 1
+               for f in glob.glob(os.path.join(p, "WebJudge*auto_eval_results.json")) for r in _jl(f)}
+    return 100 * sum(lab.get(i, False) for i in ids) / len(ids)
+
+
+def table(args):
+    reg, named, benches = load()
+    cols = [b for b in reg["benchmarks"] if b in benches]
+    print("Task success (%): reproduced = mean over the runs present (k of n runs), paper = the paper's number.\n")
+    print(f"{'':44s}" + "".join(f"{b:>20s}" for b in cols))
+    for arm, a in reg["arms"].items():
+        runs, paper, cells = arm_runs(reg, named, arm), a.get("paper", {}), []
+        for b in cols:
+            rs = [r for r in (rate(benches[b], x) for x in runs.get(b, [])) if r is not None]
+            got = f"{sum(rs) / len(rs):.1f} ({len(rs)}/{len(runs.get(b, []))})" if rs else "--"
+            cells.append(f"{got} | {paper[b]:.1f}" if b in paper else got)
+        print(f"{a.get('label', arm)[:43]:44s}" + "".join(f"{c:>20s}" for c in cells))
+
+
 # ── commands ────────────────────────────────────────────────────────────────────────────────────────────────────────
 def server_cmd(reg, loras):
     s = reg["server"]
     env = {"MODEL": s["model"], "SERVED": s["served"], "PORT": s["port"], **s.get("env", {})}
     if loras:
-        env["LORA_MODULES"] = " ".join(f"{a}=data/webmix/adapters/{a}" for a in loras)
+        # an entry is an adapter folder, or served-name=folder (the specialists are requested by family: drag, io, ...)
+        env["LORA_MODULES"] = " ".join(f"{a.partition('=')[0]}=data/webmix/adapters/{a.partition('=')[2] or a}"
+                                       for a in loras)
     return " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items()) + " bash src/miniwebagent/scripts/serve.sh"
 
 
@@ -221,6 +277,10 @@ def train(args):
 # ── figures ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 def figures(args):
     reg = yaml.safe_load(open(REG))
+    missing = [f["cmd"].split()[0] for f in reg["figures"] if not os.path.exists(os.path.join(ROOT, f["cmd"].split()[0]))]
+    if missing:
+        sys.exit(f"the figure scripts are not in this checkout ({len(missing)} missing, e.g. {missing[0]}); "
+                 "scripts/skill_report.py reports the per-skill numbers of any run")
     paper = os.path.join(ROOT, args.paper or reg["paper_dir"])
     for f in reg["figures"]:
         cmd = f["cmd"]
@@ -249,6 +309,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status", help="every run and adapter the paper reads: present and complete?")
+    sub.add_parser("table", help="task success of the runs present, next to the paper's numbers")
     p = sub.add_parser("show", help="the commands behind an arm (or 'rq1')")
     p.add_argument("arm")
     p.add_argument("--bench")
@@ -267,7 +328,7 @@ def main():
     p.add_argument("--paper", help="paper source folder (default: paper_dir of scripts/paper.yaml)")
     p.add_argument("--no-copy", action="store_true")
     args = ap.parse_args()
-    return {"status": status, "show": show, "run": run, "train": train, "figures": figures}[args.cmd](args)
+    return {"status": status, "table": table, "show": show, "run": run, "train": train, "figures": figures}[args.cmd](args)
 
 
 if __name__ == "__main__":

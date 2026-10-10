@@ -20,16 +20,28 @@ def load(v):
     return None if v is None else json.loads(v)
 
 
+def unflatten(v):
+    """The release stores nested fields as JSON text: back to the value (plain strings stay strings)."""
+    if isinstance(v, str) and v[:1] in "{[":
+        try:
+            return json.loads(v)
+        except ValueError:
+            return v
+    return v
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", help="a local copy of the release (default: download the two tables from the Hub)")
     ap.add_argument("--repo", default=REPO)
     ap.add_argument("--out", default=os.environ.get("MINIWEB_ANNOTATIONS_DIR", os.path.join(ROOT, "data", "annotations")))
+    ap.add_argument("--valset", default=os.path.join(ROOT, "data", "webmix", "valgen", "val_v2.jsonl"),
+                    help="where to write the generated single-primitive test tasks")
     a = ap.parse_args()
     src = a.src
     if not src:
         from huggingface_hub import snapshot_download
-        src = snapshot_download(a.repo, repo_type="dataset", allow_patterns=["data/tasks/*", "data/demonstrations/*"])
+        src = snapshot_download(a.repo, repo_type="dataset", allow_patterns=["data/tasks/*", "data/demonstrations/*", "data/single_primitive_test_tasks/*"])
     tasks = {}
     for f in sorted(glob.glob(os.path.join(src, "data", "tasks", "*.parquet"))):
         for r in pq.read_table(f).to_pylist():
@@ -77,6 +89,15 @@ def main():
         json.dump([e for _, e in sorted(evs, key=lambda x: x[0])], open(os.path.join(folder[tid], "trajectory.json"), "w"),
                   ensure_ascii=False)
     print(f"{len(tasks)} tasks in {a.out} ({len(events)} with a recording)")
+    # the generated single-primitive test tasks of the held-out sites, as the file the evaluator reads (--tasks)
+    rows = [r for f in sorted(glob.glob(os.path.join(src, "data", "single_primitive_test_tasks", "*.parquet")))
+            for r in pq.read_table(f).to_pylist()]
+    if rows:
+        os.makedirs(os.path.dirname(a.valset), exist_ok=True)
+        with open(a.valset, "w") as fh:
+            for r in rows:
+                fh.write(json.dumps({k: unflatten(v) for k, v in r.items()}, ensure_ascii=False) + "\n")
+        print(f"{len(rows)} generated single-primitive test tasks in {a.valset}")
 
 
 if __name__ == "__main__":
