@@ -87,6 +87,8 @@ def main():
         for k in keys:
             jp, jn, vp, vn = stat[k]
             print(f"  {k:34s} {max(jn, vn):5d}  {pct(jp, jn):>6s}  {pct(vp, vn):>8s}")
+        jp, jn, vp, vn = (sum(v[i] for v in stat.values()) for i in range(4))
+        print(f"  {'all instances':34s} {max(jn, vn):5d}  {pct(jp, jn):>6s}  {pct(vp, vn):>8s}")
         if a.failures:
             shown = [f for f in fails if not a.family or f[2] == a.family][:a.failures]
             print(f"\n  failed instances{' (' + a.family + ')' if a.family else ''}: {len(shown)} shown")
