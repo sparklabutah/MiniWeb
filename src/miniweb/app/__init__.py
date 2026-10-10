@@ -706,6 +706,10 @@ def create_app():
             return send_from_directory(data_static / sub, filename)
         return send_from_directory(_Path(app.static_folder) / sub, filename)
 
+    # External media (images linked from site data, map tiles) served from a local copy when one exists
+    from .media import init_media
+    init_media(app, os.environ.get("MINIWEB_MEDIA_DIR", str(REPO_ROOT / "data" / "media")))
+
     # Reusable in-network ads — expose product_ads() to every template so any
     # site can render MiniWeb (ShopHub) sponsored image cards with no route
     # changes:  {% set ads = product_ads(3, seed=request.path) %}

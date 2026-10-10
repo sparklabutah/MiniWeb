@@ -72,58 +72,72 @@ of steps of task-centric trajectories, collected on the same training sites with
 and WebArena-Lite average three runs; the live-web benchmarks leave out impossible tasks and sites that block our
 network.
 
-## The data
+## Get started
 
-`python scripts/build_release.py` consolidates everything the paper uses into one folder, `data/release/miniweb-v1/`, split by the held-out sites
-and free of personal information (annotators appear as pseudonyms; the build audits every file it writes). Its own
-README documents each field.
-
-```
-sites.jsonl             65 sites: domain, split, hub, data source and license
-primitives/             the macro registry, the final 37-primitive set, the 7 skill families
-tasks/test/             63 tasks that start on a held-out site
-tasks/train/            310 tasks on training sites only
-tasks/excluded/         3 tasks that start on a training site and use a held-out one (in neither split)
-  <task_id>/            task.json and verifier.json as evaluated, original/ as the annotator wrote them,
-                        demonstration/ (recording, server log, screenshots), provenance.json
-generated/              MiniWebGen: 3,128 trajectories, 4,614 training episodes (plain, recovery, chain),
-                        the per-primitive guides, generated single-primitive test tasks of the held-out sites,
-                        and task_centric/: the task-centric comparison data (proposed tasks, judged episodes)
-```
-
-Every task keeps its original and its reviewed version, and `provenance.json` says what the review changed and whether
-the demonstration is the annotator's original recording or a re-recording.
-
-## Quickstart
-
-### Install
+### 1. Install
 
 ```bash
+git clone https://github.com/miniweb-site/MiniWeb.git && cd MiniWeb
 conda create -n miniweb python=3.11 -y && conda activate miniweb
 pip install -r requirements.txt
 pip install -e .                          # the src/ packages: miniweb, miniwebgen, miniwebagent, helpers
 python -m playwright install chromium     # the agents' browser
 ```
 
-Training and serving use a second environment with vLLM (`scripts/envs/webmix.txt`).
+Training and serving models use a second environment with vLLM (`scripts/envs/webmix.txt`).
 
-### Configure
+### 2. Download the data
 
-The site data is one SQLite file (about 38 GB) that git does not track. Put it at `data/trimmed_miniweb.db` and create
-`.env` from `.env.example`:
+All data is on the Hugging Face Hub: **[huggingface.co/datasets/miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb)**.
+Two scripts put what the code needs in place:
 
 ```bash
-MINIWEB_DB="data/trimmed_miniweb.db"
+python scripts/restore_site_db.py   # the sites: database, images and a copy of the media they link to (~8 GB)
+                                    #   -> data/miniweb.db, data/static/, data/media/
+python scripts/fetch_tasks.py       # the 376 human tasks: task, verifier, recording, verification walk
+                                    #   -> data/annotations/<author>/<task_id>/
+```
+
+The site database is the one the tasks were made on, search indexes included, so do not rebuild it with
+`build_db.py`. The media copy lets the sites render without the internet: the server serves it at `/media/...` and
+rewrites the pages' links to it (`src/miniweb/app/media.py`).
+
+Every table of the release also loads directly with `datasets`, screenshots as images:
+
+```python
+from datasets import load_dataset
+tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")                         # the 63 held-out tasks
+steps = load_dataset("miniweb/MiniWeb", "training_steps", split="train", streaming=True)  # MiniWebAgent's training data
+```
+
+| Table | Rows | One row per |
+|---|---|---|
+| `tasks` | 376 (train 310, test 63, excluded 3) | human task: instruction, primitives, verifier, the annotator's original version, provenance |
+| `demonstrations` | 17.8K | recorded event of a human demonstration, with the page's HTML, accessibility tree and screenshot |
+| `miniwebgen_trajectories`, `miniwebgen_steps` | 3,128 / 17.1K | MiniWebGen's verified single-primitive trajectories and their steps |
+| `training_steps` | 31K | MiniWebAgent's training data, in the agent harness's format, with the step's screenshot |
+| `task_centric_tasks`, `task_centric_steps` | 7,280 / 27.6K | the task-centric comparison data |
+| `single_primitive_test_tasks` | 115 | generated single-primitive tasks of the held-out sites |
+| `sites`, `primitives`, `guides` | 65 / 53 / 46 | the websites with their data sources and licenses, the macro registry, MiniWebGen's guides |
+
+`test` is the 13 held-out sites: no training data comes from them. Annotators appear as pseudonyms (A1 to A6).
+
+### 3. Configure
+
+Create `.env` from `.env.example`:
+
+```bash
+MINIWEB_DB="data/miniweb.db"
 MINIWEB_ANNOTATIONS_DIR="data/annotations"
 MINIWEB_ANNOTATORS="alice:secret,bob:secret"     # annotation-tool logins
 GEMINI_API_KEY=...                               # or GOOGLE_GENAI_USE_VERTEXAI + GOOGLE_CREDENTIALS_JSON
 OPENAI_API_KEY=...                               # only the providers you use (routing: src/helpers/llm.py)
 ```
 
-The parser takes `KEY=VALUE` lines and whole-line comments. Never run `build_db.py`: the database changed after it was
-built, and some content comes from the seed scripts in `src/miniweb/scripts/`.
+The parser takes `KEY=VALUE` lines and whole-line comments. The sites run without an LLM key; the VLM judge,
+MiniWebGen, and the verifier checks that compare free text by meaning need one.
 
-### Run the sites
+### 4. Run the sites
 
 ```bash
 python run.py                              # http://localhost:8080
@@ -138,11 +152,11 @@ MINIWEB_SITES=banking,email python run.py  # only some sites, for a faster start
 
 Production runs `gunicorn run:app` (`Procfile`, `Dockerfile`).
 
-### Evaluate an agent
+### 5. Evaluate an agent
 
 ```bash
 # one task (starts its own server; --model mock checks the pipeline without a model)
-python src/miniweb/evaluation/run_agent_verify.py --task-id <annotator>/crm_bf9346 --model mock
+python src/miniweb/evaluation/run_agent_verify.py --task-id crm_bf9346 --model mock
 
 # the held-out tasks with the browser-use harness and a served model
 python -m miniwebagent.evaluate --human --arm base --base-name qwen35-4b --vllm http://127.0.0.1:8400/v1 --out runs/base
@@ -172,6 +186,15 @@ The steps follow the paper: the site split, MiniWebGen's site maps and per-primi
 the replay into training episodes with the recovery and chain variants, the training pool, the generated test tasks of
 the held-out sites, the task-centric comparison data, and the release.
 
+### Build the release
+
+The Hub release is built from the working data in two steps. `python scripts/build_release.py` consolidates
+everything the paper uses into `data/release/miniweb-v1/`, split by the held-out sites and free of personal information
+(annotators appear as pseudonyms; the build audits every file it writes; every task keeps its original and its reviewed
+version, and `provenance.json` says what the review changed). `python scripts/build_hf_dataset.py` converts it to the
+Hub's Parquet tables, `scripts/fetch_site_media.py` downloads the media the sites link to, and
+`scripts/export_site_db.py` exports the site database, its images and that media to `site_db/`.
+
 ## Repository map
 
 ```
@@ -183,7 +206,9 @@ src/miniwebgen/     the data pipeline (python -m miniwebgen), replay into traini
 src/miniwebagent/   the harness, the planner agent, LoRA training, the evaluators for MiniWeb, WebArena-Lite and
                     the live web, scripts/ (vLLM serving, cluster wrappers)
 src/helpers/        shared utilities: LLM routing, the repository root
-scripts/            the paper's entry points: reproduce.py, generate_data.py, build_release.py, paper.yaml, pools/
+scripts/            the paper's entry points: reproduce.py, generate_data.py, paper.yaml, pools/; the data
+                    release: restore_site_db.py, fetch_tasks.py, build_release.py, build_hf_dataset.py,
+                    export_site_db.py, fetch_site_media.py
 data/               macros.yaml, macro_locations.yaml, final_set.yaml, sites.yaml (tracked); the database,
                     annotations, generated data and runs (not tracked)
 assets/readme/      the figures above
