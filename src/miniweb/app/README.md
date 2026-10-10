@@ -78,9 +78,10 @@ grader in the same session sees the agent's changes.
 ## Data layer (`db.py`)
 
 All site data lives in per-site SQLite tables (`<site>_<collection>`, for
-example `banking_transactions`) in the file named by `MINIWEB_DB`. The project
-`.env` points it at `data/trimmed_miniweb.db`; without it the default is
-`miniweb.db` at the repo root. The `site_registry` table maps
+example `banking_transactions`) in the file named by `MINIWEB_DB` (relative to
+the repository; by default `data/miniweb.db`, where `scripts/restore_site_db.py`
+writes it). The server refuses to start when that file is missing or holds no
+sites. The `site_registry` table maps
 `(site, collection)` to a table name and primary key.
 
 **Session overlay.** Writes never touch base tables. `save_item`, `delete_item`
@@ -125,7 +126,7 @@ them at `/_admin/data/filesystem/files`. Endpoints: `/_fs/list`, `/_fs/file`,
 
 | Variable | Effect |
 |---|---|
-| `MINIWEB_DB` | SQLite file path. |
+| `MINIWEB_DB` | SQLite file path, relative to the repository (default `data/miniweb.db`). |
 | `MINIWEB_SITES` | Comma-separated subset of sites to load. |
 | `MINIWEB_NO_AUTOLOGIN` | Disable auto-login for the whole process. |
 | `MINIWEB_VFS_DIR` | Base directory for the simulated file system. |

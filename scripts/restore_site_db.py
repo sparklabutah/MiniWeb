@@ -1,6 +1,7 @@
 """Rebuild the MiniWeb site database (SQLite) and the sites' static images from the Hugging Face release
-(site_db/, written by scripts/export_site_db.py). Run it once before serving the sites; then point MINIWEB_DB at the
-database and MINIWEB_DATA_STATIC at the static folder (.env.example).
+(site_db/, written by scripts/export_site_db.py). Run it once before serving the sites. The server reads data/miniweb.db,
+data/static/ and data/media/ by default; if you write them elsewhere (--db, --static, --media), set MINIWEB_DB,
+MINIWEB_DATA_STATIC and MINIWEB_MEDIA_DIR to match (.env.example).
 
     python scripts/restore_site_db.py                                  # downloads site_db/ from the Hub
     python scripts/restore_site_db.py --src path/to/site_db            # a local copy

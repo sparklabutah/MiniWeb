@@ -25,7 +25,7 @@ This guide covers the common jobs. [REPRODUCE.md](REPRODUCE.md) reproduces the p
 Follow steps 1 to 3 of the [README](README.md#get-started): install, download the data, write `.env`. In short:
 
 ```bash
-pip install -r requirements.txt && pip install -e . && python -m playwright install chromium
+conda env create -f environment.yml && conda activate miniweb && python -m playwright install chromium
 python scripts/restore_site_db.py     # the sites: data/miniweb.db, data/static/, data/media/
 python scripts/fetch_tasks.py         # the tasks: data/annotations/, data/webmix/valgen/val_v2.jsonl
 ```
@@ -60,7 +60,7 @@ small and mount the folder as above.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MINIWEB_DB` | `miniweb.db` | the site database; `restore_site_db.py` writes `data/miniweb.db`, which `.env` points to |
+| `MINIWEB_DB` | `data/miniweb.db` | the site database, where `restore_site_db.py` writes it; the server stops if it is missing or empty |
 | `MINIWEB_DATA_STATIC` | `data/static` | the sites' own images |
 | `MINIWEB_MEDIA_DIR` | `data/media` | the copy of external media; without it, pages load images from their original hosts |
 | `MINIWEB_SITES` | all | comma-separated sites to load |

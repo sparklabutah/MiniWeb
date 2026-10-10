@@ -37,10 +37,9 @@ import time
 # Configuration
 # ---------------------------------------------------------------------------
 
-_DB_PATH = os.environ.get(
-    "MINIWEB_DB",
-    str(REPO_ROOT / "miniweb.db"),
-)
+# MINIWEB_DB, relative to the repository unless absolute; by default data/miniweb.db, where
+# scripts/restore_site_db.py writes it
+_DB_PATH = str(REPO_ROOT / os.environ.get("MINIWEB_DB", "data/miniweb.db"))
 _SESSION_TTL = 3600  # 1 hour
 
 # ---------------------------------------------------------------------------

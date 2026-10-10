@@ -41,7 +41,7 @@ is the walkthrough.
   5.17, peft 0.21).
 - `fara.txt` (Python 3.11): Fara1.5-4B's released loop (`microsoft/fara` at a675d6d).
 
-The repo's `requirements.txt` is the minimal install for running the app; these files are what produced the numbers.
+The repo's `requirements.txt` (`environment.yml`) installs current versions for using MiniWeb; these files are what produced the numbers. Each `<name>.yml` creates its environment from `<name>.txt` and names the systems it ran on (REPRODUCE.md).
 
 ## Grading
 

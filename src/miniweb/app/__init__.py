@@ -3,7 +3,9 @@ import importlib
 import json
 import os
 import pathlib
+import re
 import sqlite3
+import sys
 
 
 def _load_dotenv():
@@ -27,7 +29,11 @@ def _load_dotenv():
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip()
-        if value.startswith('"') and not (len(value) > 1 and value.endswith('"')):
+        quoted = re.match(r'"((?:\\.|[^\\"])*)"|\'((?:\\.|[^\\\'])*)\'', value)
+        if quoted:
+            # quoted on one line; anything after the closing quote is a comment
+            value = quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
+        elif value.startswith('"'):
             # multi-line double-quoted value (e.g. GOOGLE_CREDENTIALS_JSON)
             parts = [value[1:]]
             while i < len(lines):
@@ -41,7 +47,7 @@ def _load_dotenv():
             # dotenv-style unescaping inside double-quoted values
             value = "\n".join(parts).replace('\\"', '"').replace("\\\\", "\\")
         else:
-            value = value.strip('"').strip("'")
+            value = value.split(" #", 1)[0].strip()      # unquoted; " #" starts a comment
         if key and key not in os.environ:
             os.environ[key] = value
 
@@ -731,8 +737,21 @@ def create_app():
     # A corrupt/partial DB (e.g. an interrupted volume upload) must not
     # crash-loop the app — boot anyway so /recovery/db can replace it.
     from miniweb.app import db
+    recovery = bool(os.environ.get("MINIWEB_RECOVERY_TOKEN"))
+
+    def no_sites(problem):
+        # Without sites every page fails, so stop. Exit code 3 is gunicorn's "worker failed to boot": its master
+        # stops too instead of restarting the worker.
+        print(f"{problem}. Run `python scripts/restore_site_db.py` (it writes data/miniweb.db), or point MINIWEB_DB "
+              "at your copy.", file=sys.stderr)
+        raise SystemExit(3)
+
+    if not os.path.exists(db._DB_PATH) and not recovery:
+        no_sites(f"No site database at {db._DB_PATH}")      # (sqlite would create an empty one)
     try:
         db.init_db()
+        if not recovery and not db.get_conn().execute("SELECT 1 FROM site_registry LIMIT 1").fetchone():
+            no_sites(f"{db._DB_PATH} holds no sites")
         app.config["DB_HEALTHY"] = True
     except sqlite3.Error as e:
         app.config["DB_HEALTHY"] = False

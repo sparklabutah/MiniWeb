@@ -78,13 +78,14 @@ network.
 
 ```bash
 git clone https://github.com/miniweb-site/MiniWeb.git && cd MiniWeb
-conda create -n miniweb python=3.11 -y && conda activate miniweb
-pip install -r requirements.txt
-pip install -e .                          # the src/ packages: miniweb, miniwebgen, miniwebagent, helpers
+conda env create -f environment.yml       # requirements.txt + the src/ packages: miniweb, miniwebgen, miniwebagent, helpers
+conda activate miniweb
 python -m playwright install chromium     # the agents' browser
 ```
 
-Training and serving models use a second environment with vLLM (`scripts/envs/webmix.txt`).
+Tested on Ubuntu 22.04 (x86_64); the sites need no GPU. Without conda: `pip install -r requirements.txt && pip install -e .`
+under Python 3.11. Training and serving models use a second environment with vLLM, and the paper's exact environments
+are in `scripts/envs/` ([REPRODUCE.md](REPRODUCE.md#what-you-need)).
 
 ### 2. Download the data
 
@@ -124,7 +125,8 @@ steps = load_dataset("miniweb/MiniWeb", "training_steps", split="train", streami
 
 ### 3. Configure
 
-Create `.env` from `.env.example`:
+The sites need no configuration: the server reads `data/miniweb.db` and stops with a message if it is missing or
+empty. For the LLM keys, the annotation tool and other locations, create `.env` from `.env.example`:
 
 ```bash
 MINIWEB_DB="data/miniweb.db"

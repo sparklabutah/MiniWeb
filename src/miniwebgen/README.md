@@ -15,7 +15,7 @@ Every human input is fixed before a run starts:
 
 | Input | Where |
 |---|---|
-| The websites and their data | `src/miniweb/sites/`, `data/trimmed_miniweb.db` |
+| The websites and their data | `src/miniweb/sites/`, `data/miniweb.db` |
 | The macro registry, and where each macro lives on each site | `data/macros.yaml`, `data/macro_locations.yaml` |
 | What a macro's target looks like on a page | control-kind code, `src/miniwebgen/kinds/` |
 | Human demonstrations: annotated recordings on train sites, summarized once per macro into a guide | `data/annotations/` → `data/datagen/guides/` |

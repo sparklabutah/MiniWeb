@@ -5,14 +5,14 @@ threaded discussions (top-level comments + nested replies) with per-user
 upvotes, instead of a bare denormalized comments_count with zero backing rows.
 
 Idempotent: skips if the table already has rows. Re-run after a DB rebuild.
-Run:  MINIWEB_DB=data/trimmed_miniweb.db python src/miniweb/scripts/seed_news_comments.py
+Run:  python src/miniweb/scripts/seed_news_comments.py
 """
 import json
 import os
 import sqlite3
 from datetime import datetime, timedelta
 
-DB = os.environ.get("MINIWEB_DB", "data/trimmed_miniweb.db")
+DB = os.environ.get("MINIWEB_DB", "data/miniweb.db")
 
 # Commenters (news_users): id -> display_name
 USERS = {1: ("alex_rivera", "Alex Rivera"),

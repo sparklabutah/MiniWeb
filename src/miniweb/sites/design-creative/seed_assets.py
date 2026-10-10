@@ -18,7 +18,7 @@ import pathlib
 import sys
 from urllib.parse import quote
 
-# --- Point db at the configured database (data/trimmed_miniweb.db via .env) ---
+# --- Point db at the configured database (MINIWEB_DB, by default data/miniweb.db) ---
 REPO = pathlib.Path(__file__).resolve().parents[4]          # the repository (src/miniweb/sites/<site>/seed_assets.py)
 sys.path.insert(0, str(REPO / "src"))
 
@@ -34,7 +34,7 @@ def _db_path():
             if line.startswith("MINIWEB_DB"):
                 _, _, val = line.partition("=")
                 return val.strip().strip('"').strip("'")
-    return str(REPO / "miniweb.db")
+    return str(REPO / "data" / "miniweb.db")
 
 
 DB_PATH = _db_path()

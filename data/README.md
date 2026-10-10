@@ -19,7 +19,7 @@ data-generation and training pipelines.
 
 | Path | Contents |
 |---|---|
-| `miniweb.db` | The per-site SQLite database every site reads and writes through `miniweb.app.db`, rebuilt from the Hub by `scripts/restore_site_db.py`. `.env` points `MINIWEB_DB` at it. It was modified after the build: **never re-run `build_db.py`** |
+| `miniweb.db` | The per-site SQLite database every site reads and writes through `miniweb.app.db`, rebuilt from the Hub by `scripts/restore_site_db.py` (`MINIWEB_DB` moves it). It was modified after the build: **never re-run `build_db.py`** |
 | `annotations/` | The human tasks, `<author>/<task_id>/`: `task.json`, `verifier.json`, `trajectory.json`, `screenshots/`, the verification walk; rebuilt from the Hub by `scripts/fetch_tasks.py` (`MINIWEB_ANNOTATIONS_DIR` moves it) |
 | `static/` | The sites' own images (`generated/`, `avatars/`, `thumbnails/`), served at `/static/<sub>/…`; restored by `scripts/restore_site_db.py` (`MINIWEB_DATA_STATIC` moves it) |
 | `media/` | A copy of the external media the sites' pages show (images that site data links to, map tiles) with `manifest.jsonl`, served at `/media/…`; restored by `scripts/restore_site_db.py`, rebuilt from the original hosts by `scripts/fetch_site_media.py` (`MINIWEB_MEDIA_DIR` moves it) |

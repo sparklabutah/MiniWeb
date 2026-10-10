@@ -10,7 +10,7 @@ Requires MINIWEB_RECOVERY_TOKEN to be set on the Railway service.
 
 Usage:
   python src/miniweb/scripts/upload_db_railway.py --url https://<app>.up.railway.app \
-      --token <MINIWEB_RECOVERY_TOKEN> [--db data/trimmed_miniweb.db] [--chunk-mb 32]
+      --token <MINIWEB_RECOVERY_TOKEN> [--db data/miniweb.db] [--chunk-mb 32]
 """
 import argparse
 import os
@@ -33,7 +33,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", required=True, help="Base URL of the deployment")
     ap.add_argument("--token", default=os.environ.get("MINIWEB_RECOVERY_TOKEN", ""))
-    ap.add_argument("--db", default="data/trimmed_miniweb.db")
+    ap.add_argument("--db", default="data/miniweb.db")
     ap.add_argument("--annotations", action="store_true",
                     help="Upload data/annotations (task dirs) instead of the DB. "
                     "Tars <annotator>/<task_id> dirs, uploads, and the server "

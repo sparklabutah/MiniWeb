@@ -23,15 +23,26 @@ For using MiniWeb beyond the paper (your own agent, more data, other graders), s
 
 ## What you need
 
-**Environments.** `scripts/envs/` pins the three the paper used (`pip list --format=freeze`):
+**Environments.** `scripts/envs/` holds the three the paper used, as conda files over the exact versions
+(`<name>.txt`, `pip list --format=freeze`):
 
-| Environment | Used for |
-|---|---|
-| `miniweb` (Python 3.11, `scripts/envs/miniweb.txt`) | the sites, the agent harness (browser-use), the graders, MiniWebGen; Playwright 1.44 with Chromium build 1117 |
-| `webmix` (Python 3.12, `scripts/envs/webmix.txt`) | vLLM 0.30 serving (`src/miniwebagent/scripts/serve.sh`) and LoRA training |
-| `fara` (Python 3.11, `scripts/envs/fara.txt`) | only Fara1.5-4B's own agent loop in Tab. 2 |
+| Environment | Used for | Ran on |
+|---|---|---|
+| `miniweb` (Python 3.11.0) | the sites, the agent harness (browser-use), the graders, MiniWebGen; Playwright 1.44 with Chromium build 1117 | Ubuntu 22.04.5 LTS, x86_64 (Linux 6.8, glibc 2.35); no GPU needed |
+| `webmix` (Python 3.12.14) | vLLM 0.30 serving (`src/miniwebagent/scripts/serve.sh`) and LoRA training | training: 4x A800 40GB, Rocky Linux 8.10 (Linux 4.18, glibc 2.28), driver 595.91; serving also on an RTX 5090, Ubuntu 22.04.5, driver 580.178 |
+| `fara` (Python 3.11.0) | only Fara1.5-4B's own agent loop in Tab. 2 | Ubuntu 22.04.5 LTS |
 
-`requirements.txt` is the minimal install for the sites; the pinned files are what produced the paper's numbers.
+```bash
+PIP_NO_DEPS=1 conda env create -f scripts/envs/miniweb.yml   # then: python -m playwright install chromium
+conda env create -f scripts/envs/webmix.yml
+conda env create -f scripts/envs/fara.yml                    # then: python -m playwright install chromium
+```
+
+`miniweb` installs only without dependency resolution (`PIP_NO_DEPS=1`): it grew by successive installs, so its
+versions conflict on paper (browser-use 0.13.3 declares openai 2.16.0 and pillow 12.2.0; the runs used openai 1.109.1
+and pillow 11.3.0). torch 2.13.0 and vLLM 0.30.0 in `webmix` are CUDA 13.0 wheels, which need an NVIDIA driver of 580 or
+newer. The root `environment.yml` (`requirements.txt`) installs current versions instead, for using MiniWeb rather
+than matching the paper's numbers.
 
 `serve.sh` looks for the vLLM environment at `$WEBMIX_ENV` (default `~/.conda/envs/webmix`).
 
