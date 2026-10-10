@@ -90,7 +90,7 @@ Everything comes from the Hugging Face Hub: the data from
 | Tab. 3: Qwen3.5-4B as a single agent or a planner, untrained or trained, on four benchmarks | arms `base`, `pooled`, `planner`, `planner_pooled`, `taskcentric` | `reproduce.py show/run <arm>`, `reproduce.py table` |
 | Fig. 7: practice per skill family on the 103 generated single-primitive tasks | `base`, `pooled` on `single` | `skill_report.py` on those runs |
 | Supp.: every configuration (the specialists, the no-`done` control) | arms `agent`, `nodone` | `reproduce.py show/run <arm>`, `reproduce.py table` |
-| Sec. 4.2: primitive success inside the held-out tasks (43.9% to 44.8% trained alone, 48.9% to 62.1% with the planner) | each arm's `heldout` runs | `skill_report.py --all-primitives`: the verifier column of "all instances", mean over the three runs |
+| Secs. 4.2-4.3: primitive success inside the held-out tasks (43.9% to 44.8% trained alone, 48.9% to 62.1% with the planner) | each arm's `heldout` runs | `skill_report.py --all-primitives`: the verifier column of "all instances", mean over the three runs |
 | Supp.: grader agreement and demonstration checks | `rq1` runs, the human recordings | `python -m miniweb.evaluation.grader_agreement --parallel 4` |
 | Supp.: compute | -- | the table above |
 
