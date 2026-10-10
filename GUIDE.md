@@ -184,13 +184,13 @@ Every task has two graders:
   agent's actions and screenshots, the request log, and the human demonstration of that primitive as a reference, and
   gives a verdict with a reason.
 
-How often each agrees with a human label, on 119 audited agent episodes (the paper's supplementary material; tasks
+How often each agrees with a human label, on 120 audited agent episodes (the paper's supplementary material; tasks
 weighted by how common each pair of verdicts is):
 
-| | Task-level accuracy | Per-primitive accuracy (242) | Drag & gesture primitives (22) |
+| | Task-level accuracy | Per-primitive accuracy (245) | Drag & gesture primitives (23) |
 |---|---|---|---|
-| VLM judge | 92.0% (κ 0.84) | 89.3% | 91.6% |
-| Task verifiers | 88.6% (κ 0.77) | 86.9% | 98.4% |
+| VLM judge | 92.2% (κ 0.84) | 89.6% | 92.3% |
+| Task verifiers | 88.9% (κ 0.77) | 87.3% | 98.4% |
 | Two humans, for comparison | 91.4% (κ 0.83) | | |
 
 Which to use:
