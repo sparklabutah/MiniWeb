@@ -191,7 +191,7 @@ weighted by how common each pair of verdicts is):
 |---|---|---|---|
 | VLM judge | 92.2% (κ 0.84) | 89.6% | 92.3% |
 | Task verifiers | 88.9% (κ 0.77) | 87.3% | 98.4% |
-| Two humans, for comparison | 91.4% (κ 0.83) | | |
+| Two humans, for comparison | 93.2% (κ 0.86) | | |
 
 Which to use:
 
