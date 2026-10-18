@@ -894,6 +894,9 @@ def annotate():
             "requires_login": task.get("requires_login", True),
             "missing_sites": [sid for sid in task_site_ids if sid not in site_map],
         }
+        if request.args.get("queue") == "1":
+            from annotation import rerecord_queue
+            rerecord["queue"] = rerecord_queue.entry(rerecord_id)
     else:
         coverage = _get_macro_coverage()
         prompt = _generate_prompt(sites, coverage)
@@ -2587,6 +2590,21 @@ def api_grader_audit_label():
 def api_grader_audit_labels():
     from annotation import grader_audit
     return jsonify(grader_audit.all_labels())
+
+
+@annotation_bp.route("/rerecord-queue")
+def rerecord_queue_page():
+    """Open the next task on the re-record queue (annotation/rerecord_queue.py) in the annotator; ?after=<task_id>
+    moves past that task (the Skip link, and the hop after each save)."""
+    from annotation import rerecord_queue
+    q, _ = rerecord_queue.status()
+    if not q:
+        return "No re-record queue on this server.", 404
+    e = rerecord_queue.next_task(request.args.get("after", ""))
+    if not e:
+        return (f"<p style='font:16px system-ui;margin:2rem'>All {len(q['tasks'])} tasks on the re-record queue "
+                "are re-recorded.</p>")
+    return redirect(url_for("annotation.annotate", rerecord=e["task_id"], annotator=e["folder"], queue=1))
 
 
 @annotation_bp.route("/task-audit")

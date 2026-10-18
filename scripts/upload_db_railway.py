@@ -46,6 +46,9 @@ def main():
     ap.add_argument("--task-audit", metavar="DIR",
                     help="Upload the task-audit index (scripts/build_task_audit.py writes data/task_audit/index.json) "
                     "into the server's annotations/.task_audit; labels are kept")
+    ap.add_argument("--rerecord-queue", metavar="FILE",
+                    help="Upload a re-record queue (annotation/rerecord_queue.py) as the server's "
+                    "annotations/.rerecord_queue/_queue/queue.json; /annotate/rerecord-queue hands its tasks out")
     ap.add_argument("--prune", action="store_true",
                     help="With --annotations: also move remote tasks that no "
                     "longer exist locally into the server's .trash, so local "
@@ -59,7 +62,7 @@ def main():
     if not args.token:
         sys.exit("No token: pass --token or set MINIWEB_RECOVERY_TOKEN")
 
-    if args.grader_audit or args.task_audit:
+    if args.grader_audit or args.task_audit or args.rerecord_queue:
         args.annotations, args.prune = True, False
     target = "annotations" if args.annotations else "db"
     if args.grader_audit:
@@ -81,6 +84,15 @@ def main():
         with tarfile.open(tar_path, "w:gz") as tf:
             tf.add(os.path.join(args.task_audit, "index.json"), arcname=".task_audit/_index/index.json")
         print(f"packed the task-audit index -> {tar_path}")
+        args.db = tar_path
+    elif args.rerecord_queue:
+        import tarfile
+        import tempfile
+        fd, tar_path = tempfile.mkstemp(suffix=".tar.gz")
+        os.close(fd)
+        with tarfile.open(tar_path, "w:gz") as tf:
+            tf.add(args.rerecord_queue, arcname=".rerecord_queue/_queue/queue.json")
+        print(f"packed the re-record queue -> {tar_path}")
         args.db = tar_path
     elif args.annotations:
         # tar the task dirs (skip any nested 'annotations' duplicate dir)

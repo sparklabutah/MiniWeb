@@ -800,6 +800,7 @@ function hydrateRerecord() {
         (t.missing_sites && t.missing_sites.length
             ? '  ⚠ Site(s) no longer in registry: ' + t.missing_sites.join(', ')
             : '');
+    if (t.queue) _queueBanner(banner, t);
     const panel = document.querySelector('.main-layout') || document.body;
     panel.parentNode.insertBefore(banner, panel);
     document.querySelectorAll('button').forEach(b => {
@@ -810,6 +811,48 @@ function hydrateRerecord() {
     if (sst && sst.parentElement) sst.parentElement.style.display = 'none';
     const sp = document.getElementById('site-picker');
     if (sp) sp.style.display = 'none';
+}
+
+// Re-record queue (/annotate/rerecord-queue): the banner says where the task starts and lists its steps; the
+// session is reset and the start page opened for you, and saving moves on to the next task
+function _queueBanner(banner, t) {
+    const q = t.queue, el = (tag, text, css) => {
+        const e = document.createElement(tag);
+        if (text) e.textContent = text;
+        if (css) e.style.cssText = css;
+        return e;
+    };
+    banner.textContent = '';
+    banner.style.fontWeight = '400';
+    const head = el('div', `Re-record queue: task ${q.position} of ${q.total} (${q.done} done) · ${t.task_id} · ` +
+                    'saving replaces the original recording and opens the next task', 'font-weight:600');
+    const skip = el('a', 'Skip to the next task →', 'margin-left:.8rem;color:#1d4ed8');
+    skip.href = '/annotate/rerecord-queue?after=' + encodeURIComponent(t.task_id);
+    head.appendChild(skip);
+    banner.appendChild(head);
+    const start = el('div', 'Start page (opened for you; the page showing when you press Start Recording is the ' +
+                     'saved start): ');
+    start.appendChild(el('code', q.start_url));
+    if (q.note) start.appendChild(el('span', ' · ' + q.note, 'color:#b45309'));
+    banner.appendChild(start);
+    if (q.answer) banner.appendChild(el('div', 'Answer: ' + q.answer));
+    if (q.steps && q.steps.length) {
+        const det = el('details');
+        det.open = true;
+        det.appendChild(el('summary', 'Steps', 'cursor:pointer;font-weight:600'));
+        const ol = el('ol', '', 'margin:.2rem 0 0 1.2rem;padding:0');
+        q.steps.forEach(s => ol.appendChild(el('li', s)));
+        det.appendChild(ol);
+        banner.appendChild(det);
+    }
+}
+
+// Open `url` in the portal's tab once the (re)loading portal is up
+function _openOnLoad(iframe, url) {
+    iframe.addEventListener('load', function once() {
+        iframe.removeEventListener('load', once);
+        setTimeout(() => iframe.contentWindow.postMessage({type: 'navigate', url}, '*'), 300);
+    });
 }
 
 function initAnnotation() {
@@ -829,10 +872,14 @@ function initAnnotation() {
         _sync2FAToggle();
         // Auto-login if toggle is checked, otherwise ensure logged out + reload iframe
         const toggle = document.getElementById('auto-login-toggle');
-        const ready = (toggle && toggle.checked) ? autoLoginSites() : _logoutSites();
+        const queued = rerecordTask && rerecordTask.queue;
+        const fresh = queued ? _resetSessionSilent().then(_sync2FAToggle) : Promise.resolve();
+        const ready = fresh.then(() => (toggle && toggle.checked) ? autoLoginSites() : _logoutSites());
         ready.then(() => {
             const iframe = document.getElementById('site-iframe');
-            if (iframe) _reloadIframe(iframe);
+            if (!iframe) return;
+            if (queued && queued.start_url) _openOnLoad(iframe, queued.start_url);
+            _reloadIframe(iframe);
         });
     }
 }
@@ -1176,6 +1223,7 @@ function renderMacroList() {
 let _spatialWarned = '';
 
 function maybeShowSpatialWarnings() {
+    if (rerecordTask && rerecordTask.queue) return;      // queued re-records keep their design: no design notes
     const warned = (selectedMacros || []).filter(m => (macroDescriptions[m] || {}).warning);
     const key = warned.slice().sort().join(',');
     if (!key || key === _spatialWarned) { _spatialWarned = key; return; }
@@ -3691,11 +3739,15 @@ async function submitTask() {
         });
         const d = await r.json();
         if (d.task_id && rerecordTask) {
+            const queued = rerecordTask.queue;
             document.getElementById('status').innerHTML =
-                `<span style="color:#16a34a;font-weight:600">Replaced: ${d.task_id} — returning to review...</span>`;
+                `<span style="color:#16a34a;font-weight:600">Replaced: ${d.task_id} — ` +
+                (queued ? 'opening the next task...' : 'returning to review...') + '</span>';
             setTimeout(() => {
-                location.href = '/annotate/verify?task_id=' + encodeURIComponent(d.task_id)
-                    + '&annotator=' + encodeURIComponent(rerecordTask.annotator);
+                location.href = queued
+                    ? '/annotate/rerecord-queue?after=' + encodeURIComponent(d.task_id)
+                    : '/annotate/verify?task_id=' + encodeURIComponent(d.task_id)
+                      + '&annotator=' + encodeURIComponent(rerecordTask.annotator);
             }, 1000);
             return;
         }
