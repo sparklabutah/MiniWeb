@@ -440,6 +440,9 @@ class ActionIncluded(Check):
     Target/selector are matched loosely on purpose: recorded selectors are often
     bare tags ("a", "select") and carry little information, while `target` is the
     human-readable description ("select 'Status' = 'Completed'").
+
+    `last_of` (a target fragment) judges only the last action on that component:
+    a toggle switched on and then off again is not left on.
     """
 
     type = "action_included"
@@ -450,7 +453,12 @@ class ActionIncluded(Check):
         want_value = _norm(self.arg("value", ""))
         want_selector = self.arg("selector", "")
 
-        for a in _actions(traj):
+        actions = _actions(traj)
+        if self.arg("last_of"):
+            on = _norm(self.arg("last_of"))
+            actions = [a for a in actions
+                       if re.search(r"(?<![\w])" + re.escape(on) + r"(?![\w])", _norm(a.get("target")))][-1:]
+        for a in actions:
             if want_action and a.get("action") != want_action and not (
                     want_action in _SAME_INPUT and a.get("action") in _SAME_INPUT):
                 continue

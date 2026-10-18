@@ -196,7 +196,10 @@ def human_tasks(sites=None, split="test", macros=None):
         out.append({"kind": "human", "task_id": tdir.name, "key": key, "site": task["site"], "sites": task_sites,
                     "subtasks": gold if gold and all(t for _, t in gold) else None,
                     "macro": macros[-1] if macros else "?", "macros": macros, "instruction": task.get("instruction", ""),
-                    "start_hint": recorded_start_url(tdir) or task.get("starting_url"), "verifier": verifier,
+                    # agent_start_url: set when the recording's first page is wrong (it showed the answer) and
+                    # the task is being re-recorded; it wins over the recording until the new one lands
+                    "start_hint": task.get("agent_start_url") or recorded_start_url(tdir) or task.get("starting_url"),
+                    "verifier": verifier,
                     "needs_login": "authenticate_by_form" in (verifier.get("macros") or {})})
     return out
 

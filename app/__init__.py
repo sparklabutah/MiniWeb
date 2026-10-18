@@ -851,19 +851,24 @@ def create_app():
     # evaluator sees the agent's mutations within the same session.
     # -----------------------------------------------------------------
 
-    # Request log — records every /sites/ request for interaction history
+    # Request log — records every /sites/ request for interaction history, plus the
+    # simulated filesystem's writes (POST /_fs/*: a download or export saved to Downloads,
+    # a Save-dialog save), which verifiers grade
     _request_logs = {}  # session_id -> [entries]
+
+    def _logged(req):
+        return req.path.startswith("/sites/") or (req.path.startswith("/_fs/") and req.method == "POST")
 
     @app.before_request
     def _log_request():
-        if not request.path.startswith("/sites/"):
+        if not _logged(request):
             return
         from flask import g
         g._req_start = __import__("time").time()
 
     @app.after_request
     def _log_response(response):
-        if not request.path.startswith("/sites/"):
+        if not _logged(request):
             return response
         from flask import g
         sid = (session.get("_data_overlay_sid") or session.get("_id") or id(session))

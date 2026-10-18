@@ -476,8 +476,12 @@ def nutrition_page():
     user = _get_current_user()
     uid = user["id"] if user else 1
 
-    # Date navigation
-    date_filter = request.args.get("date", _today())
+    # Date navigation: open on the user's latest tracked day, as the dashboard does (the
+    # data is static, so the real today would show an empty diary far from the logged days)
+    date_filter = request.args.get("date", "")
+    if not date_filter:
+        latest = _load_daily_stats(where={"user_id": uid}, sort="-date", limit=1)
+        date_filter = latest[0]["date"] if latest else _today()
     meal_type_filter = request.args.get("meal_type", "")
 
     # Build where clause
