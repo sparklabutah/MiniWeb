@@ -1866,9 +1866,10 @@ def api_auto_login():
             if not users:
                 continue
 
-            # Find Alex Rivera or use first user
-            user = None
-            for u in users:
+            # The user agents are signed in as (id or root_user_id 1); else Alex Rivera; else the first user.
+            # A name match alone picked Carlos Rivera (id 5) on SportsHub, so recordings showed another user's data.
+            user = next((u for u in users if u.get("id") in (1, "1") or u.get("root_user_id") in (1, "1")), None)
+            for u in ([] if user else users):
                 name = " ".join(str(v) for v in [
                     u.get("name", ""), u.get("display_name", ""), u.get("username", "")
                 ]).lower()

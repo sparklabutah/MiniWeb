@@ -850,17 +850,7 @@
     <div class="modal-box">
         <h3>Upload file</h3>
         <form id="uploadForm">
-            <input class="modal-input" type="text" name="name" placeholder="File name" id="uploadFileName">
-            <select class="modal-input" name="type" id="uploadFileType" style="cursor:pointer;">
-                <option value="document">Document</option>
-                <option value="spreadsheet">Spreadsheet</option>
-                <option value="presentation">Presentation</option>
-                <option value="image">Image</option>
-                <option value="code">Code</option>
-                <option value="note">Note</option>
-                <option value="archive">Archive</option>
-            </select>
-            <input class="modal-input" type="number" name="size_bytes" placeholder="Size in bytes" value="0" id="uploadFileSize">
+            <input class="modal-input" type="file" name="file" id="uploadFileInput" required>
             <div class="modal-actions">
                 <button type="button" class="modal-btn modal-btn-cancel" onclick="closeModal('uploadModal')">Cancel</button>
                 <button type="submit" class="modal-btn modal-btn-primary">Upload</button>
@@ -961,19 +951,15 @@
         });
     });
 
-    /* ── Upload file (API-based) ──────────────────────────────── */
+    /* ── Upload file: the picked file, as multipart ─────────────── */
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        var name = document.getElementById('uploadFileName').value.trim() || 'Untitled';
-        var type = document.getElementById('uploadFileType').value;
-        var size = parseInt(document.getElementById('uploadFileSize').value) || 0;
-        fetch("{{ url_for('cloud-storage-file-transfer.api_upload') }}", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name, type: type, size_bytes: size})
-        }).then(function() {
-            window.location.reload();
-        });
+        var input = document.getElementById('uploadFileInput');
+        if (!input.files || !input.files.length) return;
+        var body = new FormData();
+        body.append('file', input.files[0]);
+        fetch("{{ url_for('cloud-storage-file-transfer.api_upload') }}", {method: 'POST', body: body})
+            .then(function() { window.location.reload(); });
     });
 
     /* ── Storage meter ─────────────────────────────────────────────

@@ -1425,14 +1425,37 @@ def api_export():
 # API routes -- Upload (upload_from_table / upload_by_route)
 # ---------------------------------------------------------------------------
 
+_TYPE_OF_EXT = {
+    **dict.fromkeys(("png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "heic"), "image"),
+    **dict.fromkeys(("xlsx", "xls", "csv", "ods", "tsv"), "spreadsheet"),
+    **dict.fromkeys(("pptx", "ppt", "key", "odp"), "presentation"),
+    **dict.fromkeys(("zip", "tar", "gz", "tgz", "rar", "7z"), "archive"),
+    **dict.fromkeys(("py", "js", "ts", "html", "css", "json", "java", "c", "cpp", "go", "rs", "sh", "sql"), "code"),
+    **dict.fromkeys(("md", "txt"), "note"),
+}
+
+
+def _type_from_name(name):
+    """The file-type category of an uploaded file, from its extension."""
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    return _TYPE_OF_EXT.get(ext, "document")
+
+
 @blueprint.route("/api/upload", methods=["POST"])
 def api_upload():
-    """Upload a file (simulated -- creates a file entry with metadata).
-    Accepts JSON with name, type, size_bytes, folder_id, owner_id."""
-    data = request.get_json(force=True)
-    files = _load_files()
+    """Upload a file. A multipart `file` (picked in the browser's file dialog) becomes a file entry named after the
+    file, with its real size and a type from its extension. JSON with name, type, size_bytes, folder_id, owner_id
+    creates an entry from metadata alone."""
+    upload = request.files.get("file")
+    if upload is not None:
+        name = pathlib.PurePosixPath((upload.filename or "").replace("\\", "/")).name or "uploaded_file"
+        data = {"name": name, "size_bytes": len(upload.read()), "type": _type_from_name(name),
+                "mime_type": upload.mimetype or "application/octet-stream",
+                "folder_id": request.form.get("folder_id", type=int), "owner_id": session.get("user_id", 1)}
+    else:
+        data = request.get_json(force=True)
 
-    new_id = max((f["id"] for f in files), default=0) + 1
+    new_id = db.next_id(SITE, "files")
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     name = data.get("name", "uploaded_file")
@@ -1461,8 +1484,7 @@ def api_upload():
         "is_trashed": False,
     }
 
-    files.append(new_file)
-    _save_files(files)
+    db.save_item(SITE, "files", new_id, new_file)
     return jsonify(new_file), 201
 
 
