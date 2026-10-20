@@ -23,6 +23,7 @@ from miniweb.annotation.macro_locations import MACRO_LOCATIONS
 from miniweb.annotation import macros as _registry
 from miniweb.annotation import final_set as _final_set
 from miniweb.annotation.storage import ANNOTATIONS_DIR
+from miniweb.app import demo as _demo
 
 PROJECT_ROOT = REPO_ROOT
 SITES_DIR = PROJECT_ROOT / "src" / "miniweb" / "sites"
@@ -767,8 +768,44 @@ def _generate_site_prompt(site, rng=None):
 
 _AUTH_EXEMPT = {"/annotate/login", "/annotate/api/auto_login", "/annotate/api/auto_logout"}
 
+# The public demo (MINIWEB_DEMO=1, app/demo.py): no login, the released tasks prefilled, nothing saved. These POSTs
+# only touch the visitor's own session (site logins, 2FA) or read (macro search, verifier runs); every other write
+# is refused. The pages and APIs of the audits, the site reviews, the accounts and the macro graph are hidden.
+_DEMO_WRITES = {"/annotate/api/auto_login", "/annotate/api/auto_logout", "/annotate/api/toggle_2fa",
+                "/annotate/api/macro_search", "/annotate/api/run_task_verifier", "/annotate/api/run_verifiers"}
+_DEMO_HIDDEN = ("/annotate/accounts", "/annotate/grader-audit", "/annotate/task-audit", "/annotate/review",
+                "/annotate/graph", "/annotate/api/grader_audit/", "/annotate/api/task_audit/", "/annotate/api/review",
+                "/annotate/api/graph/")
+_DEMO_BANNER = (
+    '<div style="position:fixed;right:12px;bottom:12px;z-index:99999;padding:3px 10px;border-radius:12px;'
+    'background:#334155;color:#f8fafc;font:12px/1.4 system-ui,sans-serif;opacity:.9;pointer-events:none">'
+    'Read-only demo: explore freely, nothing you change is saved</div>'
+    '<style>' + ",".join(f'a[href^="{p}"]' for p in _DEMO_HIDDEN)
+    # (and the editor's LLM helpers)
+    + ',a[href="/annotate/logout"],#draft-task-btn,#infer-macros-btn,#suggest-tags-btn,'
+      'button[onclick="generateInstruction()"]{display:none!important}</style>'
+    # the editor asks for the annotator's name before it opens (it runs at DOMContentLoaded, after this)
+    "<script>window.MINIWEB_DEMO=true;try{sessionStorage.getItem('annotator_name')||"
+    "sessionStorage.setItem('annotator_name','guest')}catch(e){}</script>")
+
+
+def _demo_gate():
+    session["annotator_authenticated"] = True
+    session.setdefault("annotator_name", "guest")
+    path = request.path
+    if path in ("/annotate/login", "/annotate/logout") or path.startswith(_DEMO_HIDDEN):
+        if path.startswith("/annotate/api/"):
+            return jsonify({"error": "Not available in the demo"}), 404
+        return redirect(url_for("annotation.index"))
+    if request.method not in ("GET", "HEAD", "OPTIONS") and path not in _DEMO_WRITES:
+        return jsonify({"error": "This is a read-only demo: nothing you change is saved."}), 403
+    return None
+
+
 @annotation_bp.before_request
 def _require_annotator_login():
+    if _demo.ENABLED:
+        return _demo_gate()
     if request.path in _AUTH_EXEMPT:
         return None
     if session.get("annotator_authenticated"):
@@ -787,11 +824,12 @@ def _require_annotator_login():
 def _final_set_banner(resp):
     """Mark every annotation page as read-only while the final set is locked (not API responses, such as a recorded
     page the Task Audit shows in a frame)."""
-    if (_final_set.locked() and resp.mimetype == "text/html" and resp.status_code == 200
+    if ((_final_set.locked() or _demo.ENABLED) and resp.mimetype == "text/html" and resp.status_code == 200
             and not resp.direct_passthrough and "/api/" not in request.path):
         html = resp.get_data(as_text=True)
         if "</body>" in html:
-            resp.set_data(html.replace("</body>", _final_set.banner() + "</body>", 1))
+            banner = _DEMO_BANNER if _demo.ENABLED else _final_set.banner()
+            resp.set_data(html.replace("</body>", banner + "</body>", 1))
     return resp
 
 
@@ -850,6 +888,13 @@ def annotate():
     sites = _load_sites()
     rerecord = None
     rerecord_id = request.args.get("rerecord", "").strip()
+    if _demo.ENABLED and not rerecord_id:
+        # the demo opens a released task, filled in, rather than an empty prompt
+        from miniweb.annotation.storage import list_tasks
+        tasks = [t for t in list_tasks() if not _final_set.locked() or t.get("task_id") in _final_set.tasks()]
+        if tasks:
+            t = random.choice(tasks)
+            return redirect(url_for("annotation.annotate", rerecord=t["task_id"], annotator=t.get("annotator", "")))
     if rerecord_id:
         from miniweb.annotation.storage import get_annotators, load_task
         annotator = request.args.get("annotator", "").strip()
@@ -1263,7 +1308,7 @@ def api_run_task_verifier():
     report["action_count"] = sum(1 for e in traj if e.get("type") == "action")
     saved = quality.read_json(tjson.parent / "verifier.json").get("macros", {})
     report["evidence_saved"] = bool(saved) and macros == quality.effective_macros(tdata, saved)
-    if report["evidence_saved"]:
+    if report["evidence_saved"] and not _demo.ENABLED:
         quality.record_run(tjson.parent, tdata, macros, which, report)
     report["quality"] = quality.summary(tjson.parent, tdata)
     return jsonify(report)

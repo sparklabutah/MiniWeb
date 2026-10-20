@@ -693,7 +693,9 @@ def create_app():
         static_folder="static",
         static_url_path="/static",
     )
-    app.secret_key = os.environ.get("SECRET_KEY", "miniweb-dev-key-change-in-production")
+    from miniweb.app import demo, uploads
+    app.secret_key = demo.secret_key() if demo.ENABLED else os.environ.get(
+        "SECRET_KEY", "miniweb-dev-key-change-in-production")
 
     # Generated images (covers, avatars, thumbnails) live under data/ so they
     # sit on the persistent volume instead of the image/git. URLs stay
@@ -707,6 +709,8 @@ def create_app():
 
     @app.route("/static/<any(generated, avatars, thumbnails):sub>/<path:filename>")
     def _data_static_files(sub, filename):
+        if sub == "generated" and uploads.find(sub, filename):     # an image this session's requests drew
+            return uploads.send(sub, filename)
         target = data_static / sub / filename
         if target.is_file():
             return send_from_directory(data_static / sub, filename)
@@ -728,6 +732,12 @@ def create_app():
     if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
         app.config["SESSION_COOKIE_SECURE"] = True
         app.config["PREFERRED_URL_SCHEME"] = "https"
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    elif os.environ.get("SPACE_ID"):
+        # a Hugging Face Space shows the app in a frame on huggingface.co: a Lax cookie would not reach it there
+        app.config.update(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE=True,
+                          SESSION_COOKIE_PARTITIONED=True, PREFERRED_URL_SCHEME="https")
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
@@ -991,6 +1001,21 @@ def create_app():
         # Strip .json suffix if present (backward compat)
         if collection.endswith(".json"):
             collection = collection[:-5]
+
+        if demo.ENABLED:
+            # bounded for the public demo: the filters go to SQL, and at most 200 rows come back
+            where = {k: v for k, v in request.args.items() if not k.startswith("_")} or None
+            if not db.get_table_name(site_id, collection):
+                abort(404)
+            if request.args.get("_id"):
+                item = db.get_item(site_id, collection, request.args["_id"])
+                return jsonify(item) if item else abort(404)
+            if request.args.get("_count"):
+                return jsonify({"count": db.count(site_id, collection, where=where)})
+            data = db.query(site_id, collection, where=where, limit=200)
+            if request.args.get("_field"):
+                return jsonify([d.get(request.args["_field"]) for d in data])
+            return jsonify(data)
 
         data = db.query(site_id, collection)
         if not data and not db.get_table_name(site_id, collection):
@@ -1374,6 +1399,9 @@ if(img.complete&&img.naturalWidth===0&&img.src)fix(img);
             else:
                 response.set_data(data + inject)
         return response
+
+    if demo.ENABLED:
+        demo.install(app, [_request_logs, _action_beacons, _recorder_stream])
 
     # Register cross-site event handlers (must be after all imports settle)
     __import__("miniweb.app.handlers")  # triggers @on() decorator registration

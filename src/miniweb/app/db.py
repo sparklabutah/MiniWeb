@@ -26,6 +26,7 @@ Schema & build
 """
 
 from helpers.paths import REPO_ROOT
+from miniweb.app import uploads
 import json
 import os
 import pathlib
@@ -59,6 +60,8 @@ def _get_conn() -> sqlite3.Connection:
         conn.execute("PRAGMA cache_size=-64000")  # 64 MB cache
         conn.execute("PRAGMA foreign_keys=OFF")
         conn.row_factory = sqlite3.Row
+        if _guarded is not None:
+            conn.set_authorizer(_authorize)
         _local.conn = conn
     return conn
 
@@ -74,6 +77,39 @@ def close():
     if conn is not None:
         conn.close()
         _local.conn = None
+
+
+# ---------------------------------------------------------------------------
+# Write guard (the public demo): the site tables refuse every write
+# ---------------------------------------------------------------------------
+
+# tables a request may still write: the visitors' own state, and the registry rows that the sites' setup code
+# registers again with the same values
+_SESSION_TABLES = {"session_overlay", "session_collection_replaced", "sessions", "event_log", "site_registry",
+                   "sqlite_sequence"}
+_DROPS = {sqlite3.SQLITE_DROP_TABLE, sqlite3.SQLITE_DROP_INDEX, sqlite3.SQLITE_DROP_TRIGGER, sqlite3.SQLITE_DROP_VIEW,
+          sqlite3.SQLITE_DROP_VTABLE, sqlite3.SQLITE_ALTER_TABLE}
+_guarded = None   # the tables that held rows when the guard went on; None: no guard
+
+
+def _authorize(action, table, *_):
+    if action in (sqlite3.SQLITE_INSERT, sqlite3.SQLITE_UPDATE, sqlite3.SQLITE_DELETE) and table in _guarded:
+        return sqlite3.SQLITE_DENY
+    if action in _DROPS:
+        return sqlite3.SQLITE_DENY
+    return sqlite3.SQLITE_OK
+
+
+def enable_write_guard():
+    """Refuse, on every connection from now on, writes to each table that holds site data (demo mode); sessions keep
+    writing their changes to session_overlay. A table a site creates empty at runtime stays writable, so its one-time
+    seed (e.g. the forums' moderators) still runs."""
+    global _guarded
+    conn = _get_conn()
+    names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+    _guarded = {n for n in names if n not in _SESSION_TABLES
+                and conn.execute(f'SELECT 1 FROM "{n}" LIMIT 1').fetchone()}
+    conn.set_authorizer(_authorize)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +276,7 @@ def reset_session(sid: str = None):
     conn.execute("DELETE FROM session_collection_replaced WHERE session_id = ?", (sid,))
     conn.execute("DELETE FROM sessions WHERE session_id = ?", (sid,))
     conn.commit()
+    uploads.drop([sid])
 
 
 def reset_all():
@@ -249,6 +286,7 @@ def reset_all():
     conn.execute("DELETE FROM session_collection_replaced")
     conn.execute("DELETE FROM sessions")
     conn.commit()
+    uploads.drop_all()
 
 
 def evict_stale_sessions():
@@ -279,6 +317,7 @@ def evict_stale_sessions():
             stale,
         )
         conn.commit()
+        uploads.drop(stale)
 
 
 def get_stats() -> dict:

@@ -20,6 +20,8 @@ Start it with `run.py` (`~/.conda/envs/miniweb/bin/python run.py`, port
 | `bank_charges.py` | `charge_card(...)`: validates a card against `banking_cc_users` and posts the charge to `banking_cc_transactions` in the overlay. Used by sites that take card payments. |
 | `ads.py` | `product_ads(n, seed, sources)`: in-network ad cards built from real MiniWeb content (e-commerce, auctions, video, books). Exposed to every template as a Jinja global; markup in `templates/ads/_product_ads.html`. |
 | `vfs.py` | Simulated Finder-style file system served at `/_fs/*` (see below). |
+| `uploads.py` | Files that requests leave on disk (password-manager icons, NoteCanvas images), in a folder per session under `MINIWEB_UPLOADS_DIR` (`data/uploads`): each session is served only its own files, file names cannot leave the folder, and the files are deleted with the session's data. |
+| `demo.py` | The public demo (`MINIWEB_DEMO=1`): read-only site tables, closed admin routes, idle sessions dropped. See `GUIDE.md`. |
 | `playback.py` | Deterministic "what's on screen" timelines for the shared media player, served at `/_player/timeline?key=&duration=`. Short spans carry facts that are visible only while the playhead is inside them. |
 | `portal/` | The site directory at `/` with `/api/sites` and `/api/search`. |
 | `llm.py` | Compatibility shim that re-exports `helpers.llm` (`call_llm`, `LLMClient`, `list_models`, ...). New code should import `helpers.llm`. |

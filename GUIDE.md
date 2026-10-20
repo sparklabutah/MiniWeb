@@ -55,18 +55,39 @@ docker build -t miniweb . && docker run -p 8080:8080 -v "$PWD/data:/app/data" \
     -e MINIWEB_DB=/app/data/miniweb.db miniweb
 ```
 
-The image copies the repository, `data/` included when it is there; add `data/` to `.dockerignore` to keep the image
-small and mount the folder as above.
+The image copies the repository but leaves out the local data (`.dockerignore`), so mount `data/` as above.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `MINIWEB_DB` | `data/miniweb.db` | the site database, where `restore_site_db.py` writes it; the server stops if it is missing or empty |
 | `MINIWEB_DATA_STATIC` | `data/static` | the sites' own images |
 | `MINIWEB_MEDIA_DIR` | `data/media` | the copy of external media; without it, pages load images from their original hosts |
+| `MINIWEB_UPLOADS_DIR` | `data/uploads` | files that requests leave (uploaded icons, drawn note images), in a folder per session that goes with the session |
 | `MINIWEB_SITES` | all | comma-separated sites to load |
 | `MINIWEB_NO_AUTOLOGIN` | off | `1`: visitors start logged out (by default they are user 1) |
 | `MINIWEB_ANNOTATORS`, `MINIWEB_ANNOTATIONS_DIR` | | logins and task folder of the annotation tool at `/annotate/` |
 | `MINIWEB_MACRO_DIR` | `data` | where the macro registry lives; point it at persistent storage on a deployment, since annotators can add macros |
+| `MINIWEB_DEMO` | off | `1`: the public demo (below) |
+
+### As a public demo
+
+`MINIWEB_DEMO=1` serves the sites and the annotation tool to anyone, and nobody can change what other visitors see
+([src/miniweb/app/demo.py](src/miniweb/app/demo.py)):
+
+- The site tables refuse writes. Each visitor's changes stay in their own session, and are dropped after an hour
+  without a request.
+- No model is called. The translation site answers the requests recorded in the dataset with their recorded
+  translations, and any other text with the local NLLB model.
+- The annotation tool needs no login. It opens released tasks filled in, and saves nothing.
+- The admin routes that read other sessions or whole tables are closed, or capped at 200 rows.
+
+```bash
+python scripts/demo_setup.py --no-media        # data/demo/: the database, the tasks, the recorded translations
+# then serve with the variables it prints (MINIWEB_DEMO=1, MINIWEB_DB=..., ...) and gunicorn as above
+python scripts/push_space.py <user>/<space>    # or as a Hugging Face Docker Space (deploy/space/)
+```
+
+The Space rebuilds `data/demo/` from the release on every start ([deploy/space/start.sh](deploy/space/start.sh)).
 
 ### Many agents on one server
 

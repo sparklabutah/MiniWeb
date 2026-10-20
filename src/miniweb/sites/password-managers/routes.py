@@ -24,7 +24,7 @@ from flask import (
     Blueprint, Response, abort, jsonify, redirect, render_template, request,
     session, url_for,
 )
-from miniweb.app import db
+from miniweb.app import db, uploads
 
 SITE = "password-managers"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
@@ -1278,7 +1278,10 @@ def api_export():
 # Upload icon image (upload_by_image)
 # ---------------------------------------------------------------------------
 
-UPLOAD_DIR = SITE_DIR / "static" / "uploads"
+@blueprint.route("/static/uploads/<name>")
+def uploaded_icon(name):
+    """An icon this session uploaded: each session keeps its own files (app/uploads.py)."""
+    return uploads.send(SITE, name)
 
 
 @blueprint.route("/api/entries/<entry_id>/icon", methods=["POST"])
@@ -1296,15 +1299,12 @@ def api_entry_upload_icon(entry_id):
     if not f.filename:
         return jsonify({"error": "Empty filename"}), 400
 
-    # Ensure upload dir exists
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
     ext = os.path.splitext(f.filename)[1].lower()
     if ext not in (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"):
         return jsonify({"error": "Unsupported image format"}), 400
 
-    filename = f"{entry_id}{ext}"
-    filepath = UPLOAD_DIR / filename
+    filepath = uploads.path(SITE, f"{entry_id}{ext}")
+    filename = filepath.name
     f.save(str(filepath))
 
     entry["icon_url"] = f"/sites/password-managers/static/uploads/{filename}"
@@ -1394,9 +1394,9 @@ def new_entry_submit():
     if icon and icon.filename:
         ext = os.path.splitext(icon.filename)[1].lower()
         if ext in (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"):
-            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-            icon.save(str(UPLOAD_DIR / f"{new_id}{ext}"))
-            new_entry["icon_url"] = f"/sites/password-managers/static/uploads/{new_id}{ext}"
+            filepath = uploads.path(SITE, f"{new_id}{ext}")
+            icon.save(str(filepath))
+            new_entry["icon_url"] = f"/sites/password-managers/static/uploads/{filepath.name}"
 
     entries.append(new_entry)
     db.save_collection(SITE, "entries", entries)

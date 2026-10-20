@@ -28,7 +28,6 @@ from helpers.auth import current_user, browsing_user
 
 SITE = "job-sites"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-UPLOAD_DIR = SITE_DIR / "data" / "uploads"
 
 blueprint = Blueprint(
     "job-sites",
@@ -633,10 +632,8 @@ def form_upload_resume():
     user, logged_in = _get_browsing_user()
     resume = request.files.get("resume")
     if resume and resume.filename:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         safe_name = re.sub(r'[^\w.\-]', '_', resume.filename)
         filename = f"{user['id']}_{safe_name}"
-        resume.save(str(UPLOAD_DIR / filename))
         users = _load_users()
         u = next((u for u in users if u["id"] == user["id"]), None)
         if u:
@@ -1109,11 +1106,9 @@ def api_upload_resume():
     if not resume or not resume.filename:
         return jsonify({"error": "No file uploaded"}), 400
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = re.sub(r'[^\w.\-]', '_', resume.filename)
     filename = f"{user['id']}_{safe_name}"
-    filepath = UPLOAD_DIR / filename
-    resume.save(str(filepath))
+    size = resume.stream.seek(0, os.SEEK_END)   # the file itself is not kept: nothing reads it back
 
     # Update user profile
     users = _load_users()
@@ -1127,7 +1122,7 @@ def api_upload_resume():
     return jsonify({
         "status": "uploaded",
         "filename": filename,
-        "size": os.path.getsize(str(filepath)),
+        "size": size,
     }), 201
 
 

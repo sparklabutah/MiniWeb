@@ -12,8 +12,10 @@ from helpers.paths import REPO_ROOT
 import csv
 import io
 import json
+import os
 import pathlib
 import re
+import sqlite3
 from collections import Counter
 from datetime import datetime
 
@@ -26,7 +28,6 @@ from helpers.auth import current_user, browsing_user
 
 SITE = "translation"
 SITE_DIR = pathlib.Path(__file__).resolve().parent
-UPLOADS_DIR = SITE_DIR / "data" / "uploads"
 
 blueprint = Blueprint(
     "translation",
@@ -191,6 +192,9 @@ def _translate_text(text, source_lang, target_lang, user_glossary=None):
         for entry in user_glossary["entries"]:
             glossary[entry["source"].lower()] = entry["target"]
 
+    if _DEMO:
+        return _demo_translate(text, source_lang, target_lang, glossary)
+
     _ensure_cache_table()
     conn = db._get_conn()
     key = _cache_key(text, source_lang, target_lang, glossary)
@@ -222,6 +226,42 @@ def _translate_text(text, source_lang, target_lang, user_glossary=None):
         return row[0] if row else translated
 
     return _dictionary_translate(text, source_lang, target_lang, glossary)
+
+
+# ---------------------------------------------------------------------------
+# The public demo (MINIWEB_DEMO=1, app/demo.py) calls no LLM and writes nothing. A request recorded in the dataset
+# gets its recorded translation (data/translation_replay.json, from scripts/demo_setup.py); other text gets the
+# cached translation, else the NLLB one, else the dictionaries. The same text always gets the same answer.
+# ---------------------------------------------------------------------------
+
+_DEMO = os.environ.get("MINIWEB_DEMO") == "1"
+_REPLAY_PATH = pathlib.Path(os.environ.get("MINIWEB_TRANSLATION_REPLAY",
+                                           str(REPO_ROOT / "data" / "translation_replay.json")))
+_replay = None        # (source, target, text) -> the recorded translation
+
+
+def _replayed(text, source_lang, target_lang):
+    global _replay
+    if _replay is None:
+        try:
+            rows = json.loads(_REPLAY_PATH.read_text())
+        except (OSError, ValueError):
+            rows = []
+        _replay = {(r["source"], r["target"], r["text"]): r["translated"] for r in rows}
+    return _replay.get((source_lang, target_lang, text))
+
+
+def _demo_translate(text, source_lang, target_lang, glossary):
+    out = _replayed(text, source_lang, target_lang)
+    if out is None:
+        try:
+            row = db._get_conn().execute(f"SELECT translated FROM [{_CACHE_TABLE}] WHERE key=?",
+                                         (_cache_key(text, source_lang, target_lang, glossary),)).fetchone()
+            out = row[0] if row else None
+        except sqlite3.Error:
+            out = None
+    return (out or _model_translate(text, source_lang, target_lang, glossary)
+            or _dictionary_translate(text, source_lang, target_lang, glossary))
 
 
 def _dictionary_translate(text, source_lang, target_lang, glossary):
@@ -1297,11 +1337,6 @@ def api_upload():
         results.append({"source": line, "translated": translated, "id": new_id})
     _save_history(history)
 
-    # Save uploaded file
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    save_path = UPLOADS_DIR / f.filename
-    save_path.write_text(content)
-
     return jsonify({
         "filename": f.filename,
         "lines_translated": len(results),
@@ -1332,11 +1367,6 @@ def api_image_translate():
     valid_codes = {l["code"] for l in languages}
     if source not in valid_codes or target not in valid_codes:
         return jsonify({"error": "Invalid language code"}), 400
-
-    # Save the image
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    save_path = UPLOADS_DIR / img.filename
-    img.save(str(save_path))
 
     # Placeholder OCR: extract "text" from filename or return mock text
     # In a real system this would use OCR. We simulate by reading the

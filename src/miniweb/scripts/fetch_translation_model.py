@@ -21,6 +21,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[3]   # the repository
 MODEL_DIR = ROOT / "models" / "nllb200-600M-ct2"
 HF_REPO = "facebook/nllb-200-distilled-600M"
+# the weights every cached translation came from; with transformers 4.57.6 and ctranslate2 4.8.1 the conversion
+# gives the same model.bin byte for byte (deploy/space/Dockerfile pins those)
+HF_REVISION = "f8d333a098d19b4fd9a8b18f94170487ad3f821d"
 
 
 def main():
@@ -30,7 +33,7 @@ def main():
 
     from huggingface_hub import snapshot_download
     print(f"downloading {HF_REPO} ...")
-    src = snapshot_download(HF_REPO, allow_patterns=[
+    src = snapshot_download(HF_REPO, revision=HF_REVISION, allow_patterns=[
         "*.json", "*.model", "pytorch_model.bin", "*.safetensors", "*.txt"])
     print("converting to CTranslate2 int8 ...")
     MODEL_DIR.parent.mkdir(exist_ok=True)

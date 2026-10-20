@@ -8,6 +8,11 @@ from the same location the app already exposes for generated media:
     data/static/generated/<filename>   ->   /static/generated/<filename>
     (served by src/miniweb/app/__init__.py :: _data_static_files)
 
+The images a request draws (a note's placeholder, an edit) go to that
+session's own folder instead (app/uploads.py, area "generated"), served at the
+same URL to that session only: a visitor's title or edit never shows up in
+another session's notes.
+
 It also implements the server-side transforms behind the `edit_by_image`
 macro (crop / resize / contrast / vibrance) using PIL. No external fetches --
 every pixel is generated locally and deterministically from a seed string.
@@ -19,6 +24,8 @@ import os
 import pathlib
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+
+from miniweb.app import uploads
 
 SITE = "handwritten-notes-whiteboards"
 SITE_SLUG = SITE.replace("-", "_")
@@ -155,9 +162,8 @@ def ensure_note_placeholder(note_id, label: str) -> str:
     """Create (idempotently) the base placeholder file for a note's image and
     return its served URL. Overwrites only its own deterministic file."""
     fn = note_image_filename(note_id)
-    path = generated_dir() / fn
     img = make_placeholder(label or f"Note {note_id}", seed=fn)
-    img.save(path, "PNG")
+    img.save(uploads.path("generated", fn), "PNG")
     return served_url(fn)
 
 
@@ -169,11 +175,12 @@ def save_upload_placeholder(note_id, original_filename: str) -> str:
 
 
 def local_path_for_url(url: str) -> pathlib.Path | None:
-    """Map a /static/generated/<fn> URL back to an on-disk path."""
+    """Map a /static/generated/<fn> URL back to an on-disk path: this session's
+    own file, else the shared one."""
     if not url:
         return None
     fn = url.rsplit("/", 1)[-1]
-    return generated_dir() / fn
+    return uploads.find("generated", fn) or generated_dir() / fn
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +251,7 @@ def apply_edit_to_note(note: dict, op: str, params: dict) -> str:
         (str(src_url) + op + json.dumps(params, sort_keys=True)).encode()
     ).hexdigest()[:10]
     fn = f"note_{SITE_SLUG}_{note['id']}_e{digest}.png"
-    out.save(generated_dir() / fn, "PNG")
+    out.save(uploads.path("generated", fn), "PNG")
     return served_url(fn)
 
 

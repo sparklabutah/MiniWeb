@@ -53,11 +53,14 @@ def main():
     ap.add_argument("--static", default=os.path.join(ROOT, "data", "static"))
     ap.add_argument("--media", default=os.path.join(ROOT, "data", "media"),
                     help="where to unpack the sites' external media (served at /media/...; MINIWEB_MEDIA_DIR)")
+    ap.add_argument("--no-media", action="store_true",
+                    help="skip the 8 GB of media: pages then load those images from their original links")
     a = ap.parse_args()
     src = a.src
     if not src:
         from huggingface_hub import snapshot_download
-        src = os.path.join(snapshot_download(a.repo, repo_type="dataset", allow_patterns="site_db/*"), "site_db")
+        src = os.path.join(snapshot_download(a.repo, repo_type="dataset", allow_patterns="site_db/*",
+                                             ignore_patterns="site_db/media/*" if a.no_media else None), "site_db")
     if os.path.exists(a.db):
         raise SystemExit(f"{a.db} exists; move it away first")
     schema = json.load(open(os.path.join(src, "schema.json")))
@@ -94,7 +97,7 @@ def main():
         os.makedirs(os.path.dirname(out), exist_ok=True)
         open(out, "wb").write(b)
     n_media = 0
-    if os.path.isfile(os.path.join(src, "media_manifest.parquet")):   # the external media the pages show
+    if os.path.isfile(os.path.join(src, "media_manifest.parquet")) and not a.no_media:   # the media the pages show
         os.makedirs(a.media, exist_ok=True)
         for f in sorted(glob.glob(os.path.join(src, "media", "*.parquet"))):
             for batch in pq.ParquetFile(f).iter_batches(batch_size=500, columns=["path", "bytes"]):

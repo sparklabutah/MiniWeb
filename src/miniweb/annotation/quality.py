@@ -175,7 +175,8 @@ def summary(directory, task):
         outdated = any(entry.get(k) != v for k, v in current.items()) or entry.get('source_hash') != source_hash(directory, source)
         negative = source in ('empty', 'answer_only')
         ok = not entry.get('passed') if negative else entry.get('passed')
-        runs.append(dict(entry, stale=outdated, ok=ok,
+        # (the source is the key: scripts/fetch_tasks.py writes entries without it)
+        runs.append(dict(entry, source=source, stale=outdated, ok=ok,
                          label='Outdated' if outdated else ('Rejected' if ok else 'Accepted') if negative else ('Pass' if ok else 'Fail')))
     walk = next((r for r in runs if r['source'] == 'walk'), None)
     attention = state in ('unreviewed', 'needs_repair', 'suggest_delete', 'stale') or any(not r['ok'] or r['stale'] for r in runs)

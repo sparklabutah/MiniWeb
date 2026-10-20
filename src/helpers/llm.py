@@ -31,6 +31,8 @@ from pathlib import Path
 
 _ROOT = REPO_ROOT
 DEFAULT_MODEL = os.environ.get("LLM_MODEL") or "gemini-2.5-flash"
+# the public demo (MINIWEB_DEMO=1, miniweb/app/demo.py) calls no model: every call returns None, as with no key
+_DEMO = os.environ.get("MINIWEB_DEMO") == "1"
 
 # Current models per provider (latest first). Unlisted names still route by
 # prefix, so this is a convenience/allow-list, not an exhaustive gate.
@@ -159,6 +161,8 @@ class LLMClient:
                  temperature: float | None = None, images: list | None = None) -> str | None:
         """`images`: optional list of image bytes or file paths, sent before the prompt
         (Gemini only for now; other providers return None rather than answer blind)."""
+        if _DEMO:
+            return None
         mt = max_tokens if max_tokens is not None else self.max_tokens
         temp = temperature if temperature is not None else self.temperature
         backend = {
@@ -286,6 +290,8 @@ def call_llm(prompt, system=None, max_tokens=500, temperature=0.7,
 
 
 def _provider_configured(provider: str) -> bool:
+    if _DEMO:
+        return False
     keys = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY",
             "groq": "GROQ_API_KEY"}
     if provider in keys:
