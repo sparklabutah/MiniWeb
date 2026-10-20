@@ -62,6 +62,11 @@ def _load_audiobooks():
     return db.query(SITE, "audiobooks")
 
 
+def _liked_by(item):
+    """The ids of the users who like an episode or audiobook (the data holds an empty string when nobody does)."""
+    return item.get("liked_by") or []
+
+
 # ---------------------------------------------------------------------------
 # Overlay-only data (mutable state)
 # ---------------------------------------------------------------------------
@@ -291,7 +296,7 @@ def episode_detail(episode_id):
     resume_percent = 0
     if "user_id" in session:
         user = _get_user(session["user_id"])
-        if user and user["id"] in episode.get("liked_by", []):
+        if user and user["id"] in _liked_by(episode):
             liked = True
         lib = _get_user_library(session["user_id"])
         if lib and episode_id in lib.get("saved_episodes", []):
@@ -375,7 +380,7 @@ def audiobook_detail(audiobook_id):
         lib = _get_user_library(session["user_id"])
         if lib and audiobook_id in lib.get("purchased_audiobooks", []):
             purchased = True
-        if user and user["id"] in audiobook.get("liked_by", []):
+        if user and user["id"] in _liked_by(audiobook):
             liked = True
 
     # Related audiobooks in same genre
@@ -914,7 +919,7 @@ def api_like_episode(episode_id):
         abort(404)
 
     user_id = session["user_id"]
-    liked_by = episode.setdefault("liked_by", [])
+    liked_by = episode["liked_by"] = _liked_by(episode)
 
     if user_id in liked_by:
         liked_by.remove(user_id)
@@ -944,7 +949,7 @@ def api_like_audiobook(audiobook_id):
         abort(404)
 
     user_id = session["user_id"]
-    liked_by = audiobook.setdefault("liked_by", [])
+    liked_by = _liked_by(audiobook)
 
     if user_id in liked_by:
         liked_by.remove(user_id)
