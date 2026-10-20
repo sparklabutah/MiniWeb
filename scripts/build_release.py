@@ -7,8 +7,8 @@ data/final_set.yaml) and writes one self-contained folder (layout and field defi
 
   sites.jsonl                      the 65 sites: domain, split, hub, data source and license
   primitives/                      the macro registry, the final 37-primitive set and the 7 skill families
-  tasks/{test,train,excluded}/     the 376 human tasks by split (test: the 63 that start on a held-out site; train: the
-    <task_id>/                     310 on training sites only; excluded: 3 that start on a training site and use a held-out
+  tasks/{test,train,excluded}/     the 369 human tasks by split (test: the 62 that start on a held-out site; train: the
+    <task_id>/                     304 on training sites only; excluded: 3 that start on a training site and use a held-out
                                    site, in neither split), each with its current (repaired) definition and verifier, the
                                    annotator's original definition and verifier from before the review (original/), the
                                    human demonstration (demonstration/) and, where a reviewer re-walked the task, that walk
@@ -415,8 +415,8 @@ Every human task went through a review after annotation, and the release keeps b
 - `demonstration.status` says whether the recording still stands in for a correct episode, as the paper's grader
   validation decides it: `valid` ({d.get('valid', 0)}) passes the task's current verifier; `stale` ({d.get('stale', 0)})
   predates a change to its site, data or task; `verifier_rejected` ({d.get('verifier_rejected', 0)}) fails the current
-  verifier, for example an early recording whose recorder missed a form submission. The paper reports 168 / 67 / 141;
-  one recording has failed its verifier since.
+  verifier, for example an early recording whose recorder missed a form submission. Fuzzy text checks are judged by
+  an LLM, so a borderline recording can pass in one run and fail in another.
 
 ## Generated data (MiniWebGen)
 
@@ -499,7 +499,7 @@ def main(argv=None):
         shutil.copy2(DATA / f, prim / f)
     from miniwebgen.viewer import FAMILIES
     write_json(prim / "families.json", FAMILIES)
-    print("grading the 376 demonstrations with their current verifiers ...", flush=True)
+    print(f"grading the {len(tasks)} demonstrations with their current verifiers ...", flush=True)
     status = recording_status(tasks)
     index = build_tasks(out, P, tasks, status)
     gen = None if a.no_generated else build_generated(out, {s["id"] for s in sites if s["split"] == "train"})

@@ -204,9 +204,10 @@ def _field_match(want, got) -> bool:
         token = str(want['insert'])
         if str(got).count(token) != 1:
             return False
-        # Allow an inserted mention at any position, with an optional list
-        # comma adjacent to it; the remaining message must be preserved.
-        patterns = [re.escape(token), r',\s*' + re.escape(token), re.escape(token) + r',\s*']
+        # Allow an inserted mention at any position, as a list item (a comma on
+        # either or both sides, or "and" before it); the remaining message must be preserved.
+        patterns = [re.escape(token), r',\s*' + re.escape(token), re.escape(token) + r',\s*',
+                    r',\s*' + re.escape(token) + r',', r',?\s+and\s+' + re.escape(token)]
         normalize = lambda s: ' '.join(s.split())
         return any(normalize(re.sub(pattern, '', str(got), count=1)) == normalize(str(want.get('original', '')))
                    for pattern in patterns)
@@ -440,6 +441,9 @@ class ActionIncluded(Check):
     Target/selector are matched loosely on purpose: recorded selectors are often
     bare tags ("a", "select") and carry little information, while `target` is the
     human-readable description ("select 'Status' = 'Completed'").
+
+    `last_of` (a target fragment) judges only the last action on that component:
+    a toggle switched on and then off again is not left on.
     """
 
     type = "action_included"
@@ -450,7 +454,12 @@ class ActionIncluded(Check):
         want_value = _norm(self.arg("value", ""))
         want_selector = self.arg("selector", "")
 
-        for a in _actions(traj):
+        actions = _actions(traj)
+        if self.arg("last_of"):
+            on = _norm(self.arg("last_of"))
+            actions = [a for a in actions
+                       if re.search(r"(?<![\w])" + re.escape(on) + r"(?![\w])", _norm(a.get("target")))][-1:]
+        for a in actions:
             if want_action and a.get("action") != want_action and not (
                     want_action in _SAME_INPUT and a.get("action") in _SAME_INPUT):
                 continue

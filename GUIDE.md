@@ -2,7 +2,7 @@
 
 MiniWeb is three things you can use separately:
 
-- **A benchmark**: 65 websites you host yourself and 376 human-written tasks whose graders check every interaction
+- **A benchmark**: 65 websites you host yourself and 369 human-written tasks whose graders check every interaction
   skill (primitive) separately, so a run tells you which skills an agent lacks, not only how many tasks it solved.
 - **A dataset**: the tasks with their human demonstrations, 3,128 generated practice trajectories, and the training data
   of MiniWebAgent, on the Hugging Face Hub ([miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb)).
@@ -13,7 +13,7 @@ This guide covers the common jobs. [REPRODUCE.md](REPRODUCE.md) reproduces the p
 
 - [Set up](#set-up)
 - [Host MiniWeb](#host-miniweb)
-- [Run the 376 tasks](#run-the-376-tasks)
+- [Run the 369 tasks](#run-the-369-tasks)
 - [Read the per-skill results](#read-the-per-skill-results)
 - [Choose a grader](#choose-a-grader)
 - [Generate more data](#generate-more-data)
@@ -86,7 +86,7 @@ session:
 The graders use exactly these: they read what the agent did from the request log and the data changes, not from the
 agent's own report. Full list: [src/miniweb/app/README.md](src/miniweb/app/README.md).
 
-## Run the 376 tasks
+## Run the 369 tasks
 
 Pick the path that matches your agent. All three grade with the same verifiers and judge.
 
@@ -101,7 +101,7 @@ python -m miniwebagent.evaluate --human --human-split all --arm base --base-name
     --vllm http://127.0.0.1:8400/v1 --ports 8300,8301 --workers 6 --out runs/qwen35-4b
 ```
 
-- `--human-split test` runs only the 63 tasks of the 13 held-out sites; `train` the 310 on training sites.
+- `--human-split test` runs only the 62 tasks of the 13 held-out sites; `train` the 304 on training sites.
 - `--human-macros filter_by_slider,sign_by_freeformdrawing` keeps tasks that use one of these primitives;
   `--task-ids a,b` runs given tasks; `--limit 20` a quick sample; `--resume` continues a run.
 - `--tasks data/webmix/valgen/val_v2.jsonl` runs the 115 generated single-primitive tasks of the held-out sites instead.
@@ -160,12 +160,12 @@ python scripts/skill_report.py runs/model_a runs/model_b                # severa
 ```
 
 ```
-runs/qwen35-4b: 376 tasks
-  task success, judge      39.4%  (376 judged)
-  task success, verifiers  36.2%  (376 graded)
+runs/qwen35-4b: 369 tasks
+  task success, judge      40.1%  (369 judged)
+  task success, verifiers  36.3%  (369 graded)
   instances passed by family             n   judge  verifier
-  Drag & gesture                        18   16.7%     22.2%
-  Discrete selection                   221   39.8%     38.2%
+  Drag & gesture                        17   11.8%     11.8%
+  Discrete selection                   217   41.0%     39.0%
   ...
 ```
 
@@ -300,7 +300,7 @@ Every table loads with `datasets`, screenshots as images:
 from datasets import load_dataset
 import json
 
-tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")             # 63 held-out tasks
+tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")             # 62 held-out tasks
 t = tasks[0]
 print(t["instruction"], t["primitives"])
 verifier = json.loads(t["verifier"])                                          # nested fields are JSON text

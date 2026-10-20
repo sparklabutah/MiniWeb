@@ -220,7 +220,12 @@
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
   }
 
+  // One dialog at a time: a page can trigger its file input twice for one click (a SELECT FILES button inside a
+  // clickable drop zone, each calling input.click()); the second open used to tear down the first and leave none.
+  var opening = false;
   function openDialog(opts) {
+    if (overlay || opening) return;
+    opening = true;
     st = {
       mode: opts.mode || 'open', accept: opts.accept || [],
       saveName: opts.saveName || 'untitled', saveContent: opts.saveContent || '',
@@ -231,9 +236,10 @@
     fetch(FS + '/list?path=/')
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        opening = false;
         build(d.favorites);
         navigate(opts.startPath || (st.mode === 'save' ? '/Downloads' : '/Documents'));
-      });
+      }, function () { opening = false; });
   }
 
   function confirmPick() {

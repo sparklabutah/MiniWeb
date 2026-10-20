@@ -8,7 +8,7 @@ one row per recorded step with its screenshot.
 Tables (configs in the dataset card):
   sites                 the 65 websites: domain, split, hub, data source, license
   primitives            the macro registry: 46 base macros and 7 reasoning operations, final-set membership
-  tasks                 the 376 human tasks (splits train / test / excluded): the task and verifier as evaluated, the
+  tasks                 the 369 human tasks (splits train / test / excluded): the task and verifier as evaluated, the
                         annotator's originals, provenance, the server and input logs of the demonstration
   demonstrations        one row per recorded event of the human demonstrations (action or observation), with the
                         page's HTML snapshot, accessibility tree and screenshot where recorded

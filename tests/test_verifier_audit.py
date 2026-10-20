@@ -112,7 +112,8 @@ class AuditRegressionTests(unittest.TestCase):
 
     def test_mention_insertion_preserves_original_message(self):
         rule={'mode':'text_with_insertion','value':{'original':'Score 94.2%. @aisha please review.', 'insert':'@marc'}}
-        for text in ('@marc Score 94.2%. @aisha please review.', 'Score 94.2%. @aisha, @marc please review.', 'Score 94.2%. @aisha please review. @marc'):
+        for text in ('@marc Score 94.2%. @aisha please review.', 'Score 94.2%. @aisha, @marc please review.', 'Score 94.2%. @aisha please review. @marc',
+                     'Score 94.2%. @aisha, @marc, please review.', 'Score 94.2%. @aisha and @marc please review.'):
             self.assertTrue(_field_match(rule,text))
         self.assertFalse(_field_match(rule,'Score 90%. @aisha, @marc please review.'))
         self.assertFalse(_field_match(rule,'Score 94.2%. @marc please review.'))

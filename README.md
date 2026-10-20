@@ -1,7 +1,7 @@
 # MiniWeb
 
 **Diagnose and train web agents one skill at a time.** MiniWeb is 65 synthetic websites served by one Flask app,
-376 human-written tasks whose verifiers grade every interaction skill separately, and a pipeline that turns a few
+369 human-written tasks whose verifiers grade every interaction skill separately, and a pipeline that turns a few
 human demonstrations into thousands of verified practice trajectories.
 
 <img alt="The 65 MiniWeb websites by domain: 21 seeded from public datasets, 44 synthetic, 13 held out for evaluation"
@@ -22,10 +22,10 @@ one against the server's request log. A run then says which skills an agent has.
   cells). The registry is `data/macros.yaml`; the final set is `data/final_set.yaml`.
 - **65 websites in 15 domains** that share one fictional world, so a task can pay a bill in SecureBank and confirm it by
   email in WebMail. 21 sites are seeded from public datasets, the other 44 from deterministic synthetic data.
-- **376 tasks** written and recorded by six annotators, 43 of them across sites. Each comes with a skill-segmented
+- **369 tasks** written and recorded by six annotators, 43 of them across sites. Each comes with a skill-segmented
   demonstration and a verifier with one check per primitive, validated against the demonstrations and two negative
   controls.
-- **13 held-out sites**, fixed before any training data was generated. The 63 tasks that start on them are the test set.
+- **13 held-out sites**, fixed before any training data was generated. The 62 tasks that start on them are the test set.
 
 ## Every agent has the same blind spot
 
@@ -95,7 +95,7 @@ Two scripts put what the code needs in place:
 ```bash
 python scripts/restore_site_db.py   # the sites: database, images and a copy of the media they link to (~8 GB)
                                     #   -> data/miniweb.db, data/static/, data/media/
-python scripts/fetch_tasks.py       # the 376 human tasks: task, verifier, recording, verification walk
+python scripts/fetch_tasks.py       # the 369 human tasks: task, verifier, recording, verification walk
                                     #   -> data/annotations/<author>/<task_id>/
 ```
 
@@ -107,14 +107,14 @@ Every table of the release also loads directly with `datasets`, screenshots as i
 
 ```python
 from datasets import load_dataset
-tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")                         # the 63 held-out tasks
+tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")                         # the 62 held-out tasks
 steps = load_dataset("miniweb/MiniWeb", "training_steps", split="train", streaming=True)  # MiniWebAgent's training data
 ```
 
 | Table | Rows | One row per |
 |---|---|---|
-| `tasks` | 376 (train 310, test 63, excluded 3) | human task: instruction, primitives, verifier, the annotator's original version, provenance |
-| `demonstrations` | 17.8K | recorded event of a human demonstration, with the page's HTML, accessibility tree and screenshot |
+| `tasks` | 369 (train 304, test 62, excluded 3) | human task: instruction, primitives, verifier, the annotator's original version, provenance |
+| `demonstrations` | 17.4K | recorded event of a human demonstration, with the page's HTML, accessibility tree and screenshot |
 | `miniwebgen_trajectories`, `miniwebgen_steps` | 3,128 / 17.1K | MiniWebGen's verified single-primitive trajectories and their steps |
 | `training_steps` | 31K | MiniWebAgent's training data, in the agent harness's format, with the step's screenshot |
 | `task_centric_tasks`, `task_centric_steps` | 7,280 / 27.6K | the task-centric comparison data |
@@ -166,7 +166,7 @@ python -m miniwebagent.evaluate --human --arm base --base-name qwen35-4b --vllm 
 
 MiniWebAgent's trained executor is on the Hub as well
 ([huggingface.co/miniweb/MiniWebAgent](https://huggingface.co/miniweb/MiniWebAgent)); `python scripts/fetch_adapters.py`
-puts it in `data/webmix/adapters/`. **[GUIDE.md](GUIDE.md)** covers the common jobs: hosting MiniWeb, running the 376
+puts it in `data/webmix/adapters/`. **[GUIDE.md](GUIDE.md)** covers the common jobs: hosting MiniWeb, running the 369
 tasks with your agent, per-primitive failure reports, choosing a grader, generating more data for a primitive or a
 skill family, and training an executor.
 

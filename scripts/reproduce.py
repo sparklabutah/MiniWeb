@@ -96,9 +96,9 @@ def status(args):
             n = done("miniweb", run)
             j = os.path.join(ROOT, run, "judge.jsonl")
             nj = sum(1 for l in open(j) if l.strip()) if os.path.exists(j) else 0
-            ok = n is not None and n >= 376 and nj >= 375
+            ok = n is not None and n >= 369 and nj >= 368
             bad += not ok
-            print(f"{'rq1':16s} {m['served']:9s} {'' if ok else '!'}{n} graded, {nj} judged  (of 376)")
+            print(f"{'rq1':16s} {m['served']:9s} {'' if ok else '!'}{n} graded, {nj} judged  (of 369)")
     for a, spec in reg["adapters"].items():
         ok = os.path.exists(os.path.join(ROOT, "data", "webmix", "adapters", a, "adapter_model.safetensors"))
         bad += not ok
@@ -214,7 +214,7 @@ def show(args):
 
 
 def show_rq1(reg):
-    print("# RQ1: ten untrained agents on all 376 MiniWeb tasks (Tab. 2). Browser-use agents (miniwebagent.evaluate):")
+    print("# RQ1: ten untrained agents on all 369 MiniWeb tasks (Tab. 2). Browser-use agents (miniwebagent.evaluate):")
     for m in reg["rq1"]["browser_use"]:
         env = {"MODEL": m["model"], "SERVED": m["served"], "PORT": 8400, **m.get("server_env", {})}
         print(" ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items()) + " bash src/miniwebagent/scripts/serve.sh")

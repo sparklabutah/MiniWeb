@@ -63,8 +63,8 @@ evaluation sets" explains the normalization).
 
 | Stage | Hardware | Time | API cost |
 |---|---|---|---|
-| MiniWeb held-out run (63 tasks), verifiers | 1 GPU | about 1 h | -- |
-| Skill profile of one agent (376 tasks), VLM judge | 1 GPU | about 5 h | $0.045 per episode |
+| MiniWeb held-out run (62 tasks), verifiers | 1 GPU | about 1 h | -- |
+| Skill profile of one agent (369 tasks), VLM judge | 1 GPU | about 5 h | $0.045 per episode |
 | WebArena-Lite run (154 tasks) | RTX 5090, 4 site instances | about 3 h | under $1 |
 | WebVoyager run (536 tasks, 100 steps) | 24 or 40 GB GPUs | 10-15 GPU-h | $26 (GPT-4o judge) |
 | Online-Mind2Web run (280 tasks, 100 steps) | 24 or 40 GB GPUs | 10-15 GPU-h | $92 (WebJudge, o4-mini) |
@@ -78,7 +78,7 @@ more made model calls time out and episodes end early.
 
 ```bash
 python scripts/restore_site_db.py              # the sites: database, images, media
-python scripts/fetch_tasks.py                  # the 376 human tasks and the 115 generated single-primitive test tasks
+python scripts/fetch_tasks.py                  # the 369 human tasks and the 115 generated single-primitive test tasks
 python scripts/fetch_adapters.py --all         # the paper's trained executors -> data/webmix/adapters/
 ```
 
@@ -97,7 +97,7 @@ Everything comes from the Hugging Face Hub: the data from
 
 | Result | Runs | Commands |
 |---|---|---|
-| Tab. 2, Fig. 5-6: skill profiles of ten untrained agents on the 376 tasks | `rq1` | `reproduce.py show rq1`, then `judge_runs.py` and `skill_report.py` |
+| Tab. 2, Fig. 5-6: skill profiles of ten untrained agents on the 369 tasks | `rq1` | `reproduce.py show rq1`, then `judge_runs.py` and `skill_report.py` |
 | Tab. 3: Qwen3.5-4B as a single agent or a planner, untrained or trained, on four benchmarks | arms `base`, `pooled`, `planner`, `planner_pooled`, `taskcentric` | `reproduce.py show/run <arm>`, `reproduce.py table` |
 | Fig. 7: practice per skill family on the 103 generated single-primitive tasks | `base`, `pooled` on `single` | `skill_report.py` on those runs |
 | Supp.: every configuration (the specialists, the no-`done` control) | arms `agent`, `nodone` | `reproduce.py show/run <arm>`, `reproduce.py table` |
@@ -106,7 +106,7 @@ Everything comes from the Hugging Face Hub: the data from
 | Supp.: compute | -- | the table above |
 
 The benchmarks, as `reproduce.py` names them: `single` (the 103 generated single-primitive tasks of well-covered
-primitives on the 13 held-out sites), `heldout` (the 63 human tasks of those sites), `wa` (WebArena-Lite, 154), `wv`
+primitives on the 13 held-out sites), `heldout` (the 62 human tasks of those sites), `wa` (WebArena-Lite, 154), `wv`
 (WebVoyager, 536), `om2w` (Online-Mind2Web, 280).
 
 ## Tab. 3: MiniWebAgent and its baselines
@@ -184,17 +184,18 @@ python scripts/skill_report.py data/webmix/eval/rq1_qwen35_4b_all
 ```
 
 ```
-data/webmix/eval/rq1_qwen35_4b_all: 376 tasks
-  task success, judge      39.4%  (376 judged)
-  task success, verifiers  36.2%  (376 graded)
+data/webmix/eval/rq1_qwen35_4b_all: 369 tasks
+  task success, judge      40.1%  (369 judged)
+  task success, verifiers  36.3%  (369 graded)
   instances passed by family             n   judge  verifier
-  Drag & gesture                        18   16.7%     22.2%
-  Discrete selection                   221   39.8%     38.2%
-  Text entry                           144   37.5%     34.3%
-  Form transaction                     183   38.3%     39.4%
-  Navigation                            78   53.8%     57.1%
-  Out-of-page I/O                       56   28.6%     27.3%
-  Reasoning base                       122   60.7%     53.3%
+  Drag & gesture                        17   11.8%     11.8%
+  Discrete selection                   217   41.0%     39.0%
+  Text entry                           144   38.9%     35.1%
+  Form transaction                     179   38.5%     37.7%
+  Navigation                            76   55.3%     58.7%
+  Out-of-page I/O                       56   32.1%     31.5%
+  Reasoning base                       121   59.5%     53.7%
+  all instances                        810   43.0%     41.1%
 ```
 
 The judge columns are Tab. 2's row for Qwen3.5-4B. `--by primitive` breaks it down per primitive, and `--failures N`

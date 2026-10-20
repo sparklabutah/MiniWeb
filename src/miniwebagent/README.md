@@ -247,11 +247,11 @@ on the other benchmarks). The older screenshot planner and subtask routers (`pla
 
 - `--human`: the human-written tasks (`data/annotations/*/*/task.json`), started like
   `src/miniweb/evaluation/run_agent_verify.py` and graded by each task's `verifier.json`.
-  `--human-split test` (the default) gives the 63 tasks on the 13 held-out sites of
-  `data/datagen/site_split.json`. `--human-split train` gives the 310 train-site tasks.
+  `--human-split test` (the default) gives the 62 tasks on the 13 held-out sites of
+  `data/datagen/site_split.json`. `--human-split train` gives the 304 train-site tasks.
 - **Dev sets** for agent development are two disjoint sets of 60 train-site tasks:
   `data/webmix/eval/pagent_devset.txt` and `pagent_devset2.txt` (comma-separated ids for
-  `--task-ids`). The held-out 63 are used only to measure.
+  `--task-ids`). The held-out 62 are used only to measure.
 - `--tasks FILE` with `"kind": "proposed"` tasks (`taskgen.py`): no check at run time; every episode
   saves its backend evidence, a final screenshot and, with `--record-rows`, its rows for the judge.
 - `--tasks FILE`: generated single-macro tasks, graded by the datagen gate. Validation v2 is
@@ -355,7 +355,7 @@ These commands assume the server from step 5 is running.
 PY=~/.conda/envs/miniweb/bin/python
 AG="--agent-version v6 --planner-name qwen35-4b --adapters drag,io,select,rest,reasoning --fallback pooled_v4 --timeout 2400"
 
-# MiniWeb held-out (63 tasks); dev: add --human-split train --task-ids $(cat data/webmix/eval/pagent_devset.txt)
+# MiniWeb held-out (62 tasks); dev: add --human-split train --task-ids $(cat data/webmix/eval/pagent_devset.txt)
 $PY -m miniwebagent.evaluate --human --arm agent_planner $AG --verifier-only --workers 6 --ports 8306,8307 --out data/webmix/eval/heldout_v5
 $PY -m miniwebagent.evaluate --human --arm base --verifier-only --workers 6 --ports 8306,8307 --out data/webmix/eval/heldout_base
 
