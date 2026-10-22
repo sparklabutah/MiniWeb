@@ -90,8 +90,8 @@ python scripts/fetch_training_data.py --table task_centric_steps     # the task-
 ```
 
 Everything comes from the Hugging Face Hub: the data from
-[miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb), the checkpoints from
-[miniweb/MiniWebAgent](https://huggingface.co/miniweb/MiniWebAgent).
+[sparklabuofu/MiniWeb](https://huggingface.co/datasets/sparklabuofu/MiniWeb), the checkpoints from
+[sparklabuofu/MiniWebAgent](https://huggingface.co/sparklabuofu/MiniWebAgent).
 
 ## Where each result comes from
 

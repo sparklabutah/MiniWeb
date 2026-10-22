@@ -9,7 +9,7 @@ Serve them with src/miniwebagent/scripts/serve.sh (LORA_MODULES=<name>=data/webm
 import argparse, os, shutil
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-REPO = "miniweb/MiniWebAgent"
+REPO = "sparklabuofu/MiniWebAgent"
 FILES = ["adapter_config.json", "adapter_model.safetensors", "train_log.jsonl", "training_meta.json"]
 # folder in the repository -> local adapter name
 MAIN = {"": "pooled_v4"}

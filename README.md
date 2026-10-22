@@ -89,7 +89,7 @@ are in `scripts/envs/` ([REPRODUCE.md](REPRODUCE.md#what-you-need)).
 
 ### 2. Download the data
 
-All data is on the Hugging Face Hub: **[huggingface.co/datasets/miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb)**.
+All data is on the Hugging Face Hub: **[huggingface.co/datasets/sparklabuofu/MiniWeb](https://huggingface.co/datasets/sparklabuofu/MiniWeb)**.
 Two scripts put what the code needs in place:
 
 ```bash
@@ -107,8 +107,8 @@ Every table of the release also loads directly with `datasets`, screenshots as i
 
 ```python
 from datasets import load_dataset
-tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")                         # the 62 held-out tasks
-steps = load_dataset("miniweb/MiniWeb", "training_steps", split="train", streaming=True)  # MiniWebAgent's training data
+tasks = load_dataset("sparklabuofu/MiniWeb", "tasks", split="test")                         # the 62 held-out tasks
+steps = load_dataset("sparklabuofu/MiniWeb", "training_steps", split="train", streaming=True)  # MiniWebAgent's training data
 ```
 
 | Table | Rows | One row per |
@@ -165,7 +165,7 @@ python -m miniwebagent.evaluate --human --arm base --base-name qwen35-4b --vllm 
 ```
 
 MiniWebAgent's trained executor is on the Hub as well
-([huggingface.co/miniweb/MiniWebAgent](https://huggingface.co/miniweb/MiniWebAgent)); `python scripts/fetch_adapters.py`
+([huggingface.co/sparklabuofu/MiniWebAgent](https://huggingface.co/sparklabuofu/MiniWebAgent)); `python scripts/fetch_adapters.py`
 puts it in `data/webmix/adapters/`. **[GUIDE.md](GUIDE.md)** covers the common jobs: hosting MiniWeb, running the 369
 tasks with your agent, per-primitive failure reports, choosing a grader, generating more data for a primitive or a
 skill family, and training an executor.

@@ -13,7 +13,7 @@ import argparse, glob, json, os
 import pyarrow.parquet as pq
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-REPO = "miniweb/MiniWeb"
+REPO = "sparklabuofu/MiniWeb"
 OUT = {"training_steps": os.path.join("data", "webmix", "replay_v4"),
        "task_centric_steps": os.path.join("data", "webmix", "taskgen", "rows_27k")}
 COLS = ["episode", "variant", "parts", "task_id", "step", "segment", "primitive", "family", "op", "resolved",

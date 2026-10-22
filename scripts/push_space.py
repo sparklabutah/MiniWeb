@@ -2,8 +2,8 @@
 working tree (tracked, plus new files git does not ignore), with deploy/space/Dockerfile and deploy/space/README.md as
 the Space's Dockerfile and README. The Space then builds the image and runs deploy/space/start.sh.
 
-    python scripts/push_space.py miniweb/MiniWeb-demo --dry-run    # list what would change
-    python scripts/push_space.py miniweb/MiniWeb-demo              # creates the Space when it does not exist
+    python scripts/push_space.py sparklabuofu/MiniWeb-demo --dry-run    # list what would change
+    python scripts/push_space.py sparklabuofu/MiniWeb-demo              # creates the Space when it does not exist
 
 Needs a token that can write to the namespace (`huggingface-cli login`, or HF_TOKEN).
 """
@@ -23,7 +23,7 @@ def local_files():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("space", help="the Space, e.g. miniweb/MiniWeb-demo")
+    ap.add_argument("space", help="the Space, e.g. sparklabuofu/MiniWeb-demo")
     ap.add_argument("--private", action="store_true", help="when creating the Space")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()

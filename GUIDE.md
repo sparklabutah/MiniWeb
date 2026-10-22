@@ -5,7 +5,7 @@ MiniWeb is three things you can use separately:
 - **A benchmark**: 65 websites you host yourself and 369 human-written tasks whose graders check every interaction
   skill (primitive) separately, so a run tells you which skills an agent lacks, not only how many tasks it solved.
 - **A dataset**: the tasks with their human demonstrations, 3,128 generated practice trajectories, and the training data
-  of MiniWebAgent, on the Hugging Face Hub ([miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb)).
+  of MiniWebAgent, on the Hugging Face Hub ([sparklabuofu/MiniWeb](https://huggingface.co/datasets/sparklabuofu/MiniWeb)).
 - **A framework**: MiniWebGen, which generates verified practice data for any primitive in any amount, and MiniWebAgent,
   which trains an executor on it and composes the skills with a planner.
 
@@ -289,7 +289,7 @@ replay, variants, test tasks, task-centric data, release), and `--run --steps ..
 
 ## Train and evaluate an executor
 
-MiniWebAgent's trained executor is on the Hub ([miniweb/MiniWebAgent](https://huggingface.co/miniweb/MiniWebAgent)):
+MiniWebAgent's trained executor is on the Hub ([sparklabuofu/MiniWebAgent](https://huggingface.co/sparklabuofu/MiniWebAgent)):
 `python scripts/fetch_adapters.py` puts it in `data/webmix/adapters/pooled_v4` (`--all` adds the paper's other
 executors). To train your own:
 
@@ -321,13 +321,13 @@ Every table loads with `datasets`, screenshots as images:
 from datasets import load_dataset
 import json
 
-tasks = load_dataset("miniweb/MiniWeb", "tasks", split="test")             # 62 held-out tasks
+tasks = load_dataset("sparklabuofu/MiniWeb", "tasks", split="test")        # 62 held-out tasks
 t = tasks[0]
 print(t["instruction"], t["primitives"])
 verifier = json.loads(t["verifier"])                                          # nested fields are JSON text
 
-demo = load_dataset("miniweb/MiniWeb", "demonstrations", split="test")      # one row per recorded event
-steps = load_dataset("miniweb/MiniWeb", "training_steps", split="train", streaming=True)
+demo = load_dataset("sparklabuofu/MiniWeb", "demonstrations", split="test") # one row per recorded event
+steps = load_dataset("sparklabuofu/MiniWeb", "training_steps", split="train", streaming=True)
 row = next(iter(steps))
 messages, target, image = json.loads(row["messages"]), row["target"], row["image"]   # prompt, action, screenshot
 ```

@@ -15,7 +15,7 @@ short_description: 65 practice websites for web agents (read-only demo)
 The 65 MiniWeb websites and the annotation tool used to build MiniWeb's 369 tasks, as a read-only demo.
 
 - **Code:** [miniweb-site/MiniWeb](https://github.com/miniweb-site/MiniWeb)
-- **Data:** [miniweb/MiniWeb](https://huggingface.co/datasets/miniweb/MiniWeb)
+- **Data:** [sparklabuofu/MiniWeb](https://huggingface.co/datasets/sparklabuofu/MiniWeb)
 
 ## What you can do
 

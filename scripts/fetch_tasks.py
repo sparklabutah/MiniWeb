@@ -13,7 +13,7 @@ import argparse, glob, json, os
 import pyarrow.parquet as pq
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-REPO = "miniweb/MiniWeb"
+REPO = "sparklabuofu/MiniWeb"
 
 
 def load(v):
