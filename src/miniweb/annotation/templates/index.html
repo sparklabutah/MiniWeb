@@ -44,16 +44,42 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
     <h1>MiniWeb Task Annotation</h1>
     <div class="stats">{{ task_count }} tasks · {{ sites|length }} sites · {{ macros|length }} macros</div>
     <div>
+    {% if demo %}
+        <a href="{{ url_for('annotation.macro_browser_page') }}">Human demonstrations</a>
+        <a href="{{ trajectories_url }}" target="_blank" rel="noopener">Agent trajectories</a>
+        <a href="/" target="_blank">MiniWeb Portal</a>
+    {% else %}
         <a href="{{ url_for('annotation.verify') }}">Verifier Builder</a>
         <a href="{{ url_for('annotation.playback_facts_page') }}">Playback Facts</a>
         <a href="{{ url_for('annotation.macro_browser_page') }}">Macro Browser</a>
         <a href="{{ url_for('annotation.task_review_page') }}">Task Review</a>
         <a href="{{ url_for('annotation.accounts_page') }}">Accounts</a>
         <a href="/" target="_blank">MiniWeb Portal</a>
+    {% endif %}
     </div>
 </div>
 
 <div class="main">
+    {% if demo %}
+    <h2>Explore</h2>
+    <div class="modes">
+        <a class="mode-card" href="{{ url_for('annotation.annotate') }}">
+            <h3>Try the annotation tool</h3>
+            <p>Opens one of the {{ task_count }} released tasks as its annotator wrote it: the instruction, the primitives it chains, and the recorded demonstration. Nothing you change is saved.</p>
+            <div class="est">A random task each time</div>
+        </a>
+        <a class="mode-card" href="{{ url_for('annotation.macro_browser_page') }}">
+            <h3>Watch human demonstrations</h3>
+            <p>Step through every recorded instance of a primitive, or every primitive of a task, with the span of the demonstration it covers.</p>
+            <div class="est">By primitive or by task</div>
+        </a>
+        <a class="mode-card" href="{{ trajectories_url }}" target="_blank" rel="noopener">
+            <h3>Agent trajectories</h3>
+            <p>Every agent episode behind the paper's results, on MiniWeb and the external benchmarks, step by step with each primitive's verdict.</p>
+            <div class="est">Opens the project website</div>
+        </a>
+    </div>
+    {% else %}
     <h2>Choose mode</h2>
     <div class="modes">
         <a class="mode-card" href="{{ url_for('annotation.review') }}">
@@ -81,6 +107,7 @@ h2 { font-size: 1.2rem; color: #0f172a; margin-bottom: 1rem; }
             <div class="est">Interactive graph editor</div>
         </a>
     </div>
+    {% endif %}
 
     <div class="grid-section">
         <h2>Task Coverage</h2>

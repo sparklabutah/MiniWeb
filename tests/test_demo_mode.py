@@ -110,3 +110,34 @@ class DemoSetupTests(unittest.TestCase):
                                                                            "walk": {"passed": True}}}))
             s = quality.summary(Path(d), {"instruction": "x"})
             self.assertEqual(sorted(r["source"] for r in s["runs"]), ["gold", "walk"])
+
+
+class DemoAnnotationPagesTests(unittest.TestCase):
+    """The demo's annotation side offers the tool, the human demonstrations and the agent trajectories; the
+    reviewers' pages are closed."""
+
+    def client(self):
+        from flask import Flask
+        from miniweb.annotation.app import annotation_bp
+        app = Flask(__name__)
+        app.secret_key = "test"
+        app.register_blueprint(annotation_bp, url_prefix="/annotate")
+        return app.test_client()
+
+    def test_reviewer_pages_are_closed(self):
+        with mock.patch("miniweb.app.demo.ENABLED", True):
+            c = self.client()
+            for page in ("/annotate/verify", "/annotate/task-review", "/annotate/playback"):
+                r = c.get(page)
+                self.assertEqual((r.status_code, r.headers["Location"]), (302, "/annotate/"), page)
+            for api in ("/annotate/api/playback_facts", "/annotate/api/task_review/index"):
+                self.assertEqual(c.get(api).status_code, 404, api)
+
+    def test_home_offers_the_three_ways_in(self):
+        from miniweb.annotation.app import TRAJECTORIES_URL
+        with mock.patch("miniweb.app.demo.ENABLED", True):
+            html = self.client().get("/annotate/").get_data(as_text=True)
+        for text in ("Try the annotation tool", "Watch human demonstrations", TRAJECTORIES_URL):
+            self.assertIn(text, html)
+        for text in ("Verifier Builder", "Playback Facts", "Task Review", "Build Verifiers"):
+            self.assertNotIn(text, html)

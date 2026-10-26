@@ -770,12 +770,15 @@ _AUTH_EXEMPT = {"/annotate/login", "/annotate/api/auto_login", "/annotate/api/au
 
 # The public demo (MINIWEB_DEMO=1, app/demo.py): no login, the released tasks prefilled, nothing saved. These POSTs
 # only touch the visitor's own session (site logins, 2FA) or read (macro search, verifier runs); every other write
-# is refused. The pages and APIs of the audits, the site reviews, the accounts and the macro graph are hidden.
+# is refused. The pages and APIs of the audits, the site reviews, the accounts and the macro graph are hidden, and
+# so are the reviewers' tools (the Verifier Builder, Task Review, and the playback facts, which give answers away).
 _DEMO_WRITES = {"/annotate/api/auto_login", "/annotate/api/auto_logout", "/annotate/api/toggle_2fa",
                 "/annotate/api/macro_search", "/annotate/api/run_task_verifier", "/annotate/api/run_verifiers"}
 _DEMO_HIDDEN = ("/annotate/accounts", "/annotate/grader-audit", "/annotate/task-audit", "/annotate/review",
                 "/annotate/graph", "/annotate/api/grader_audit/", "/annotate/api/task_audit/", "/annotate/api/review",
-                "/annotate/api/graph/")
+                "/annotate/api/graph/", "/annotate/verify", "/annotate/task-review", "/annotate/api/task_review/",
+                "/annotate/playback", "/annotate/api/playback_facts")
+TRAJECTORIES_URL = "https://minhphd.github.io/miniweb/trajectories.html"   # every agent episode of the paper
 _DEMO_BANNER = (
     '<div style="position:fixed;right:12px;bottom:12px;z-index:99999;padding:3px 10px;border-radius:12px;'
     'background:#334155;color:#f8fafc;font:12px/1.4 system-ui,sans-serif;opacity:.9;pointer-events:none">'
@@ -873,7 +876,8 @@ def index():
     return render_template("index.html",
                            sites=sites, task_count=ann_stats["total_tasks"],
                            macros=macros, coverage=coverage,
-                           cell_counts=cell_counts, macro_counts=macro_counts)
+                           cell_counts=cell_counts, macro_counts=macro_counts,
+                           demo=_demo.ENABLED, trajectories_url=TRAJECTORIES_URL)
 
 
 @annotation_bp.route("/task")

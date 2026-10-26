@@ -224,7 +224,10 @@ function render() {
     $('c-eyebrow').textContent = mode === 'macro' ? 'Occurrence' : 'Task';
     $('c-title').innerHTML = t ? `<span class="sw" style="background:${color(t.macro)}"></span>${esc(t.instance)}${t.op ? ` <span class="op">${esc(t.op)}</span>` : ''}${t.required === false ? ' <span class="op" title="performed in the recording, not required by the instruction">incidental</span>' : ''}` : esc(detail.key);
     $('c-subtask').textContent = t ? (t.subtask || '') : `${detail.tags.length} macro instance(s)`;
-    $('c-task').innerHTML = `<a href="/annotate/verify?annotator=${encodeURIComponent(ann)}&task_id=${encodeURIComponent(tid)}" target="_blank">${esc(detail.key)}</a>`;
+    // the public demo has no Verifier Builder: its task link opens the task, prefilled, in the annotation tool
+    const taskHref = window.MINIWEB_DEMO ? `/annotate/task?rerecord=${encodeURIComponent(tid)}&annotator=${encodeURIComponent(ann)}`
+                                         : `/annotate/verify?annotator=${encodeURIComponent(ann)}&task_id=${encodeURIComponent(tid)}`;
+    $('c-task').innerHTML = `<a href="${taskHref}" target="_blank">${esc(detail.key)}</a>`;
     $('c-span').innerHTML = t ? (t.span ? `actions ${t.span[0]}–${t.span[1]} of ${detail.actions.length}` : '<span class="warn">no span recorded — showing the whole task</span>')
                               : `${detail.actions.length} actions`;
     $('c-instr').textContent = detail.instruction;
