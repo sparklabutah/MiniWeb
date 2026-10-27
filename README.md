@@ -77,7 +77,7 @@ network.
 ### 1. Install
 
 ```bash
-git clone https://github.com/miniweb-site/MiniWeb.git && cd MiniWeb
+git clone https://github.com/sparklabutah/MiniWeb.git && cd MiniWeb
 conda env create -f environment.yml       # requirements.txt + the src/ packages: miniweb, miniwebgen, miniwebagent, helpers
 conda activate miniweb
 python -m playwright install chromium     # the agents' browser
