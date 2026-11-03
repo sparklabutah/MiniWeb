@@ -1,0 +1,45 @@
+# Version 1: MiniWebAgent on MiniWeb's training-site human tasks, a simulated human, SFT each night.
+# Defaults for every key: daynight/config.py DEFAULTS.
+#
+#   python -m daynight.loop --config daynight/configs/v1_sim.yaml                    # stops at each night's plan
+#   python -m daynight.loop --config daynight/configs/v1_sim.yaml --resume --execute # runs the nights itself
+#   python -m daynight.loop --config daynight/configs/v1_sim.yaml --model mock --out data/daynight/v1_sim_mock
+name: v1_sim
+days: 5
+tasks_per_day: 20            # 310 training-site tasks: up to 15 days without repeating a task
+seed: 0
+workers: 2
+sites: train                 # or a list of training sites, e.g. [banking, email, forums]
+
+probe:
+  enabled: true
+  split: test                # the 63 held-out tasks, no human, every day
+  limit: 0                   # 0 = all
+
+agent:
+  planner: qwen35-4b         # untrained Qwen3.5-4B planner
+  executor: pooled_v4        # day 0 executor (MiniWebAgent's)
+  executor_path: data/webmix/adapters/pooled_v4
+  version: v6
+  vllm: http://127.0.0.1:8400/v1
+  ports: [8316, 8317]
+
+human:
+  kind: simulated            # simulated | real | none
+  model: gemini-3.5-flash
+  max_messages: 2
+  partial_verify: true
+
+meta:
+  model: gemini-3.5-flash
+  weak_macros: 3
+
+propose:
+  trajectories_per_night: 60
+  min_per_macro: 10
+
+train:
+  method: sft
+  gpus: "0"
+  recipe: --adapter pooled --epochs 1 --lr 5e-5 --beta 0.1 --anchor-ratio 0.25 --rank 64 --alpha 128
+  replay_mix: 1.0

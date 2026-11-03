@@ -32,6 +32,7 @@ some tests are plain strings, not live requests.
 | `test_webmix_replay.py` | `webmix/replay.py::build_plan`: recorded datagen pixel actions become a browser-use action plan. |
 | `test_webmix_augment.py` | `webmix/augment.py`: recovery variants (an injected, then corrected mistake) and chain variants (two trajectories in one episode). |
 | `test_webmix_evaluate.py` | `webmix/evaluate.py` routing: the oracle router switches adapters at each `macro_done` and gates a premature `done`; the planner agent's specialist choice sends reasoning to its adapter or the base and falls back when an adapter is not loaded. |
+| `test_daynight.py` | `daynight/`: the episode log round-trips, the meta agent never sees oracle fields or labels, LLM replies are parsed defensively, intent accuracy and day metrics, proposals by trouble without question answering, every night command stays inside the experiment dir, and the whole loop on the mock world (refusing to overwrite an experiment). |
 
 ## Beyond unit tests
 
