@@ -154,3 +154,144 @@ def test_mock_loop_runs_end_to_end_and_refuses_to_overwrite(tmp_path, capsys):
     assert json.loads((out / "state.json").read_text())["phase"] == "done"
     with pytest.raises(SystemExit):
         loop.main(args)
+
+
+# ── the day console (mock world, a real HTTP server on a free port) ───────────────────────────────────────────────
+
+class _Console:
+    def __init__(self, tmp_path, delay):
+        import asyncio
+        import threading
+        from daynight import console
+        from daynight.day import day0_agent
+        from daynight.world import make_backend
+        cfg, saved = console.console_config(_cfg(tmp_path), port=0)
+        backend = make_backend(cfg)
+        backend.step_delay = delay
+        self.log = C.day_dir(cfg, 1) / "episodes.jsonl"
+        up = threading.Event()
+
+        def ready(hub, url):
+            self.hub, self.url = hub, url
+            up.set()
+        self.thread = threading.Thread(daemon=True, target=lambda: asyncio.run(
+            console.session(cfg, saved, 1, backend, day0_agent(cfg), ready=ready)))
+        self.thread.start()
+        assert up.wait(10)
+
+    def post(self, name, body=None, header=True):
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(f"{self.url}/api/{name}", data=json.dumps(body or {}).encode(),
+                                     headers={"X-Console": "1"} if header else {})
+        try:
+            return 200, json.loads(urllib.request.urlopen(req, timeout=10).read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    def snap(self):
+        import urllib.request
+        return json.loads(urllib.request.urlopen(f"{self.url}/api/events?since=0", timeout=10).read())
+
+    def wait(self, cond, timeout=15):
+        import time
+        t = time.time()
+        while time.time() - t < timeout:
+            s = self.snap()
+            if cond(s):
+                return s
+            time.sleep(0.02)
+        raise AssertionError(f"timed out; status {self.snap()['status']}")
+
+    def close(self):
+        self.wait(lambda s: s["status"] == "idle")
+        assert self.post("end")[0] == 200
+        self.thread.join(10)
+
+
+def _agent_steps(s):
+    return sum(e["kind"] == "agent" for e in s["events"])
+
+
+def test_console_takeover_stops_the_agent_at_once_and_keeps_recording(tmp_path):
+    import time
+    con = _Console(tmp_path, delay=0.5)
+    try:
+        site = con.hub.info["sites"][0]
+        assert con.post("run", {"text": "Do the thing", "site": site})[0] == 200
+        assert con.post("input", {"type": "down", "x": 1, "y": 1})[0] == 400      # the agent has the browser
+        n = _agent_steps(con.wait(lambda s: _agent_steps(s) >= 1))
+        assert con.post("takeover")[0] == 200
+        con.wait(lambda s: s["status"] == "human")
+        for ev in ({"type": "down", "x": 10, "y": 20}, {"type": "up", "x": 10, "y": 20}, {"type": "key", "key": "a"}):
+            assert con.post("input", ev)[0] == 200
+        time.sleep(1.6)                                                          # three of the agent's steps
+        assert _agent_steps(con.snap()) == n                                     # it did nothing after the takeover
+        assert con.post("done", {"passed": True, "error_type": "wrong_target", "note": "wrong item"})[0] == 200
+        con.close()
+    finally:
+        if con.thread.is_alive():
+            con.post("end")
+    ep, = read_episodes(con.log)
+    iv = ep.interventions[-1]
+    assert ep.human == "real" and iv.kind == "takeover" and iv.at is not None
+    assert ep.steps[iv.step].action == {"interrupted": {"text": "stopped by the human"}}
+    assert [s.actor for s in ep.steps[iv.step + 1:]] == ["human"]
+    assert iv.label.error_type == "wrong_target" and iv.text == "wrong item"
+    assert [a["type"] for a in iv.human_actions] == ["down", "up", "key"]
+    assert ep.outcome.human_finished and not ep.autonomous
+    assert (con.log.parent / "console" / f"001_{ep.task_id}" / "chat.jsonl").exists()
+
+
+def test_console_reviews_every_done(tmp_path):
+    con = _Console(tmp_path, delay=0.01)
+    try:
+        tid = con.hub.info["tasks"][0]["id"]
+        con.post("run", {"task_id": tid})
+        con.wait(lambda s: s["status"] == "review")
+        assert con.post("accept")[0] == 200                                      # correct: the agent did it alone
+        con.wait(lambda s: s["status"] == "idle")
+        con.post("run", {"task_id": tid})
+        con.wait(lambda s: s["status"] == "review")
+        con.post("takeover")                                                     # wrong: the person takes it
+        con.wait(lambda s: s["status"] == "human")
+        con.post("done", {"passed": False})
+        con.close()
+    finally:
+        if con.thread.is_alive():
+            con.post("end")
+    first, again = read_episodes(con.log)
+    assert first.task_id == tid and not first.interventions
+    assert again.task_id == f"{tid}~2" and again.episode_id != first.episode_id
+    assert again.interventions[0].kind == "takeover" and "done" in again.steps[again.interventions[0].step].action
+    assert json.loads((tmp_path / "exp" / "state.json").read_text())["phase"] == "night"
+
+
+def test_console_refuses_posts_without_its_header(tmp_path):
+    con = _Console(tmp_path, delay=0.01)
+    try:
+        assert con.post("run", {"text": "x", "site": con.hub.info["sites"][0]}, header=False)[0] == 403
+        assert con.post("run", {"text": "", "site": ""})[0] == 400
+        assert con.snap()["status"] == "idle"
+    finally:
+        con.post("end")
+        con.thread.join(10)
+
+
+def test_until_interrupt_cancels_mid_step():
+    import asyncio
+    from daynight.world import until_interrupt
+
+    async def go():
+        h = type("H", (), {"interrupt": asyncio.Event()})()
+        stopped = []
+
+        async def agent():
+            await asyncio.sleep(30)
+            return "finished"
+        asyncio.get_running_loop().call_later(0.05, h.interrupt.set)
+        cut = await until_interrupt(agent(), h, on_cut=lambda: stopped.append(1))
+        fast = await until_interrupt(asyncio.sleep(0, "ok"), type("H", (), {"interrupt": asyncio.Event()})())
+        plain = await until_interrupt(asyncio.sleep(0, "ok"), None)
+        return cut, stopped, fast, plain
+    assert asyncio.run(asyncio.wait_for(go(), 5)) == ((None, True), [1], ("ok", False), ("ok", False))

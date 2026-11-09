@@ -165,7 +165,7 @@ PYTHONPATH=. python -m pytest tests/ -q
 | `evaluation/` | Agent harness and grading: `run_agent_verify.py`, `run_study.py`, `verifiers.py`, `macro_judge.py`, `xray.py` (results viewer) |
 | `datagen/` | Macro data pipeline: site split, site maps, task sampling, scripted executor, backend gate, exports |
 | `webmix/` | WebMix: replay to training rows, augmentation, LoRA training, vLLM serving, planner agent, MiniWeb / WebArena-Lite / live-web evaluation |
-| `daynight/` | Day/night continual learning: human-supervised days, a meta-train agent and MiniWebGen practice at night, per-day metrics ([README](daynight/README.md)) |
+| `daynight/` | Day/night continual learning: human-supervised days (a chat console with live takeover), a meta-train agent and MiniWebGen practice at night, per-day metrics ([README](daynight/README.md)) |
 | `helpers/` | Generic utilities: LLM routing and token accounting (`llm.py`), geo, auth, security |
 | `data/` | `macros.yaml`, `macro_locations.yaml` (tracked); the DB, annotations, datagen and webmix outputs (not tracked) |
 | `tests/` | pytest suite |

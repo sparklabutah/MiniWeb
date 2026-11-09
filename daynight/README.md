@@ -31,9 +31,13 @@ bash data/daynight/v1_sim/day_1/night_plan.sh                                 # 
 $PY -m daynight.loop --config data/daynight/v1_sim/config.yaml --resume       # serve the new adapter, then day 2
 $PY -m daynight.loop --config data/daynight/v1_sim/config.yaml --resume --execute   # or: run every night itself
 
-# one day with you as the human (headful browser + this terminal; see takeover.py)
+# a day with you as the human: the console (chat + the agent's browser, live; see "The console" below)
+$PY -m daynight.console --config daynight/configs/v1_sim.yaml --day 1      # then open http://127.0.0.1:8390
+$PY -m daynight.console --config daynight/configs/v1_mock.yaml            # try it on the mock world, no browser
+$PY -m daynight.loop --config data/daynight/v1_sim/config.yaml --resume   # after End day: the night on your day
+
+# the older terminal interface (headful browser + this terminal; see takeover.py)
 $PY -m daynight.day --config daynight/configs/v1_sim.yaml --day 1 --human real --tasks 5 --out data/daynight/me
-$PY -m daynight.day --config daynight/configs/v1_mock.yaml --day 1 --human real --tasks 2   # try the interface
 ```
 
 What each kind of run needs:
@@ -46,6 +50,39 @@ What each kind of run needs:
 Without `--execute`, the loop never runs a paid or GPU step: it writes `night_plan.sh` and stops. The loop never
 starts or stops a model server. It prints the `serve.sh` line for the new adapter, and with `--execute` it waits
 until the server lists it.
+
+## The console
+
+`python -m daynight.console` serves one page on `console.host:console.port` (default 127.0.0.1:8390; on a lab
+machine, `ssh -L 8390:127.0.0.1:8390 <host>` and open it locally). It needs no new dependency: a stdlib HTTP server
+on the same event loop as the agent.
+
+| Left: the chat | Right: the agent's browser |
+|---|---|
+| Type a task and pick its site, or pick an annotated task. Every step the agent takes appears as a message. What you type while it works reaches it after its current step (`Agent.add_new_task`). When it says it is done, mark it **Correct**, tell it what is still wrong, or press **Wrong, I'll take over**. | A live view: the agent's own headless tab, `console.fps` frames a second over CDP (`screen.py`). |
+
+**Take over** stops the agent at once, mid-step: the running planner (and the specialist it delegated to) is cancelled
+(`world.until_interrupt`) and the browser stays open. The episode gets an `interrupted` step and a takeover
+`Intervention` at that step, with `at` = the second it happened. Then you have the browser: your clicks, drags,
+scrolls, keys and pastes go into the agent's tab, plus Back, Reload and the URL bar (this MiniWeb server only).
+Recording never stops:
+- MiniWeb's page recorder logs your actions right after the agent's. The slice from the takeover on becomes
+  `Intervention.human_actions`, and the task's verifier grades the final state with them.
+- The console logs every input to `inputs.jsonl`, and the chat to `chat.jsonl`.
+- A frame is saved every `console.save_every` seconds to `frames/<seconds>_<agent|human>.jpg`.
+
+Finish with **Done** or **Give up**, plus an optional answer, error type, part and note. A takeover means the agent
+failed: the error type and part are the intervention's `Label`, which RQ1 scores the meta agent against.
+
+Grading:
+- An annotated task is graded by its verifier.
+- A typed task has no verifier, so your verdict grades it (`Outcome.grader: "human"`): Correct or Done passes it,
+  Give up fails it.
+
+Episodes are appended to `day_<t>/episodes.jsonl` as they finish (the same schema, human `real`), with their files in
+`day_<t>/console/<n>_<task>/`. **End day** sets `state.json` to that day's night, so `daynight.loop --resume` analyzes
+your day and trains on it. `--probe` runs the day's probe first. On the mock world each agent step takes
+`console.mock_step_delay` seconds, so you can watch it and take over.
 
 ## The loop
 
@@ -120,7 +157,9 @@ answering (`report_information`, `count_entries`) is skipped, because WebMix nev
 | `miniweb.py` | `MiniWebBackend`: real tasks, MiniWebAgent with the human hook, verifier grading |
 | `day.py` | the day runner and its CLI |
 | `human_sim.py` | the human interface (`View`, `Decision`), `LLMSimulatedHuman`, `MockSimulatedHuman` |
-| `takeover.py` | `TerminalHuman`: the real human's terminal controller |
+| `console.py`, `console.html` | the day console: chat, live view, takeover at any moment (`ConsoleHuman`, the HTTP server) |
+| `screen.py` | the console's live view of the agent's browser and the human's input into it, over CDP |
+| `takeover.py` | `TerminalHuman`: the older terminal controller (takes over only between steps) |
 | `meta.py` | the meta-train agent: `digest`, `LLMMetaAgent`, `RuleMetaAgent`, `summarize` |
 | `propose.py` | weak macros -> proposals -> MiniWebGen and replay commands; the mock generator |
 | `train.py` | rows folder, `webmix.train` command, serve line, adapter wait; the mock trainer |
@@ -161,6 +200,9 @@ These numbers show that the loop works end to end. They are not results.
     raises and the episode records the error.
   - **The planner hook:** the planner's `on_step_end` hook.
   - **Takeover capture:** the recorder slice that captures a real human's takeover actions.
+  - **The console's stop and live view:** cancelling the planner mid-step (browser-use must leave the kept-alive
+    session usable after a cancel), and the CDP calls in `screen.py` (`Page.captureScreenshot`,
+    `Input.dispatchMouseEvent`/`dispatchKeyEvent`/`insertText`). The console was only run on the mock world here.
 - **Screenshots:** episode folders keep the specialist histories (`history_<i>.json`), but their screenshots are not
   copied out of browser-use's temp dir. `webmix.evaluate` has the same gap for the planner arm.
 - **Simulated takeover:** it ends the episode. The simulated human does not finish the task, so it adds no
