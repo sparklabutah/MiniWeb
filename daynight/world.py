@@ -50,8 +50,44 @@ OTHER_ERRORS = ("wrong_target", "wrong_value", "wrong_page", "missed_step", "loo
 MAX_STEPS = 40
 
 
+async def until_interrupt(coro, human, on_cut=None):
+    """Run the agent (`coro`) until it ends or the human's `interrupt` is set. An interrupt cancels it at once,
+    mid-step (`on_cut()` first, e.g. Agent.stop). -> (result or None, interrupted)."""
+    ev = getattr(human, "interrupt", None)
+    task = asyncio.ensure_future(coro)
+    if ev is None:
+        return await task, False
+    wait = asyncio.ensure_future(ev.wait())
+    await asyncio.wait({task, wait}, return_when=asyncio.FIRST_COMPLETED)
+    if task.done():
+        wait.cancel()
+        return task.result(), False
+    if on_cut:
+        on_cut()
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception:                                # whatever the agent raised on its way out
+        pass
+    return None, True
+
+
 class Backend:
     def day_tasks(self, day, n):
+        raise NotImplementedError
+
+    def catalog(self):
+        """-> the tasks a person can pick in the console (annotated, so the verifier grades them)."""
+        return []
+
+    def sites(self):
+        """-> site ids a free-text console task can start on."""
+        return []
+
+    def free_task(self, text, site):
+        """A task typed in the console: no annotation, so the human's verdict grades it."""
         raise NotImplementedError
 
     def probe_tasks(self):
@@ -120,6 +156,7 @@ class _Servers:
 class MockBackend(Backend):
     POOL = 3000                      # day-stream task pool (disjoint slices per day)
     PROBE = 30
+    step_delay = 0.0                 # seconds per agent step (the console slows the agent down to watch it)
 
     def __init__(self, cfg):
         self.cfg, self.seed = cfg, cfg["seed"]
@@ -137,22 +174,43 @@ class MockBackend(Backend):
     def servers(self):
         return _Servers()
 
+    def _task(self, rng, site, tid, instruction=None):
+        avail = sorted(self.locations[site])
+        ms = rng.sample(avail, min(len(avail), rng.choice((1, 2, 2, 3))))
+        ms = [m for m in ms if family_of(m) != REASONING] + [m for m in ms if family_of(m) == REASONING]
+        subs = [(family_of(m), f"{m.replace('_', ' ')}: {self.locations[site][m][0]}") for m in ms]
+        return {"kind": "mock", "task_id": tid, "key": f"mock/{tid}", "site": site, "sites": [site], "macros": ms,
+                "subtasks": subs, "instruction": instruction or f"[mock] On {site}: " + "; then ".join(s for _, s in subs)}
+
     def _tasks(self, sites, n, tag):
         rng = random.Random(_h("tasks", self.seed, tag))
-        out = []
-        for k in range(n):
-            site = rng.choice(sites)
-            avail = sorted(self.locations[site])
-            ms = rng.sample(avail, min(len(avail), rng.choice((1, 2, 2, 3))))
-            ms = [m for m in ms if family_of(m) != REASONING] + [m for m in ms if family_of(m) == REASONING]
-            subs = [(family_of(m), f"{m.replace('_', ' ')}: {self.locations[site][m][0]}") for m in ms]
-            out.append({"kind": "mock", "task_id": f"mock_{tag}{k:04d}", "key": f"mock/{tag}{k:04d}", "site": site,
-                        "sites": [site], "macros": ms, "subtasks": subs,
-                        "instruction": f"[mock] On {site}: " + "; then ".join(s for _, s in subs)})
-        return out
+        return [self._task(rng, rng.choice(sites), f"mock_{tag}{k:04d}") for k in range(n)]
 
     def day_tasks(self, day, n):
         return self._pool[(day - 1) * n:day * n]
+
+    def catalog(self):
+        return self._pool[:200]
+
+    def sites(self):
+        return sorted(set(self.train) | set(self.test))
+
+    def free_task(self, text, site):
+        """The mock agent cannot read: it attempts a few of the site's macros, drawn from the text."""
+        if site not in self.locations:
+            raise ValueError(f"no such site in the mock world: {site}")
+        return self._task(random.Random(_h("free", self.seed, site, text)), site,
+                          f"free_{_h(site, text) % 16 ** 6:06x}", instruction=text)
+
+    async def _pace(self, human):
+        """The agent "works" for `step_delay` seconds. -> True if the human took over meanwhile (Human.interrupt)."""
+        ev = getattr(human, "interrupt", None)
+        if self.step_delay:
+            try:
+                await asyncio.wait_for(ev.wait() if ev else asyncio.sleep(self.step_delay), self.step_delay)
+            except asyncio.TimeoutError:
+                pass
+        return bool(ev and ev.is_set())
 
     def probe_tasks(self):
         lim = self.cfg["probe"].get("limit") or 0
@@ -182,21 +240,42 @@ class MockBackend(Backend):
             d = await human.decide(view(done))
             if d.kind == "continue":
                 return "continue"
-            iv = Intervention(step=ep.steps[-1].i, kind=d.kind, actor=human.actor, text=d.text, label=d.label)
+            iv = Intervention(step=ep.steps[-1].i, kind=d.kind, actor=human.actor, text=d.text, label=d.label,
+                              at=round(time.time() - t0, 2))
             ep.interventions.append(iv)
             if d.kind == "message":
                 return "retry"
-            if human.can_act:                          # the terminal human "finishes" the mock task
-                ans, note, label = await human.take_over(view(done))
-                iv.text, iv.label = note or iv.text, label or iv.label
-                for m in task["macros"]:
-                    by_macro[m] = True
-                iv.human_actions = [{"type": "action", "action": "mock_finish", "macro": m} for m in task["macros"]]
-                ep.steps.append(Step(i=len(ep.steps), actor="human", action={"takeover": {"text": note or ""}},
-                                     report=ans))
+            if human.can_act:
+                await take(iv, done)
             return "stop"
 
+        async def take(iv, done=False):
+            """A real human finishes the mock task: it counts as done unless they say they gave up."""
+            nonlocal answer
+            ans, note, label = await human.take_over(view(done))
+            iv.text, iv.label = note or iv.text, label or iv.label
+            if human.verdict() is not False:
+                for m in task["macros"]:
+                    by_macro[m] = True
+            iv.human_actions = human.recorded_actions() or [
+                {"type": "action", "action": "mock_finish", "macro": m} for m in task["macros"]]
+            ep.steps.append(Step(i=len(ep.steps), actor="human", action={"takeover": {"text": note or ""}},
+                                 report=ans))
+            answer = ans if ans is not None else answer
+
+        async def cut():
+            """The human took over while the agent was working: it stops at once, before the step lands."""
+            ep.steps.append(Step(i=len(ep.steps), actor="agent", action={"interrupted": {"text": "stopped by the human"}}))
+            iv = Intervention(step=ep.steps[-1].i, kind="takeover", actor=human.actor, at=round(time.time() - t0, 2))
+            ep.interventions.append(iv)
+            if human.can_act:
+                await take(iv)
+
         while k < len(task["macros"]) and len(ep.steps) < MAX_STEPS:
+            if await self._pace(human):
+                await cut()
+                stopped = True
+                break
             m = task["macros"][k]
             fam = family_of(m)
             p = min(0.97, skills.get(m, 0.5) + help_bonus)
@@ -232,9 +311,12 @@ class MockBackend(Backend):
                 continue
             help_bonus, k = 0.0, k + 1
         if not stopped and (not ep.steps or "done" not in ep.steps[-1].action):
-            answer = answer or "Done."
-            ep.steps.append(Step(i=len(ep.steps), actor="agent", action={"done": {"text": answer}}, report=answer))
-            await watch(done=True)
+            if await self._pace(human):
+                await cut()
+            else:
+                answer = answer or "Done."
+                ep.steps.append(Step(i=len(ep.steps), actor="agent", action={"done": {"text": answer}}, report=answer))
+                await watch(done=True)
         took_over = any(iv.kind == "takeover" for iv in ep.interventions)
         ep.outcome = Outcome(passed=all(by_macro.values()), by_macro=by_macro, answer=answer,
                              human_finished=took_over, grader="mock")

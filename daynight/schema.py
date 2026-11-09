@@ -67,6 +67,7 @@ class Intervention:
     text: str = ""                   # the message, or the human's note at a takeover
     label: Label | None = None       # ground truth, when known
     human_actions: list = field(default_factory=list)   # takeover: what the human did (recorder entries)
+    at: float | None = None          # seconds into the episode (console takeovers: the moment the agent was stopped)
 
 
 @dataclass

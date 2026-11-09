@@ -46,11 +46,16 @@ class Decision:
     text: str = ""
     label: Label | None = None
 
-
 class Human:
-    """Interface. `can_act`: the human performs the rest of a takeover in the browser (only a real one)."""
+    """Interface. `can_act`: the human performs the rest of a takeover in the browser (only a real one).
+
+    `interrupt`: an asyncio.Event, or None. A human who can take over at any moment (console.py) sets it, and the
+    backend stops the agent at once, mid-step, instead of at the next `decide`. `remote_screen`: the human watches
+    and drives the agent's browser through `attach` (a live view), so the browser may stay headless."""
     actor = "simulated"
     can_act = False
+    interrupt = None
+    remote_screen = False
 
     async def decide(self, view: View) -> Decision:
         raise NotImplementedError
@@ -58,6 +63,20 @@ class Human:
     async def take_over(self, view: View):
         """-> (answer or None, note, Label or None) once the human has finished the task (can_act humans only)."""
         raise NotImplementedError
+
+    async def attach(self, browser, base):
+        """The episode's browser session is up (real backend only)."""
+
+    async def detach(self):
+        """The episode is over; the browser is about to close."""
+
+    def verdict(self):
+        """-> True / False: the human judged the task done / not done; None: not asked."""
+        return None
+
+    def recorded_actions(self):
+        """-> what the human did during a takeover, when the backend has no page recorder (the mock world)."""
+        return []
 
 
 def messages_sent(view):

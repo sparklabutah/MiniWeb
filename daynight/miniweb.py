@@ -9,6 +9,8 @@ evaluation.verifiers.verify_task, with webmix.evaluate.QA_MODEL as the answer ch
 The planner runs here rather than through webmix.planner_agent.run_planner_agent only to pass an on_step_end hook to
 the planner Agent: after every planner turn that delegated a step, the human sees the step and may send a message
 (Agent.add_new_task) or take over (Agent.stop()). A message after the agent's own `done` re-runs the planner with it.
+A human with an `interrupt` event (the console, console.py) can also take over at any moment: the planner run is
+cancelled mid-step (world.until_interrupt), the browser stays open, and the page recorder keeps logging.
 
 Runs in the miniweb env (browser-use, Playwright, chromium-1117) against the vLLM server of the day's agent.
 """
@@ -24,7 +26,7 @@ from types import SimpleNamespace
 
 from daynight.human_sim import View
 from daynight.schema import Episode, Intervention, Outcome, Step
-from daynight.world import REASONING, Backend, family_of
+from daynight.world import REASONING, Backend, family_of, until_interrupt
 
 USER_PREFIX = "Message from the person who gave you this task: "
 
@@ -79,6 +81,23 @@ class MiniWebBackend(Backend):
     def probe_tasks(self):
         return list(self._probe)
 
+    def catalog(self):
+        return list(self._day)
+
+    def sites(self):
+        from datagen import config
+        sp = json.loads(config.SPLIT_PATH.read_text())
+        return sorted(sp["train"] + sp["test"])
+
+    def free_task(self, text, site):
+        if site not in self.sites():
+            raise ValueError(f"unknown site: {site}")
+        import hashlib
+        tid = "free_" + hashlib.md5(f"{site}:{text}".encode()).hexdigest()[:6]
+        return {"kind": "free", "task_id": tid, "key": None, "site": site, "sites": [site], "subtasks": None,
+                "macro": "?", "macros": [], "instruction": text, "start_hint": f"/sites/{site}/", "verifier": None,
+                "needs_login": False}
+
     async def _progress(self, bs, base, task):
         """Per-macro progress on the trace so far (non-reasoning macros: an answer is only graded at the end)."""
         from evaluation.verifiers import verify_task
@@ -106,11 +125,14 @@ class MiniWebBackend(Backend):
                      human=human.actor if human else "none", subtasks=task.get("subtasks"),
                      artifacts={"dir": str(ep_dir), "key": task["key"]})
         real = human is not None and human.actor == "real"
-        bs = H.make_session(headless=a["headless"] and not real)
+        # a real human at the terminal needs the browser window; the console shows it as a live view instead
+        bs = H.make_session(headless=a["headless"] and (not real or human.remote_screen))
         state = {"takeover": False, "seen": 0, "answer": None}
         try:
             await bs.start()
             await H.enable_clipboard(bs)
+            if human is not None:
+                await human.attach(bs, base)
             os.environ.setdefault("VERIFIER_JUDGE_MODEL", E.QA_MODEL)
             prompt, start = await E.prepare_human(bs, base, task)
             pick = SimpleNamespace(adapters=set(), fallback=agent["executor"], base_name=agent["planner"],
@@ -174,8 +196,19 @@ class MiniWebBackend(Backend):
                         state["takeover"] = True
                     return ph
 
-            ph = await (drive() if real else asyncio.wait_for(drive(), timeout=a["timeout"]))
-            ph.save_to_file(ep_dir / "planner_history.json")
+            ph, cut = await until_interrupt(drive() if real else asyncio.wait_for(drive(), timeout=a["timeout"]),
+                                            human, on_cut=planner.stop)
+            if cut and not state["takeover"]:          # stopped mid-step: what it did so far is in the recorder
+                sync_steps()
+                state["takeover"] = True
+                state["answer"] = next((t["answer"] for t in reversed(team.trace) if t.get("answer")), None)
+                ep.steps.append(Step(i=len(ep.steps), actor="agent",
+                                     action={"interrupted": {"text": "stopped by the human"}}))
+                ep.interventions.append(Intervention(step=ep.steps[-1].i, kind="takeover", actor=human.actor,
+                                                     at=round(time.time() - t0, 2)))
+            hist = ph if ph is not None else getattr(planner, "history", None)
+            if hist is not None:
+                hist.save_to_file(ep_dir / "planner_history.json")
             answer = state["answer"]
             if state["takeover"] and human.can_act:
                 rec0 = len((await H.admin_get(bs, base, "/_admin/record")).get("entries", []) or [])
@@ -193,10 +226,16 @@ class MiniWebBackend(Backend):
             (ep_dir / "grade_inputs.json").write_text(json.dumps(
                 {"base": base, "traj": traj, "answer": answer, "log": log, "changes": changes, "clip": clip},
                 default=str))
-            report = await asyncio.to_thread(verify_task, task["verifier"], traj, answer or "", task["instruction"])
-            ep.outcome = Outcome(passed=bool(report.get("passed")), by_macro=by_macro_of(report), answer=answer,
-                                 human_finished=state["takeover"],
-                                 detail=str(report.get("summary") or "")[:300])
+            if human is not None and human.verdict() is not None:
+                ep.artifacts["human_verdict"] = human.verdict()
+            if task.get("verifier") is None:           # typed in the console: no annotation, the human's verdict
+                ep.outcome = Outcome(passed=bool(human and human.verdict()), answer=answer,
+                                     human_finished=state["takeover"], grader="human")
+            else:
+                report = await asyncio.to_thread(verify_task, task["verifier"], traj, answer or "", task["instruction"])
+                ep.outcome = Outcome(passed=bool(report.get("passed")), by_macro=by_macro_of(report), answer=answer,
+                                     human_finished=state["takeover"],
+                                     detail=str(report.get("summary") or "")[:300])
             E._Hist(team.hists, answer).save_to_file(ep_dir / "history.json")
             (ep_dir / "trace.json").write_text(json.dumps(team.trace, indent=1, default=str))
             # specialist histories (their screenshot paths point into browser-use's temp dir)
@@ -210,6 +249,11 @@ class MiniWebBackend(Backend):
             if ep.outcome is None:
                 ep.outcome = Outcome(passed=False, human_finished=state["takeover"], detail=ep.error or "")
             ep.duration_s = round(time.time() - t0, 1)
+            if human is not None:
+                try:
+                    await human.detach()
+                except Exception:
+                    pass
             try:
                 await bs.kill()
             except Exception:
