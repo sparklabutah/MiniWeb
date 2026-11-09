@@ -1,4 +1,5 @@
-"""The real human's interface (v1): the agent's browser, headful, plus this terminal.
+"""The real human's terminal interface: the agent's browser, headful, plus this terminal. The console (console.py)
+replaces it for day sessions: there you can take over at any moment, not only between steps.
 
 After every agent step the terminal shows what the agent did and waits for one line:
 

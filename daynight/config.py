@@ -47,6 +47,14 @@ DEFAULTS = {
         "max_messages": 2,            # corrective messages before a takeover
         "partial_verify": True,       # the simulated human sees per-macro progress (verifier on the partial trace)
     },
+    "console": {                      # the day console (console.py): a person prompts the agent and takes over
+        "host": "127.0.0.1",          # on a lab machine, reach it through an ssh tunnel
+        "port": 8390,
+        "fps": 4,                     # live view frames per second
+        "save_every": 1.0,            # seconds between frames saved to the episode's frames/
+        "mock_step_delay": 1.5,       # mock world: seconds per agent step, so a person can watch and interrupt
+        "max_messages": 20,           # corrections per episode (each `done` waits for the person's verdict)
+    },
     "meta": {
         "model": "gemini-3.5-flash",  # meta-train agent's LLM
         "weak_macros": 3,             # proposals per night

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MiniWeb day console</title>
+<style>
+  :root { --line:#e2e2de; --muted:#6b6b66; --ink:#1d1d1b; --bg:#fafaf8; --agent:#f0f0ec; --you:#2457c5; --stop:#c0392b; --ok:#1e7a46; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); height:100vh; display:grid; grid-template-columns:420px 1fr; }
+  button { font:inherit; border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 12px; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.stop { background:var(--stop); border-color:var(--stop); color:#fff; font-weight:600; }
+  button.ok { background:var(--ok); border-color:var(--ok); color:#fff; }
+  button.primary { background:var(--you); border-color:var(--you); color:#fff; }
+  input, select, textarea { font:inherit; border:1px solid var(--line); border-radius:6px; padding:6px 8px; background:#fff; width:100%; }
+  #left { display:flex; flex-direction:column; border-right:1px solid var(--line); min-height:0; background:#fff; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; }
+  header .meta { color:var(--muted); font-size:12px; }
+  #pick { padding:10px 16px; border-bottom:1px solid var(--line); display:grid; gap:6px; }
+  #pick details summary { cursor:pointer; color:var(--muted); font-size:12px; }
+  #pick .row { display:flex; gap:6px; }
+  #chat { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+  .msg { max-width:92%; padding:8px 10px; border-radius:10px; white-space:pre-wrap; word-wrap:break-word; }
+  .user { align-self:flex-end; background:var(--you); color:#fff; }
+  .agent { align-self:flex-start; background:var(--agent); }
+  .agent .k { color:var(--muted); font-size:11px; display:block; }
+  .system { align-self:center; color:var(--muted); font-size:12px; text-align:center; }
+  .task { align-self:stretch; border:1px solid var(--line); background:#fff; font-weight:500; }
+  .task .k { display:block; color:var(--muted); font-size:11px; font-weight:400; }
+  .takeover { align-self:stretch; background:#fdecea; color:var(--stop); border:1px solid #f5c6c0; }
+  .done { align-self:flex-start; background:#eef5ee; border:1px solid #cfe5d2; }
+  .result { align-self:stretch; font-weight:600; border:1px solid var(--line); }
+  .result.pass { background:#eef5ee; color:var(--ok); } .result.fail { background:#fdecea; color:var(--stop); }
+  .error { align-self:stretch; background:#fff4e5; color:#8a5300; }
+  #bar { padding:8px 16px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  #bar .hint { color:var(--muted); font-size:12px; flex:1; }
+  #handback { padding:10px 16px; border-top:1px solid var(--line); background:#fdf6f5; display:none; gap:6px; }
+  #handback.on { display:grid; }
+  #handback .row { display:flex; gap:6px; }
+  #compose { padding:10px 16px 14px; border-top:1px solid var(--line); display:flex; gap:8px; }
+  #compose textarea { resize:none; height:58px; }
+  #right { display:flex; flex-direction:column; min-width:0; min-height:0; }
+  #tools { display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line); background:#fff; }
+  #pill { font-size:12px; font-weight:600; padding:3px 10px; border-radius:99px; background:#eee; white-space:nowrap; }
+  #pill.agent { background:#e8eefb; color:var(--you); } #pill.human { background:#fdecea; color:var(--stop); }
+  #pill.review { background:#eef5ee; color:var(--ok); }
+  .rec { display:none; width:9px; height:9px; border-radius:50%; background:var(--stop); animation:blink 1s infinite; }
+  .rec.on { display:inline-block; }
+  @keyframes blink { 50% { opacity:.25; } }
+  #url { flex:1; }
+  #stage { flex:1; display:flex; align-items:center; justify-content:center; padding:12px; min-height:0; background:#ecece8; }
+  #view { position:relative; max-width:100%; max-height:100%; outline:none; }
+  #view img { display:block; max-width:100%; max-height:calc(100vh - 80px); box-shadow:0 1px 8px rgba(0,0,0,.15); background:#fff; user-select:none; -webkit-user-drag:none; }
+  #view.locked img { cursor:not-allowed; }
+  #view.live { box-shadow:0 0 0 3px var(--stop); }
+  #view:focus.live { box-shadow:0 0 0 3px var(--stop), 0 0 0 6px #f5c6c0; }
+  #status { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<section id="left">
+  <header><h1>MiniWeb day console</h1><div class="meta" id="meta">connecting…</div></header>
+  <div id="pick">
+    <div class="row"><select id="site" title="Site a typed task starts on"></select></div>
+    <details><summary>or pick an annotated task (graded by its verifier)</summary>
+      <div style="display:grid;gap:6px;margin-top:6px">
+        <input id="filter" placeholder="filter by site or words">
+        <select id="tasks" size="6"></select>
+        <button id="runpick" class="primary">Run this task</button>
+      </div>
+    </details>
+  </div>
+  <div id="chat"></div>
+  <div id="bar">
+    <span class="hint" id="hint">Type a task below to start.</span>
+    <button id="accept" class="ok" hidden>Correct</button>
+    <button id="reject" hidden>Wrong, I'll take over</button>
+    <button id="takeover" class="stop" hidden>Take over</button>
+    <button id="end" title="Hand today's episodes to the night">End day</button>
+  </div>
+  <div id="handback">
+    <input id="answer" placeholder="Answer, if the task asks a question (optional)">
+    <div class="row"><select id="etype"><option value="">What went wrong? (optional)</option></select>
+      <select id="part"><option value="">Which part? (optional)</option></select></div>
+    <input id="note" placeholder="Note on the agent's mistake (optional)">
+    <div class="row"><button id="finish" class="ok" style="flex:1">Done, task finished</button><button id="giveup">Give up</button></div>
+  </div>
+  <div id="compose"><textarea id="text" placeholder="Describe a task for the agent…"></textarea><button id="send" class="primary">Send</button></div>
+</section>
+<section id="right">
+  <div id="tools">
+    <span id="pill">idle</span><span class="rec" id="rec" title="recording your actions"></span>
+    <button id="back" disabled title="Back">←</button><button id="reload" disabled title="Reload">⟳</button>
+    <input id="url" readonly><button id="go" disabled>Go</button>
+    <span id="status"></span>
+  </div>
+  <div id="stage"><div id="view" class="locked" tabindex="0"><img id="screen" alt="the agent's browser" draggable="false"></div></div>
+</section>
+<script>
+const $ = id => document.getElementById(id);
+let since = 0, status = "idle", frame = -1, info = null, episode = null, queue = Promise.resolve();
+const STATUS = {idle: "idle", starting: "starting…", agent: "agent working", review: "agent says done",
+                human: "you have control", grading: "grading…", ended: "day ended"};
+
+async function post(name, body = {}) {
+  const r = await fetch("/api/" + name, {method: "POST", headers: {"Content-Type": "application/json", "X-Console": "1"},
+                                          body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { $("status").textContent = j.error || r.statusText; throw new Error(j.error); }
+  $("status").textContent = "";
+  return j;
+}
+
+function bubble(e) {
+  const d = document.createElement("div");
+  d.className = "msg " + e.kind;
+  if (e.kind === "agent") { d.innerHTML = `<span class="k">agent · step ${e.step}</span>`; d.append(e.text); }
+  else if (e.kind === "task") { d.innerHTML = `<span class="k">task · ${e.site} · ${e.task_id}</span>`; d.append(e.text); }
+  else if (e.kind === "done") d.textContent = "I'm done." + (e.answer ? "\nAnswer: " + e.answer : "") + "\nIs it right?";
+  else if (e.kind === "result") { d.classList.add(e.passed ? "pass" : "fail"); d.textContent = e.text; }
+  else d.textContent = e.text;
+  $("chat").append(d);
+  $("chat").scrollTop = $("chat").scrollHeight;
+}
+
+function render() {
+  const live = status === "human";
+  $("pill").textContent = STATUS[status] || status;
+  $("pill").className = status;
+  $("rec").classList.toggle("on", live);
+  $("view").className = live ? "live" : "locked";
+  $("takeover").hidden = status !== "agent";
+  $("accept").hidden = $("reject").hidden = status !== "review";
+  $("handback").classList.toggle("on", live);
+  $("end").hidden = !(status === "idle");
+  for (const id of ["back", "reload", "go"]) $(id).disabled = !live;
+  $("url").readOnly = !live;
+  $("pick").style.display = status === "idle" ? "" : "none";
+  $("send").disabled = !["idle", "agent", "review", "human"].includes(status);
+  $("text").placeholder = {idle: "Describe a task for the agent…", agent: "Message the agent (it reads it after its current step)…",
+                           review: "Or tell the agent what is still wrong…", human: "Note for the log (the agent is stopped)…"}[status] || "";
+  $("hint").textContent = {idle: "Type a task below, or pick an annotated one.", starting: "Starting the agent…",
+                           agent: "Watch it work. Take over the moment it goes wrong.", review: "Check the page, then mark it.",
+                           human: "Recording: act in the browser on the right, then press Done.", grading: "Grading the episode…",
+                           ended: "Day ended. Run the night: python -m daynight.loop --config <out>/config.yaml --resume"}[status] || "";
+}
+
+async function poll() {
+  try {
+    const s = await (await fetch("/api/events?since=" + since)).json();
+    for (const e of s.events) bubble(e);
+    since += s.events.length;
+    if (s.status !== status || JSON.stringify(s.episode) !== JSON.stringify(episode)) {
+      if (s.status === "human" && status !== "human") $("view").focus();
+      status = s.status; episode = s.episode; render(); parts();
+    }
+    if (document.activeElement !== $("url")) $("url").value = s.url || "";
+    if (s.screen_error && status === "agent") $("status").textContent = s.screen_error;
+    if (s.frame !== frame) { frame = s.frame; $("screen").src = "/api/frame?n=" + frame; }
+  } catch (err) { $("status").textContent = "console not reachable"; }
+  setTimeout(poll, 350);
+}
+
+function parts() {
+  $("part").innerHTML = '<option value="">Which part? (optional)</option>';
+  for (const m of (episode && episode.macros) || []) $("part").add(new Option(m.replaceAll("_", " "), m));
+  $("part").hidden = !(episode && episode.macros && episode.macros.length);
+}
+
+function fillTasks() {
+  const f = $("filter").value.toLowerCase();
+  $("tasks").innerHTML = "";
+  for (const t of info.tasks) {
+    const label = `${t.site} · ${t.instruction}`;
+    if (!f || label.toLowerCase().includes(f)) $("tasks").add(new Option(label.slice(0, 160), t.id));
+  }
+}
+
+$("send").onclick = async () => {
+  const text = $("text").value.trim();
+  if (!text) return;
+  if (status === "idle") await post("run", {text, site: $("site").value});
+  else await post("message", {text});
+  $("text").value = "";
+};
+$("text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("send").click(); } });
+$("runpick").onclick = () => $("tasks").value && post("run", {task_id: $("tasks").value});
+$("filter").oninput = fillTasks;
+$("takeover").onclick = () => post("takeover");
+$("reject").onclick = () => post("takeover");
+$("accept").onclick = () => post("accept");
+$("end").onclick = () => confirm("End the day and hand its episodes to the night?") && post("end");
+function handback(passed) {
+  post("done", {passed, answer: $("answer").value, note: $("note").value, error_type: $("etype").value, macro: $("part").value})
+    .then(() => { for (const id of ["answer", "note"]) $(id).value = ""; $("etype").value = ""; });
+}
+$("finish").onclick = () => handback(true);
+$("giveup").onclick = () => handback(false);
+$("back").onclick = () => post("nav", {to: "back"});
+$("reload").onclick = () => post("nav", {to: "reload"});
+$("go").onclick = () => post("nav", {to: $("url").value});
+$("url").addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
+
+// ── your input into the agent's browser, only while you have control ──
+function send(ev) { queue = queue.then(() => post("input", ev)).catch(() => {}); }
+function pt(e) {
+  const img = $("screen"), r = img.getBoundingClientRect();
+  const w = img.naturalWidth || 1280, h = img.naturalHeight || 800;
+  return {x: Math.round((e.clientX - r.left) * w / r.width), y: Math.round((e.clientY - r.top) * h / r.height)};
+}
+const mods = e => ({ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey});
+let lastMove = 0;
+const img = $("screen");
+img.addEventListener("mousedown", e => { if (status !== "human") return; e.preventDefault(); $("view").focus();
+  send({type: "down", ...pt(e), clicks: e.detail || 1, ...mods(e)}); });
+img.addEventListener("mouseup", e => { if (status === "human") send({type: "up", ...pt(e), clicks: e.detail || 1, ...mods(e)}); });
+img.addEventListener("mousemove", e => { if (status !== "human") return; const now = Date.now();
+  if (now - lastMove < (e.buttons ? 30 : 120)) return; lastMove = now; send({type: "move", ...pt(e), buttons: e.buttons}); });
+img.addEventListener("wheel", e => { if (status !== "human") return; e.preventDefault();
+  send({type: "wheel", ...pt(e), dx: e.deltaX, dy: e.deltaY}); }, {passive: false});
+img.addEventListener("contextmenu", e => e.preventDefault());
+$("view").addEventListener("keydown", e => {
+  if (status !== "human" || ["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") return;      // the paste event sends the text
+  e.preventDefault();
+  send({type: "key", key: e.key, code: e.code, ...mods(e)});
+});
+$("view").addEventListener("paste", e => { if (status !== "human") return; e.preventDefault();
+  send({type: "text", text: e.clipboardData.getData("text")}); });
+
+(async () => {
+  info = await (await fetch("/api/info")).json();
+  $("meta").textContent = `${info.name} · day ${info.day} · agent ${info.agent} · ${info.mock ? "mock world" : "MiniWeb"}`;
+  for (const s of info.sites) $("site").add(new Option(s, s));
+  for (const t of info.error_types) $("etype").add(new Option(t.replaceAll("_", " "), t));
+  fillTasks(); render(); parts(); poll();
+})();
+</script>
+</body>
+</html>
