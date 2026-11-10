@@ -5,166 +5,199 @@
 <title>MiniWeb Console</title>
 <style>
   :root {
-    --bg: #f5f5f7; --panel: rgba(255,255,255,.82); --ink: #1d1d1f; --ink2: #6e6e73; --ink3: #a1a1a6;
-    --line: rgba(0,0,0,.07); --fill: #f2f2f7; --fill2: #e8e8ed;
-    --orange: linear-gradient(135deg, #ffb340 0%, #ff8a1f 52%, #ff5f2e 100%);
-    --orange-soft: linear-gradient(135deg, #fff4e3 0%, #ffe6cf 100%);
-    --red: #ff3b30; --green: #34c759;
-    --r: 14px; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+    --bg: #1c1c1c; --panel: #202020; --raise: #272727; --raise2: #2e2e2e; --line: rgba(255,255,255,.08);
+    --line2: rgba(255,255,255,.14); --ink: #ececec; --ink2: #a8a8a8; --ink3: #737373;
+    --orange: linear-gradient(135deg, #ffa24a 0%, #f47a35 50%, #e4552c 100%);
+    --red: #ff6b5e; --green: #6fdc95;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    margin: 0; display: grid; grid-template-columns: 400px 1fr; gap: 14px; padding: 14px;
-    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
-    letter-spacing: -.01em; color: var(--ink); -webkit-font-smoothing: antialiased;
-    background: radial-gradient(1200px 600px at 0% 0%, #fff7ee 0%, transparent 60%), var(--bg);
+    margin: 0; display: grid; grid-template-columns: minmax(420px, 34%) minmax(0, 1fr); color: var(--ink);
+    font: 14.5px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
+    letter-spacing: -.005em; -webkit-font-smoothing: antialiased;
+    background: radial-gradient(140% 55% at 25% 115%, #6a2e1c 0%, rgba(106,46,28,.45) 30%, transparent 62%), var(--bg);
   }
-  button, input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
-  button { border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; font-weight: 500;
-           background: var(--fill); transition: transform .08s ease, filter .15s ease, background .15s ease; }
-  button:hover:not(:disabled) { filter: brightness(.97); }
+  button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { border: 0; background: none; cursor: pointer; border-radius: 9px; padding: 7px 12px; color: var(--ink);
+           transition: background .15s, opacity .15s, transform .08s; }
+  button:hover:not(:disabled) { background: rgba(255,255,255,.07); }
   button:active:not(:disabled) { transform: scale(.97); }
-  button:disabled { opacity: .4; cursor: default; }
-  .orange { background: var(--orange); color: #fff; box-shadow: 0 4px 14px rgba(255,120,40,.28); }
-  .stop { background: var(--red); color: #fff; }
-  .ok { background: var(--green); color: #fff; }
-  .ghost { background: transparent; color: var(--ink2); }
-  input, select, textarea { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 12px;
-                            width: 100%; outline: none; transition: border .15s, box-shadow .15s; }
-  input:focus, select:focus, textarea:focus { border-color: #ffb066; box-shadow: 0 0 0 4px rgba(255,150,60,.15); }
+  button:disabled { opacity: .35; cursor: default; }
+  input, select { width: 100%; background: var(--raise); border: 1px solid var(--line); border-radius: 10px;
+                  padding: 9px 12px; outline: none; }
+  input:focus, select:focus { border-color: var(--line2); }
+  select option { background: #262626; }
   [hidden] { display: none !important; }
+  ::placeholder { color: var(--ink3); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 8px; }
 
-  /* ── left: the conversation ── */
-  #left { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-radius: 20px;
-          box-shadow: var(--shadow); border: 1px solid var(--line); backdrop-filter: saturate(180%) blur(20px);
-          overflow: hidden; }
-  header { padding: 18px 20px 12px; }
-  header h1 { margin: 0; font: 600 20px/1.2 -apple-system, "SF Pro Display", sans-serif; letter-spacing: -.02em; }
-  header h1 span { background: var(--orange); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  header .meta { color: var(--ink2); font-size: 12.5px; margin-top: 2px; }
-  #pick { padding: 4px 20px 14px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
-  #pick summary { cursor: pointer; color: var(--ink2); font-size: 12.5px; list-style: none; }
-  #pick summary::-webkit-details-marker { display: none; }
-  #pick summary::before { content: "›"; display: inline-block; margin-right: 6px; transition: transform .15s; }
-  #pick details[open] summary::before { transform: rotate(90deg); }
-  #tasks { padding: 4px; }
-  #tasks option { padding: 6px 8px; border-radius: 6px; }
-  #chat { flex: 1; overflow-y: auto; padding: 16px 16px 8px; display: flex; flex-direction: column; gap: 6px; }
-  .msg { max-width: 86%; padding: 9px 13px; border-radius: 18px; white-space: pre-wrap; word-wrap: break-word;
-         animation: rise .18s ease-out; }
+  /* ── left ── */
+  #left { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); }
+  #left.empty { overflow-y: auto; }
+  #dock, #examples, #list { min-width: 0; }
+  #top { display: flex; align-items: center; gap: 10px; padding: 16px 22px; }
+  #top .logo { width: 22px; height: 22px; border-radius: 7px; background: var(--orange); }
+  #top b { font-weight: 600; }
+  #meta { color: var(--ink3); font-size: 12.5px; margin-left: auto; text-align: right; }
+  #body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 22px; }
+  #welcome { padding: 6vh 0 18px; }
+  #welcome h1 { margin: 0; font: 500 30px/1.2 -apple-system, "SF Pro Display", sans-serif; letter-spacing: -.02em; }
+  #welcome p { margin: 8px 0 0; color: var(--ink2); }
+  #notices { display: grid; gap: 6px; margin-top: 14px; }
+  #notices div { font-size: 12.5px; color: var(--ink3); text-align: left; }
+  #notices .error { color: #ffb27a; }
+  #chat { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 12px; }
+  #left.empty #chat { display: none; }
+  #left:not(.empty) #welcome { display: none; }
+
+  .msg { max-width: 88%; white-space: pre-wrap; word-wrap: break-word; animation: rise .2s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
-  .user { align-self: flex-end; background: var(--orange); color: #fff; border-bottom-right-radius: 6px; }
-  .agent { align-self: flex-start; background: var(--fill); border-bottom-left-radius: 6px; }
-  .agent .k, .task .k { display: block; font-size: 11px; color: var(--ink3); margin-bottom: 2px; font-weight: 500;
-                        text-transform: uppercase; letter-spacing: .04em; }
-  .system { align-self: center; color: var(--ink3); font-size: 12px; text-align: center; max-width: 92%; padding: 4px; }
-  .task { align-self: stretch; max-width: none; background: #fff; border: 1px solid var(--line); border-radius: var(--r);
-          font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-top: 6px; }
-  .takeover, .record { align-self: stretch; max-width: none; border-radius: var(--r); font-weight: 500;
-                       background: #fff1f0; color: #c4251c; }
-  .done { align-self: flex-start; background: #eafaf0; color: #1d7a3c; border-bottom-left-radius: 6px; }
-  .result { align-self: stretch; max-width: none; border-radius: var(--r); font-weight: 600; text-align: center; }
-  .result.pass { background: #eafaf0; color: #1d7a3c; } .result.fail { background: #fff1f0; color: #c4251c; }
-  .error { align-self: stretch; max-width: none; border-radius: var(--r); background: var(--orange-soft); color: #9a4a00; }
+  .user { align-self: flex-end; background: var(--raise2); padding: 9px 14px; border-radius: 16px 16px 4px 16px; }
+  .agent { align-self: flex-start; color: #d9d9d9; padding: 2px 2px 2px 12px; border-left: 2px solid #3a3a3a; }
+  .k { display: block; font-size: 11px; color: var(--ink3); letter-spacing: .03em; margin-bottom: 1px; }
+  .system { align-self: center; color: var(--ink3); font-size: 12px; text-align: center; }
+  .task { align-self: stretch; max-width: none; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 12px 14px; margin-top: 8px; }
+  .takeover, .record { align-self: stretch; max-width: none; border-radius: 12px; padding: 10px 14px;
+                       background: rgba(255,107,94,.1); color: #ff9b91; border: 1px solid rgba(255,107,94,.18); }
+  .done { align-self: flex-start; background: rgba(111,220,149,.08); color: #a6ebbd; padding: 9px 14px;
+          border-radius: 16px 16px 16px 4px; border: 1px solid rgba(111,220,149,.16); }
+  .result { align-self: stretch; max-width: none; border-radius: 12px; padding: 10px 14px; font-weight: 500; text-align: center; }
+  .result.pass { background: rgba(111,220,149,.1); color: var(--green); }
+  .result.fail { background: rgba(255,107,94,.1); color: var(--red); }
+  .error { align-self: stretch; max-width: none; border-radius: 12px; padding: 10px 14px;
+           background: rgba(255,162,74,.1); color: #ffb27a; border: 1px solid rgba(255,162,74,.18); }
 
-  #hintbar { margin: 4px 14px 0; padding: 10px 12px 10px 16px; border-radius: var(--r); background: var(--orange);
-             color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-             box-shadow: 0 6px 18px rgba(255,120,40,.25); }
-  #hint { flex: 1; font-weight: 500; font-size: 13px; min-width: 160px; }
-  #hintbar button { background: rgba(255,255,255,.22); color: #fff; padding: 6px 14px; }
-  #hintbar button.ok { background: #fff; color: #1d7a3c; }
-  #hintbar button.stop { background: #fff; color: var(--red); font-weight: 600; }
-  #handback { margin: 10px 14px 0; padding: 12px; border-radius: var(--r); background: #fff; border: 1px solid var(--line);
-              display: grid; gap: 8px; }
+  /* composer, hint, handback */
+  #dock { padding: 10px 22px 18px; display: grid; gap: 10px; }
+  #left.empty #dock { padding-top: 0; }
+  #left.empty #body { flex: 0 0 auto; }
+  #hintbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 10px 9px 14px; border-radius: 12px;
+             background: var(--orange); color: #fff; box-shadow: 0 8px 26px rgba(228,85,44,.25); }
+  #hint { flex: 1; min-width: 160px; font-size: 13px; font-weight: 500; }
+  #hintbar button { background: rgba(255,255,255,.2); color: #fff; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+  #hintbar button:hover { background: rgba(255,255,255,.3); }
+  #hintbar #takeover, #hintbar #accept { background: #fff; color: #b8381a; font-weight: 600; }
+  #hintbar #accept { color: #1f7a45; }
+  #handback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 8px; }
   #handback .row { display: flex; gap: 8px; }
-  #compose { margin: 10px 14px 0; display: flex; align-items: flex-end; gap: 8px; background: #fff; border-radius: 22px;
-             border: 1px solid var(--line); padding: 6px 6px 6px 14px; transition: box-shadow .15s, border .15s; }
-  #compose:focus-within { border-color: #ffb066; box-shadow: 0 0 0 4px rgba(255,150,60,.15); }
-  #compose textarea { border: 0; padding: 7px 0; resize: none; height: 36px; max-height: 120px; box-shadow: none; }
-  #send { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; flex: none; }
-  #send svg { width: 16px; height: 16px; }
-  #footer { display: flex; align-items: center; gap: 8px; padding: 10px 14px 14px; }
-  #record { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); }
-  #record .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
-  #record.on { background: var(--red); color: #fff; border-color: transparent; }
-  #record.on .dot { background: #fff; animation: pulse 1.2s ease-in-out infinite; }
-  #record.auto { background: #fff1f0; color: #c4251c; border-color: transparent; opacity: 1; }
-  #record.auto .dot { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { opacity: .3; } }
-  #footer .spacer { flex: 1; }
-  #end { font-size: 13px; }
+  #finish { background: var(--ink); color: #111; font-weight: 600; flex: 1; }
+  #finish:hover { background: #fff !important; }
+  #giveup { border: 1px solid var(--line2); }
+  #composer { background: var(--raise); border: 1px solid var(--line2); border-radius: 16px; padding: 14px 12px 8px 16px;
+              transition: border .15s, box-shadow .15s; position: relative; }
+  #composer:focus-within { border-color: rgba(255,255,255,.24); box-shadow: 0 0 0 4px rgba(255,255,255,.03); }
+  #text { width: 100%; border: 0; outline: none; background: transparent; resize: none; height: 46px; max-height: 160px;
+          font-size: 15px; padding: 0; }
+  .bar { display: flex; align-items: center; gap: 4px; margin-top: 6px; margin-left: -6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; color: #cfcfcf; padding: 6px 9px; font-size: 13.5px; }
+  .chip svg { width: 15px; height: 15px; flex: none; }
+  .chip .caret { color: var(--ink3); font-size: 10px; }
+  #model { color: var(--ink2); cursor: default; }
+  #model:hover { background: none; }
+  .spacer { flex: 1; }
+  #record { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; color: #cfcfcf; font-size: 13.5px; }
+  #record .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); flex: none; }
+  #record.on { background: rgba(255,107,94,.16); color: #ff9b91; }
+  #record.on .dot, #record.auto .dot { animation: pulse 1.1s ease-in-out infinite; }
+  #record.auto { color: #ff9b91; opacity: 1; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  #send { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+          background: var(--raise2); color: var(--ink3); }
+  #send.ready { background: var(--ink); color: #111; }
+  #send svg { width: 15px; height: 15px; }
+  #startpop { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 8px); background: #2a2a2a;
+              border: 1px solid var(--line2); border-radius: 12px; padding: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+  #startpop label { display: block; font-size: 12px; color: var(--ink3); margin: 0 0 6px 2px; }
+
+  /* examples */
+  #examples h3 { margin: 8px 0 10px; font-weight: 400; font-size: 14px; color: var(--ink2); display: flex; align-items: center; gap: 10px; }
+  #examples h3 input { width: 180px; margin-left: auto; padding: 5px 10px; font-size: 12.5px; }
+  #list { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  #left:not(.empty) #list { display: flex; overflow-x: auto; max-height: none; padding-bottom: 4px; }
+  #left:not(.empty) .card { flex: 0 0 240px; }
+  .card { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+  .card:hover { background: #252525 !important; border-color: var(--line2); }
+  .card .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink); }
+  .card .m { margin-top: 4px; font-size: 12px; color: var(--ink3); }
+  #footer { display: flex; justify-content: flex-end; }
+  #end { color: var(--ink3); font-size: 12.5px; padding: 4px 8px; }
 
   /* ── right: the browser ── */
-  #right { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); border-radius: 20px;
-           box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; }
-  #tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
-  #tools .nav { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; background: transparent;
-                color: var(--ink2); font-size: 18px; }
-  #tools .nav:hover:not(:disabled) { background: var(--fill); }
-  #urlwrap { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--fill); border-radius: 10px;
-             padding: 0 4px 0 12px; height: 34px; }
+  #right { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #tools { display: flex; gap: 6px; align-items: center; padding: 12px 18px; }
+  #tools .nav { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; color: var(--ink2); font-size: 18px; }
+  #urlwrap { flex: 1; display: flex; align-items: center; background: var(--raise); border: 1px solid var(--line);
+             border-radius: 10px; height: 34px; padding: 0 4px 0 12px; }
   #url { border: 0; background: transparent; padding: 0; height: 100%; text-align: center; color: var(--ink2); }
-  #url:focus { text-align: left; color: var(--ink); box-shadow: none; }
-  #go { padding: 4px 12px; font-size: 12px; background: #fff; }
-  #pill { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; background: var(--fill);
-          color: var(--ink2); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  #url:focus { text-align: left; color: var(--ink); }
+  #go { padding: 3px 10px; font-size: 12px; color: var(--ink2); }
+  #pill { font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--raise);
+          color: var(--ink2); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px;
+          border: 1px solid var(--line); }
   #pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink3); }
-  #pill.agent { background: #fff4e5; color: #c25e00; }
-  #pill.agent::before { background: #ff8a1f; animation: pulse 1.2s infinite; }
-  #pill.human, #pill.recording { background: #fff1f0; color: #c4251c; }
-  #pill.human::before, #pill.recording::before { background: var(--red); animation: pulse 1s infinite; }
-  #pill.review { background: #eafaf0; color: #1d7a3c; } #pill.review::before { background: var(--green); }
-  #stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 18px; min-height: 0;
-           background: linear-gradient(180deg, #fafafa, #f0f0f3); }
-  #view { position: relative; max-width: 100%; max-height: 100%; outline: none; border-radius: 12px;
-          transition: box-shadow .2s; }
-  #view img { display: block; max-width: 100%; max-height: calc(100vh - 120px); border-radius: 12px; background: #fff;
-              box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 18px 48px rgba(0,0,0,.12); user-select: none;
-              -webkit-user-drag: none; }
+  #pill.agent { color: #ffbf86; } #pill.agent::before { background: #ff9a3c; animation: pulse 1.2s infinite; }
+  #pill.human, #pill.recording { color: #ff9b91; } #pill.human::before, #pill.recording::before { background: var(--red); animation: pulse 1s infinite; }
+  #pill.review { color: var(--green); } #pill.review::before { background: var(--green); }
+  #status { color: var(--ink3); font-size: 12px; max-width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 6px 22px 22px; min-height: 0; }
+  #view { position: relative; max-width: 100%; max-height: 100%; outline: none; border-radius: 12px; transition: box-shadow .2s; }
+  #view img { display: block; max-width: 100%; max-height: calc(100vh - 86px); border-radius: 12px; background: #fff;
+              box-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(0,0,0,.45); user-select: none; -webkit-user-drag: none; }
   #view.locked img { cursor: not-allowed; }
-  #view.live { box-shadow: 0 0 0 3px var(--red), 0 0 0 8px rgba(255,59,48,.15); }
-  #status { color: var(--ink3); font-size: 12px; max-width: 30%; overflow: hidden; text-overflow: ellipsis;
-            white-space: nowrap; }
+  #view.live { box-shadow: 0 0 0 2px var(--red), 0 0 0 7px rgba(255,107,94,.18); }
 </style>
 </head>
 <body>
-<section id="left">
-  <header><h1>MiniWeb <span>Console</span></h1><div class="meta" id="meta">connecting…</div></header>
-  <div id="pick">
-    <select id="site" title="Site a typed task starts on"></select>
-    <input id="starturl" hidden placeholder="Start page, e.g. google.com" title="The page a typed task starts on">
-    <details><summary id="picklabel">Pick an annotated task (graded by its verifier)</summary>
-      <div style="display:grid;gap:8px;margin-top:8px">
-        <input id="filter" placeholder="Filter by site or words">
-        <select id="tasks" size="5"></select>
-        <button id="runpick" class="orange">Run this task</button>
+<section id="left" class="empty">
+  <div id="top"><span class="logo"></span><b>MiniWeb</b><span id="meta">connecting…</span></div>
+  <div id="body">
+    <div id="welcome">
+      <h1>What should the agent do today?</h1>
+      <p>Give it a task and watch it work. Take over the moment it goes wrong.</p>
+      <div id="notices"></div>
+    </div>
+    <div id="chat"></div>
+  </div>
+  <div id="dock">
+    <div id="hintbar">
+      <span id="hint">Type a task below to start.</span>
+      <button id="accept" hidden>Correct</button>
+      <button id="reject" hidden>Wrong, I'll take over</button>
+      <button id="takeover" hidden>Take over</button>
+    </div>
+    <div id="handback" hidden>
+      <input id="answer" placeholder="Answer, if the task asks a question (optional)">
+      <div class="row"><select id="etype"><option value="">What went wrong? (optional)</option></select>
+        <select id="part"><option value="">Which part? (optional)</option></select></div>
+      <input id="note" placeholder="Note on the agent's mistake (optional)">
+      <div class="row"><button id="finish">Done, task finished</button><button id="giveup">Give up</button></div>
+    </div>
+    <div id="composer">
+      <div id="startpop" hidden>
+        <label id="startlabel">Start page</label>
+        <input id="starturl" hidden placeholder="google.com" spellcheck="false">
+        <select id="site" hidden></select>
       </div>
-    </details>
-  </div>
-  <div id="chat"></div>
-  <div id="hintbar">
-    <span id="hint">Type a task below to start.</span>
-    <button id="accept" class="ok" hidden>Correct</button>
-    <button id="reject" hidden>Wrong, I'll take over</button>
-    <button id="takeover" class="stop" hidden>Take over</button>
-  </div>
-  <div id="handback" hidden>
-    <input id="answer" placeholder="Answer, if the task asks a question (optional)">
-    <div class="row"><select id="etype"><option value="">What went wrong? (optional)</option></select>
-      <select id="part"><option value="">Which part? (optional)</option></select></div>
-    <input id="note" placeholder="Note on the agent's mistake (optional)">
-    <div class="row"><button id="finish" class="ok" style="flex:1">Done, task finished</button><button id="giveup">Give up</button></div>
-  </div>
-  <div id="compose">
-    <textarea id="text" placeholder="Describe a task for the agent…"></textarea>
-    <button id="send" class="orange" title="Send"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
-  </div>
-  <div id="footer">
-    <button id="record" title="Record yourself doing a task in the browser"><span class="dot"></span><span id="reclabel">Record</span></button>
-    <span class="spacer"></span>
-    <button id="end" class="ghost" title="Hand today's episodes to the night">End day</button>
+      <textarea id="text" placeholder="Describe a task for the agent…"></textarea>
+      <div class="bar">
+        <button id="startchip" class="chip" title="Where the task starts">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.2"/>
+            <path d="M1.8 8h12.4M8 1.8c1.8 1.9 2.6 3.9 2.6 6.2S9.8 12.3 8 14.2C6.2 12.3 5.4 10.3 5.4 8S6.2 3.7 8 1.8z"/></svg>
+          <span id="startname">start page</span><span class="caret">▾</span></button>
+        <span class="spacer"></span>
+        <span id="model" class="chip" title="The agent's model"></span>
+        <button id="record" title="Record yourself doing a task in the browser"><span class="dot"></span><span id="reclabel">Record</span></button>
+        <button id="send" title="Send"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
+      </div>
+    </div>
+    <div id="examples" hidden>
+      <h3><span id="exlabel">Example tasks</span><input id="filter" hidden placeholder="Filter"></h3>
+      <div id="list"></div>
+    </div>
+    <div id="footer"><button id="end" title="Hand today's episodes to the night">End day</button></div>
   </div>
 </section>
 <section id="right">
@@ -179,6 +212,7 @@
 <script>
 const $ = id => document.getElementById(id);
 let since = 0, status = "idle", frame = -1, info = null, episode = null, queue = Promise.resolve(), browser = false;
+let started = false;            // a task or recording has begun: the conversation replaces the welcome
 // the browser takes your input after a takeover, while you record, and (real web) whenever no task is running
 const canAct = () => status === "human" || status === "recording" || (status === "idle" && browser);
 const STATUS = {idle: "Idle", starting: "Starting", agent: "Agent working", review: "Agent says done",
@@ -194,10 +228,14 @@ async function post(name, body = {}) {
 }
 
 function bubble(e) {
+  if (!started && ["task", "user", "record"].includes(e.kind)) { started = true; $("left").classList.remove("empty"); }
   const d = document.createElement("div");
+  if (!started && (e.kind === "system" || e.kind === "error")) {        // before the first task: quiet notices
+    d.className = e.kind; d.textContent = e.text; $("notices").append(d); return;
+  }
   d.className = "msg " + e.kind;
-  if (e.kind === "agent") { d.innerHTML = `<span class="k">Agent · step ${e.step}</span>`; d.append(e.text); }
-  else if (e.kind === "task") { d.innerHTML = `<span class="k">Task · ${e.site}</span>`; d.append(e.text); }
+  if (e.kind === "agent") { d.innerHTML = `<span class="k">STEP ${e.step}</span>`; d.append(e.text); }
+  else if (e.kind === "task") { d.innerHTML = `<span class="k">TASK · ${e.site}</span>`; d.append(e.text); }
   else if (e.kind === "done") d.textContent = "I'm done." + (e.answer ? "\nAnswer: " + e.answer : "") + "\nIs it right?";
   else if (e.kind === "result") { d.classList.add(e.passed ? "pass" : "fail"); d.textContent = e.text; }
   else d.textContent = e.text;
@@ -216,9 +254,10 @@ function render() {
   $("end").hidden = !idle;
   for (const id of ["back", "reload", "go"]) $(id).disabled = !free;
   $("url").readOnly = !free;
-  $("pick").hidden = !idle;
+  $("startchip").hidden = !idle;
+  if (!idle) $("startpop").hidden = true;
+  $("examples").hidden = !(idle && info && info.tasks.length);
   $("send").disabled = !["idle", "agent", "review", "human", "recording"].includes(status);
-  // Record: start / stop your own demonstration when idle; during a task it shows that recording is on
   const auto = ["agent", "review", "human", "grading", "starting"].includes(status);
   $("record").className = status === "recording" ? "on" : auto ? "auto" : "";
   $("record").disabled = !(idle || status === "recording");
@@ -227,8 +266,8 @@ function render() {
                            review: "Or tell the agent what's still wrong…", human: "Note for the log…",
                            recording: "What are you showing? (saved with the recording)"}[status] || "";
   $("hint").textContent = {
-    idle: browser ? "The browser is yours. Type a task, or press Record to show one yourself."
-                  : "Type a task below, or pick one above.",
+    idle: browser ? "The browser on the right is yours. Give the agent a task, or press Record to show one."
+                  : "Give the agent a task, or pick an example below.",
     starting: "Starting the agent…",
     agent: "Watch it work. Take over the moment it goes wrong.",
     review: "The agent says it's done. Check the page, then mark it.",
@@ -236,7 +275,10 @@ function render() {
     grading: "Saving the episode…",
     recording: "Recording you. Do the task in the browser, then Stop & save.",
     ended: "Day ended. Run the night: python -m daynight.loop --config <out>/config.yaml --resume"}[status] || "";
+  ready();
 }
+
+const ready = () => $("send").classList.toggle("ready", !!$("text").value.trim() || status === "recording");
 
 async function poll() {
   try {
@@ -262,11 +304,27 @@ function parts() {
 
 function fillTasks() {
   const f = $("filter").value.toLowerCase();
-  $("tasks").innerHTML = "";
+  $("list").innerHTML = "";
+  let n = 0;
   for (const t of info.tasks) {
-    const label = `${t.site} · ${t.instruction}`;
-    if (!f || label.toLowerCase().includes(f)) $("tasks").add(new Option(label.slice(0, 160), t.id));
+    if (f && !`${t.site} ${t.instruction}`.toLowerCase().includes(f)) continue;
+    if (++n > 40) break;
+    const c = document.createElement("button");
+    c.className = "card";
+    c.innerHTML = `<div class="t"></div><div class="m"></div>`;
+    c.querySelector(".t").textContent = t.instruction;
+    c.querySelector(".m").textContent = t.site;
+    c.onclick = () => post("run", {task_id: t.id});
+    $("list").append(c);
   }
+}
+
+function startName() {
+  if (info.start.kind === "url") {
+    const v = $("starturl").value.trim();
+    try { return new URL(v.includes("://") ? v : "https://" + v).host.replace(/^www\./, ""); } catch { return v || "start page"; }
+  }
+  return $("site").value || "site";
 }
 
 $("send").onclick = async () => {
@@ -275,17 +333,23 @@ $("send").onclick = async () => {
   if (!text) return;
   if (status === "idle") await post("run", {text, site: info.start.kind === "url" ? $("starturl").value : $("site").value});
   else await post("message", {text});
-  $("text").value = "";
+  $("text").value = ""; ready();
 };
+$("text").addEventListener("input", () => { ready(); $("text").style.height = "46px";
+  $("text").style.height = Math.min(160, $("text").scrollHeight) + "px"; });
 $("text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("send").click(); } });
-$("runpick").onclick = () => $("tasks").value && post("run", {task_id: $("tasks").value});
+$("startchip").onclick = () => { $("startpop").hidden = !$("startpop").hidden;
+  if (!$("startpop").hidden) (info.start.kind === "url" ? $("starturl") : $("site")).focus(); };
+$("starturl").addEventListener("input", () => $("startname").textContent = startName());
+$("starturl").addEventListener("keydown", e => { if (e.key === "Enter") { $("startpop").hidden = true; $("text").focus(); } });
+$("site").onchange = () => { $("startname").textContent = startName(); $("startpop").hidden = true; };
 $("filter").oninput = fillTasks;
 $("takeover").onclick = () => post("takeover");
 $("reject").onclick = () => post("takeover");
 $("accept").onclick = () => post("accept");
 $("record").onclick = async () => {
   if (status === "idle") await post("record_start");
-  else if (status === "recording") { await post("record_stop", {task: $("text").value.trim()}); $("text").value = ""; }
+  else if (status === "recording") { await post("record_stop", {task: $("text").value.trim()}); $("text").value = ""; ready(); }
 };
 $("end").onclick = () => confirm("End the day and hand its episodes to the night?") && post("end");
 function handback(passed) {
@@ -328,15 +392,16 @@ $("view").addEventListener("paste", e => { if (!canAct()) return; e.preventDefau
 
 (async () => {
   info = await (await fetch("/api/info")).json();
-  const world = info.mock ? "mock world" : info.backend === "realweb" ? "the real web" : "MiniWeb";
-  $("meta").textContent = `${info.name} · day ${info.day} · ${info.agent} · ${world}`;
+  const world = info.mock ? "mock world" : info.backend === "realweb" ? "real web" : "MiniWeb";
+  $("meta").textContent = `${info.name} · day ${info.day} · ${world}`;
+  $("model").textContent = info.agent;
   for (const s of info.sites) $("site").add(new Option(s, s));
   for (const t of info.error_types) $("etype").add(new Option(t.replaceAll("_", " "), t));
-  if (info.start.kind === "url") {
-    $("site").hidden = true; $("starturl").hidden = false; $("starturl").value = info.start.default || "";
-    $("picklabel").textContent = "Pick an example task";
-    if (!info.tasks.length) $("picklabel").parentElement.hidden = true;
-  }
+  if (info.start.kind === "url") { $("starturl").hidden = false; $("starturl").value = info.start.default || ""; }
+  else { $("site").hidden = false; $("startlabel").textContent = "Site"; }
+  $("exlabel").textContent = info.backend === "realweb" ? "Example tasks" : "Annotated tasks · graded by their verifier";
+  $("filter").hidden = info.tasks.length <= 8;
+  $("startname").textContent = startName();
   fillTasks(); render(); parts(); poll();
 })();
 </script>
