@@ -127,6 +127,9 @@ class Backend:
 def make_backend(cfg):
     if C.is_mock(cfg):
         return MockBackend(cfg)
+    if cfg["backend"] == "realweb":
+        from daynight.realweb import RealWebBackend
+        return RealWebBackend(cfg)
     from daynight.miniweb import MiniWebBackend
     return MiniWebBackend(cfg)
 

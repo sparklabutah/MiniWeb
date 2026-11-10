@@ -17,6 +17,12 @@ from pathlib import Path
 KEY_CODES = {"Backspace": 8, "Tab": 9, "Enter": 13, "Escape": 27, "PageUp": 33, "PageDown": 34, "End": 35,
              "Home": 36, "ArrowLeft": 37, "ArrowUp": 38, "ArrowRight": 39, "ArrowDown": 40, "Delete": 46}
 MODS = {"alt": 1, "ctrl": 2, "meta": 4, "shift": 8}
+# The element under a click: its tag, text and the attributes that name it.
+TARGET_JS = """(() => { let e = document.elementFromPoint(%f, %f); if (!e) return null;
+  e = e.closest('a,button,input,select,textarea,label,[role],[onclick]') || e;
+  const a = n => e.getAttribute(n) || undefined;
+  return {tag: e.tagName.toLowerCase(), text: (e.innerText || e.value || a('aria-label') || a('placeholder') || '')
+          .trim().slice(0, 80), id: e.id || undefined, name: a('name'), href: a('href'), role: a('role')}; })()"""
 
 
 class Screen:
@@ -27,7 +33,7 @@ class Screen:
         self._task, self._t0, self._saved = None, time.time(), 0.0
 
     async def _cdp(self):
-        cdp = await self.bs.get_or_create_cdp_session()
+        cdp = await asyncio.wait_for(self.bs.get_or_create_cdp_session(), 5)
         return cdp.cdp_client.send, cdp.session_id
 
     async def start(self):
@@ -47,10 +53,12 @@ class Screen:
         while True:
             try:
                 send, sid = await self._cdp()
-                r = await send.Page.captureScreenshot(params={"format": "jpeg", "quality": 70}, session_id=sid)
+                # a page in the middle of loading can leave a call unanswered: never let it freeze the view
+                r = await asyncio.wait_for(send.Page.captureScreenshot(params={"format": "jpeg", "quality": 70},
+                                                                       session_id=sid), 5)
                 self.jpeg, self.n = base64.b64decode(r["data"]), self.n + 1
-                u = await send.Runtime.evaluate(params={"expression": "location.href", "returnByValue": True},
-                                                session_id=sid)
+                u = await asyncio.wait_for(send.Runtime.evaluate(
+                    params={"expression": "location.href", "returnByValue": True}, session_id=sid), 5)
                 self.url, self.error = (u.get("result") or {}).get("value") or self.url, None
                 now = time.time()
                 if self.save_dir and now - self._saved >= self.save_every:
@@ -63,9 +71,11 @@ class Screen:
             await asyncio.sleep(1 / self.fps)
 
     async def input(self, ev):
-        """One input event from the console, in page pixels (the screenshot's size: device scale factor 1)."""
+        """One input event from the console, in page pixels (the screenshot's size: device scale factor 1).
+        -> for a press, the element under it (recorded with the click: live sites have no page recorder)."""
         send, sid = await self._cdp()
         kind = ev.get("type")
+        target = await self._target(send, sid, ev) if kind == "down" else None
         if kind in ("down", "up", "move"):
             p = {"type": {"down": "mousePressed", "up": "mouseReleased", "move": "mouseMoved"}[kind],
                  "x": float(ev["x"]), "y": float(ev["y"]), "modifiers": _mods(ev),
@@ -94,19 +104,34 @@ class Screen:
                                               session_id=sid)
         elif kind == "text" and ev.get("text"):
             await send.Input.insertText(params={"text": str(ev["text"])}, session_id=sid)
+        return target
+
+    async def _target(self, send, sid, ev):
+        try:
+            r = await asyncio.wait_for(send.Runtime.evaluate(
+                params={"expression": TARGET_JS % (float(ev["x"]), float(ev["y"])), "returnByValue": True},
+                session_id=sid), 3)
+            return (r.get("result") or {}).get("value")
+        except Exception:
+            return None
 
     async def navigate(self, what):
-        """`what`: "back", "reload", or a path / URL on this MiniWeb server (the agent's browser is localhost-only)."""
-        from webmix import harness as H
+        """`what`: "back", "reload", or a URL: on the live web any http(s) page; on MiniWeb (`base`) a path or URL of
+        that server only (its browser is localhost-only)."""
         send, sid = await self._cdp()
         if what in ("back", "reload"):
             js = "history.back()" if what == "back" else "location.reload()"
             await send.Runtime.evaluate(params={"expression": js}, session_id=sid)
             return
-        url = what if what.startswith("http") else self.base + "/" + what.lstrip("/")
-        if not url.startswith(self.base):
-            raise ValueError(f"only pages of {self.base}")
-        await H.goto(self.bs, url)
+        if self.base:
+            url = what if what.startswith("http") else self.base + "/" + what.lstrip("/")
+            if not url.startswith(self.base):
+                raise ValueError(f"only pages of {self.base}")
+        else:
+            url = what if "://" in what else "https://" + what
+            if not url.startswith(("http://", "https://")):
+                raise ValueError("only http(s) pages")
+        await send.Page.navigate(params={"url": url}, session_id=sid)
 
 
 def _mods(ev):

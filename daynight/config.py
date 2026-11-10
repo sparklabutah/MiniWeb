@@ -18,7 +18,7 @@ DEFAULTS = {
     "name": "daynight",
     "out": None,                      # default data/daynight/<name>
     "model": None,                    # "mock" = the whole loop mocked
-    "backend": "miniweb",             # "miniweb" (real sites, browser, vLLM) | "mock"
+    "backend": "miniweb",             # "miniweb" (MiniWeb's sites) | "realweb" (live websites, console) | "mock"
     "seed": 0,
     "days": 3,
     "tasks_per_day": 20,
@@ -46,6 +46,15 @@ DEFAULTS = {
         "model": "gemini-3.5-flash",  # simulated human's LLM (helpers.llm)
         "max_messages": 2,            # corrective messages before a takeover
         "partial_verify": True,       # the simulated human sees per-macro progress (verifier on the partial trace)
+    },
+    # backend "realweb" (realweb.py): the console on live websites, a browser-use agent on an API model
+    "realweb": {
+        "model": "gpt-5.5",           # browser-use's OpenAI chat model; OPENAI_API_KEY from the env or .env
+        "base_url": None,             # another OpenAI-compatible server (e.g. MiniWebAgent on vLLM); None = OpenAI
+        "start_url": "https://www.google.com",       # a typed task's default start page
+        "max_steps": 30,
+        "chrome": None,               # Chromium binary; None = the one browser-use finds (playwright's)
+        "examples": [],               # [{task, url}]: tasks to pick in the console
     },
     "console": {                      # the day console (console.py): a person prompts the agent and takes over
         "host": "127.0.0.1",          # on a lab machine, reach it through an ssh tunnel
@@ -98,8 +107,8 @@ def load(path=None, **overrides):
             cfg[k] = v
     if cfg["model"] == "mock":
         cfg["backend"] = "mock"
-    if cfg["backend"] not in ("miniweb", "mock"):
-        raise ValueError(f"backend must be miniweb or mock, not {cfg['backend']!r}")
+    if cfg["backend"] not in ("miniweb", "realweb", "mock"):
+        raise ValueError(f"backend must be miniweb, realweb or mock, not {cfg['backend']!r}")
     if cfg["human"]["kind"] not in ("simulated", "real", "none"):
         raise ValueError(f"human.kind must be simulated, real or none, not {cfg['human']['kind']!r}")
     bad = [p for p in cfg["agent"]["ports"] if not 8300 <= int(p) <= 8320]
