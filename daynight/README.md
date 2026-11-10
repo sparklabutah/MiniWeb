@@ -36,6 +36,9 @@ $PY -m daynight.console --config daynight/configs/v1_sim.yaml --day 1      # the
 $PY -m daynight.console --config daynight/configs/v1_mock.yaml            # try it on the mock world, no browser
 $PY -m daynight.loop --config data/daynight/v1_sim/config.yaml --resume   # after End day: the night on your day
 
+# the console on the real web: live websites, a browser-use agent on an OpenAI model (OPENAI_API_KEY in .env)
+.venv/bin/python -m daynight.console --config daynight/configs/v1_realweb.yaml   # needs browser-use + Chromium only
+
 # the older terminal interface (headful browser + this terminal; see takeover.py)
 $PY -m daynight.day --config daynight/configs/v1_sim.yaml --day 1 --human real --tasks 5 --out data/daynight/me
 ```
@@ -83,6 +86,16 @@ Episodes are appended to `day_<t>/episodes.jsonl` as they finish (the same schem
 `day_<t>/console/<n>_<task>/`. **End day** sets `state.json` to that day's night, so `daynight.loop --resume` analyzes
 your day and trains on it. `--probe` runs the day's probe first. On the mock world each agent step takes
 `console.mock_step_delay` seconds, so you can watch it and take over.
+
+**The real web** (`backend: realweb`, `realweb.py`). The console opens one headless Chromium on
+`realweb.start_url` (default Google) and shows it live from the start. While no task runs, the browser is yours to
+use. The agent is browser-use's own Agent on `realweb.model`, or on any OpenAI-compatible server
+(`realweb.base_url`). Live sites have no page recorder, so the console records the takeover itself: each click with
+the element under it, each key and navigation, and the frames. Your verdict grades the episode.
+
+**Record** (below the chat): while no task runs, record yourself doing a task in the browser. Every input, with its
+element, and the frames go to `day_<t>/console/<n>_rec_<time>/recording.json`, plus a line in
+`day_<t>/recordings.jsonl`. During a task, the button only shows that recording is on.
 
 ## The loop
 
@@ -159,6 +172,7 @@ answering (`report_information`, `count_entries`) is skipped, because WebMix nev
 | `human_sim.py` | the human interface (`View`, `Decision`), `LLMSimulatedHuman`, `MockSimulatedHuman` |
 | `console.py`, `console.html` | the day console: chat, live view, takeover at any moment (`ConsoleHuman`, the HTTP server) |
 | `screen.py` | the console's live view of the agent's browser and the human's input into it, over CDP |
+| `realweb.py` | `RealWebBackend`: the console on live websites (one shared browser, a browser-use agent on an API model) |
 | `takeover.py` | `TerminalHuman`: the older terminal controller (takes over only between steps) |
 | `meta.py` | the meta-train agent: `digest`, `LLMMetaAgent`, `RuleMetaAgent`, `summarize` |
 | `propose.py` | weak macros -> proposals -> MiniWebGen and replay commands; the mock generator |

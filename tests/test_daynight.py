@@ -295,3 +295,21 @@ def test_until_interrupt_cancels_mid_step():
         plain = await until_interrupt(asyncio.sleep(0, "ok"), None)
         return cut, stopped, fast, plain
     assert asyncio.run(asyncio.wait_for(go(), 5)) == ((None, True), [1], ("ok", False), ("ok", False))
+
+
+def test_console_records_a_demonstration(tmp_path):
+    con = _Console(tmp_path, delay=0.01)
+    try:
+        assert con.post("record_start")[0] == 200
+        assert con.post("run", {"text": "x", "site": con.hub.info["sites"][0]})[0] == 400     # not while recording
+        for ev in ({"type": "down", "x": 5, "y": 6}, {"type": "up", "x": 5, "y": 6}, {"type": "key", "key": "b"}):
+            assert con.post("input", ev)[0] == 200
+        code, out = con.post("record_stop", {"task": "show the filter"})
+        assert code == 200 and con.snap()["status"] == "idle"
+    finally:
+        con.post("end")
+        con.thread.join(10)
+    from pathlib import Path
+    rec = json.loads((Path(out["dir"]) / "recording.json").read_text())
+    assert rec["task"] == "show the filter" and [a["type"] for a in rec["actions"]] == ["down", "up", "key"]
+    assert json.loads((con.log.parent / "recordings.jsonl").read_text())["n_actions"] == 3

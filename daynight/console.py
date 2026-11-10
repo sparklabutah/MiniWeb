@@ -53,6 +53,10 @@ def _step_text(s):
         return f"{d.get('family') or 'step'}: {d.get('instruction') or ''}" + (f"\n→ {s.report}" if s.report else "")
     if "done" in act:
         return "Done" + (f": {s.report}" if s.report else "")
+    if "browse" in act:                                    # the live web's agent: its goal and its actions
+        b = act["browse"] or {}
+        acts = "; ".join(", ".join(f"{k} {json.dumps(v)[:80]}" for k, v in a.items()) for a in b.get("actions") or [])
+        return (b.get("goal") or "step") + (f"\n· {acts}" if acts else "") + (f"\n→ {s.report}" if s.report else "")
     return json.dumps(act)[:300]
 
 
@@ -145,13 +149,22 @@ class ConsoleHuman(Human):
         return (d.get("answer") or "").strip() or None, note, label
 
     async def attach(self, browser, base):
+        shared = self.hub.screen
+        if shared is not None and shared.bs is browser:      # the console's own browser (the real web): reuse its view
+            self.screen, self._shared = shared, True
+            shared.save_dir = self.ep_dir / "frames"
+            shared.save_dir.mkdir(parents=True, exist_ok=True)
+            shared.who = lambda: self.mode
+            return
         from daynight.screen import Screen
-        self.screen = Screen(browser, base, fps=self.fps, save_dir=self.ep_dir / "frames", save_every=self.save_every,
-                             who=lambda: self.mode)
+        self.screen, self._shared = Screen(browser, base, fps=self.fps, save_dir=self.ep_dir / "frames",
+                                           save_every=self.save_every, who=lambda: self.mode), False
         await self.screen.start()
 
     async def detach(self):
-        if self.screen:
+        if self.screen and getattr(self, "_shared", False):
+            self.screen.save_dir, self.screen.who = None, (lambda: "idle")
+        elif self.screen:
             await self.screen.stop()
 
     def verdict(self):
@@ -168,6 +181,8 @@ class Hub:
         self.loop, self.backend, self.info = loop, backend, info
         self.lock = threading.Lock()
         self.events, self.status, self.episode, self.human = [], "idle", None, None
+        self.screen = None               # the console's own browser view, when the backend keeps one open (real web)
+        self.rec, self.day_dir = None, None   # Record: the person's own demonstration, outside any task
         self.requests = asyncio.Queue()
         self.tasks = {t["task_id"]: t for t in backend.catalog()}
 
@@ -183,11 +198,11 @@ class Hub:
 
     def snapshot(self, since=0):
         with self.lock:
-            scr = self.human.screen if self.human else None
+            scr = (self.human.screen if self.human else None) or self.screen
             n = scr.n if scr else len(self.events) + (len(self.human.inputs) if self.human else 0)
             return {"events": self.events[since:], "status": self.status, "episode": self.episode, "frame": n,
                     "url": scr.url if scr else (self.episode or {}).get("url", ""),
-                    "screen_error": scr.error if scr else None}
+                    "screen_error": scr.error if scr else None, "browser": self.screen is not None}
 
     # ── called from HTTP threads ──
     def call(self, name, data):
@@ -204,10 +219,15 @@ class Hub:
         return fut.result(15)
 
     def frame(self):
-        scr = self.human.screen if self.human else None
-        if scr:
+        scr = (self.human.screen if self.human else None) or self.screen
+        if scr and scr.jpeg:
             return scr.jpeg, "image/jpeg"
-        return mock_frame(self).encode(), "image/svg+xml"
+        if self.info.get("mock"):
+            return mock_frame(self).encode(), "image/svg+xml"
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800"><rect width="1280" height="800" '
+                f'fill="#f7f7f5"/><text x="60" y="120" font-size="28" font-family="sans-serif" fill="#666">'
+                f'{"Starting the browser…" if self.screen or not self.human else "Opening the page…"}</text></svg>'
+                ).encode(), "image/svg+xml"
 
     # ── actions (on the loop) ──
     def a_run(self, d):
@@ -251,16 +271,70 @@ class Hub:
         self.set_status("ended")
         self.requests.put_nowait(None)
 
+    # ── Record: no task running, the person demonstrates in the browser; inputs and frames are saved ──
+    def a_record_start(self, d):
+        if self.status != "idle":
+            raise ValueError("finish the running task first")
+        k = len(list((self.day_dir / "console").glob("*"))) + 1 if (self.day_dir / "console").exists() else 1
+        rdir = self.day_dir / "console" / f"{k:03d}_rec_{time.strftime('%H%M%S')}"
+        rdir.mkdir(parents=True, exist_ok=True)
+        self.rec = {"dir": rdir, "t0": time.time(), "inputs": [], "start_url": self.screen.url if self.screen else ""}
+        if self.screen:
+            self.screen.save_dir, self.screen.who = rdir / "frames", (lambda: "human")
+            self.screen.save_dir.mkdir(exist_ok=True)
+        self.set_status("recording")
+        self.emit("record", "Recording. Do the task in the browser, then press Stop and say what you showed.")
+
+    def a_record_stop(self, d):
+        if self.rec is None:
+            raise ValueError("not recording")
+        r, self.rec = self.rec, None
+        if self.screen:
+            self.screen.save_dir, self.screen.who = None, (lambda: "idle")
+        demo = {"task": (d.get("task") or "").strip(), "start_url": r["start_url"],
+                "end_url": self.screen.url if self.screen else "", "seconds": round(time.time() - r["t0"], 1),
+                "actions": r["inputs"], "dir": str(r["dir"])}
+        (r["dir"] / "recording.json").write_text(json.dumps(demo, indent=1, default=str))
+        with open(self.day_dir / "recordings.jsonl", "a") as f:
+            f.write(json.dumps({k: v for k, v in demo.items() if k != "actions"} | {"n_actions": len(r["inputs"])})
+                    + "\n")
+        self.set_status("idle")
+        self.emit("system", f"Saved the recording: {len(r['inputs'])} actions, {demo['seconds']} s"
+                            + (f", \u201c{demo['task']}\u201d" if demo["task"] else "") + ".")
+        return {"dir": str(r["dir"])}
+
+    async def _free_input(self, d, nav=False):
+        """No task running: the console's browser is the person's. While recording, every input is saved."""
+        entry = None
+        if self.rec is not None:
+            entry = {"t": round(time.time() - self.rec["t0"], 3), "source": "console",
+                     **({"type": "nav", "to": d.get("to")} if nav else
+                        {k: d[k] for k in ("type", "x", "y", "key", "text", "dx", "dy", "clicks") if k in d})}
+            self.rec["inputs"].append(entry)
+        if self.screen is None:
+            return
+        if nav:
+            return await self.screen.navigate(d.get("to") or "reload")
+        target = await self.screen.input(d)
+        if entry is not None and target:
+            entry["target"] = target
+
     async def a_input(self, d):
+        if self.human is None and (self.screen is not None or self.rec is not None):
+            return await self._free_input(d)
         h = self._human()
         if h.mode != "human":
             raise ValueError("take over first: the agent has the browser")
         h.inputs.append({"t": round(time.time(), 3), "source": "console",
                          **{k: d[k] for k in ("type", "x", "y", "key", "text", "dx", "dy", "clicks") if k in d}})
         if h.screen:
-            await h.screen.input(d)
+            target = await h.screen.input(d)
+            if target:
+                h.inputs[-1]["target"] = target            # what was under the click
 
     async def a_nav(self, d):
+        if self.human is None and (self.screen is not None or self.rec is not None):
+            return await self._free_input(d, nav=True)
         h = self._human()
         if h.mode != "human":
             raise ValueError("take over first: the agent has the browser")
@@ -277,9 +351,13 @@ def mock_frame(hub):
     color = "#c0392b" if human else "#2c3e50"
     rows = "".join(f'<text x="60" y="{250 + 60 * i}" font-size="22" fill="#333">{html.escape(s[:95])}</text>'
                    for i, s in enumerate(t.split("\n")[0] for t in steps))
+    rec = hub.rec is not None
     clicks = "".join(f'<circle cx="{e["x"]}" cy="{e["y"]}" r="9" fill="none" stroke="#c0392b" stroke-width="3"/>'
-                     for e in (h.inputs if h else [])[-12:] if e.get("type") == "down" and "x" in e)
-    banner = ("You have control: clicks and keys are recorded" if human else
+                     for e in (h.inputs if h else (hub.rec or {}).get("inputs", []))[-12:]
+                     if e.get("type") == "down" and "x" in e)
+    human = human or rec
+    color = "#c0392b" if human else color
+    banner = ("Recording your demonstration" if rec else "You have control: clicks and keys are recorded" if human else
               "The agent is working" if ep else "No task running: type one in the chat")
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">'
             f'<rect width="1280" height="800" fill="#f7f7f5"/><rect width="1280" height="70" fill="{color}"/>'
@@ -363,21 +441,30 @@ async def session(cfg, saved_cfg, day, backend, agent, ready=None):
     ccfg = cfg["console"]
     d = C.day_dir(cfg, day)
     log = d / "episodes.jsonl"
+    web = cfg["backend"] == "realweb"
     info = {"name": cfg["name"], "backend": cfg["backend"], "mock": C.is_mock(cfg), "day": day,
-            "agent": agent["executor"], "out": str(C.out_dir(cfg)), "error_types": list(ERROR_TYPES),
+            "agent": cfg["realweb"]["model"] if web else agent["executor"],
+            "start": {"kind": "url", "default": cfg["realweb"]["start_url"]} if web else {"kind": "site"}, "out": str(C.out_dir(cfg)), "error_types": list(ERROR_TYPES),
             "sites": backend.sites(),
             "tasks": [{"id": t["task_id"], "site": t["site"], "instruction": t["instruction"][:240],
                        "macros": t["macros"]} for t in backend.catalog()]}
     hub = Hub(asyncio.get_running_loop(), backend, info)
+    hub.day_dir = d
     httpd = ThreadingHTTPServer((ccfg["host"], int(ccfg["port"])), make_handler(hub))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     url = f"http://{ccfg['host']}:{httpd.server_address[1]}"
-    print(f"console: {url}  (day {day}, agent {agent['executor']}, {cfg['backend']} backend; episodes -> {log})",
+    print(f"console: {url}  (day {day}, agent {info['agent']}, {cfg['backend']} backend; episodes -> {log})",
           flush=True)
     if ready:
         ready(hub, url)
     n = 0
     try:
+        if hasattr(backend, "open"):            # the real web: one browser for the whole session, live from the start
+            hub.screen = await backend.open(fps=ccfg["fps"])
+            hub.emit("system", f"Browser open on {hub.screen.url or 'the start page'}. Type a task, or use the page "
+                               "yourself first.")
+        for msg in backend.warnings() if hasattr(backend, "warnings") else []:
+            hub.emit("error", msg)
         with backend.servers() as bases:
             while True:
                 hub.set_status("idle")
@@ -392,9 +479,10 @@ async def session(cfg, saved_cfg, day, backend, agent, ready=None):
                 first = len(hub.events)
                 hub.episode = {"task_id": task["task_id"], "site": task["site"], "instruction": task["instruction"],
                                "macros": task["macros"],
-                               "graded_by": "human" if task.get("kind") == "free" else
-                               "mock" if C.is_mock(cfg) else "verifier",
-                               "url": f"/sites/{task['site']}/"}
+                               "graded_by": "mock" if C.is_mock(cfg) else
+                               "human" if task.get("verifier") is None else "verifier",
+                               "url": task.get("start_hint") if cfg["backend"] == "realweb" else
+                               f"/sites/{task['site']}/"}
                 hub.human = human
                 hub.set_status("agent")
                 hub.emit("task", task["instruction"], task_id=task["task_id"], site=task["site"])
@@ -423,6 +511,8 @@ async def session(cfg, saved_cfg, day, backend, agent, ready=None):
         if n or log.exists():
             hand_to_night(cfg, saved_cfg, day, agent)
     finally:
+        if hasattr(backend, "close"):
+            await backend.close()
         httpd.shutdown()
     return n
 
@@ -459,7 +549,8 @@ def main(argv=None):
     (d / "console.json").write_text(json.dumps({"by": "daynight.console", "agent": agent}, indent=1))
     backend = make_backend(cfg)
     if args.probe and not (d / "probe.jsonl").exists():
-        run_probe(cfg, day, backend, agent)
+        from daynight.miniweb import MiniWebBackend        # the probe is MiniWeb's held-out tasks, whatever the day
+        run_probe(cfg, day, backend if cfg["backend"] == "miniweb" else MiniWebBackend(cfg), agent)
     if C.is_mock(cfg):
         backend.step_delay = cfg["console"]["mock_step_delay"]
     try:
