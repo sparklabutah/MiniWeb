@@ -313,3 +313,23 @@ def test_console_records_a_demonstration(tmp_path):
     rec = json.loads((Path(out["dir"]) / "recording.json").read_text())
     assert rec["task"] == "show the filter" and [a["type"] for a in rec["actions"]] == ["down", "up", "key"]
     assert json.loads((con.log.parent / "recordings.jsonl").read_text())["n_actions"] == 3
+
+
+def test_console_takes_an_api_key_without_a_restart(tmp_path, monkeypatch):
+    from daynight.realweb import api_key
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    con = _Console(tmp_path, delay=0.01)
+    monkeypatch.setattr(C, "ROOT", tmp_path)                                  # .env under tmp, not the repo's
+    (tmp_path / ".env").write_text("# keys\nOPENAI_API_KEY=\nOTHER=1\n")
+    try:
+        assert con.post("key", {"key": "sk-test"}, header=False)[0] == 403
+        assert con.post("key", {"key": "not a key"})[0] == 400
+        assert con.post("key", {"key": "sk-test-0123456789abcdefghij", "save": False})[0] == 200
+        assert api_key() == "sk-test-0123456789abcdefghij" and "sk-test" not in (tmp_path / ".env").read_text()
+        assert con.post("key", {"key": "sk-test-saved-0123456789abcdef", "save": True})[0] == 200
+        assert (tmp_path / ".env").read_text() == "# keys\nOPENAI_API_KEY=sk-test-saved-0123456789abcdef\nOTHER=1\n"
+        assert con.hub.info["needs_key"] is False
+        assert not any("sk-test" in e["text"] for e in con.snap()["events"])         # never echoed back
+    finally:
+        con.post("end")
+        con.thread.join(10)

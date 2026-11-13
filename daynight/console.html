@@ -12,8 +12,13 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
+  /* the grid lives on #app, not body: extensions inject elements into body, and a grid on body
+     lets them take a cell and push the panels around */
+  #app { height: 100%; display: grid; grid-template-columns: minmax(420px, 34%) minmax(0, 1fr);
+         grid-template-rows: minmax(0, 1fr); }
+  #left { grid-area: 1 / 1; } #right { grid-area: 1 / 2; }
   body {
-    margin: 0; display: grid; grid-template-columns: minmax(420px, 34%) minmax(0, 1fr); color: var(--ink);
+    margin: 0; color: var(--ink);
     font: 14.5px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
     letter-spacing: -.005em; -webkit-font-smoothing: antialiased;
     background: radial-gradient(140% 55% at 25% 115%, #6a2e1c 0%, rgba(106,46,28,.45) 30%, transparent 62%), var(--bg);
@@ -132,6 +137,8 @@
              border-radius: 10px; height: 34px; padding: 0 4px 0 12px; }
   #url { border: 0; background: transparent; padding: 0; height: 100%; text-align: center; color: var(--ink2); }
   #url:focus { text-align: left; color: var(--ink); }
+  #urlwrap.typing { border-color: #ff7f27; box-shadow: 0 0 0 3px rgba(255,127,39,.18); }
+  #urlwrap.typing #url { text-align: left; color: var(--ink); }
   #go { padding: 3px 10px; font-size: 12px; color: var(--ink2); }
   #pill { font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--raise);
           color: var(--ink2); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px;
@@ -141,6 +148,14 @@
   #pill.human, #pill.recording { color: #ff9b91; } #pill.human::before, #pill.recording::before { background: var(--red); animation: pulse 1s infinite; }
   #pill.review { color: var(--green); } #pill.review::before { background: var(--green); }
   #status { color: var(--ink3); font-size: 12px; max-width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #keybar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 18px 6px; padding: 9px 10px 9px 14px;
+            border-radius: 12px; background: var(--raise); border: 1px solid rgba(255,155,145,.35); }
+  #keybar[hidden] { display: none; }
+  #keybar .msg { font-size: 13px; color: #ff9b91; white-space: nowrap; }
+  #key { flex: 1; min-width: 180px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line2);
+         background: var(--bg); color: var(--ink); font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  #keybar label { font-size: 12.5px; color: var(--ink2); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #usekey { background: var(--ink); color: #111; font-weight: 600; padding: 5px 12px; font-size: 13px; }
   #stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 6px 22px 22px; min-height: 0; }
   #view { position: relative; max-width: 100%; max-height: 100%; outline: none; border-radius: 12px; transition: box-shadow .2s; }
   #view img { display: block; max-width: 100%; max-height: calc(100vh - 86px); border-radius: 12px; background: #fff;
@@ -150,6 +165,7 @@
 </style>
 </head>
 <body>
+<div id="app">
 <section id="left" class="empty">
   <div id="top"><span class="logo"></span><b>MiniWeb</b><span id="meta">connecting…</span></div>
   <div id="body">
@@ -207,8 +223,15 @@
     <div id="urlwrap"><input id="url" readonly spellcheck="false"><button id="go" disabled>Go</button></div>
     <span id="status"></span>
   </div>
+  <form id="keybar" hidden autocomplete="off">
+    <span class="msg">The agent needs an OpenAI API key</span>
+    <input id="key" type="password" placeholder="sk-…" spellcheck="false" autocomplete="off">
+    <label title="Write it to the repo's .env (gitignored) so the next console starts with it"><input id="savekey" type="checkbox" checked>Save to .env</label>
+    <button id="usekey" type="submit">Use key</button>
+  </form>
   <div id="stage"><div id="view" class="locked" tabindex="0"><img id="screen" alt="the agent's browser" draggable="false"></div></div>
 </section>
+</div>
 <script>
 const $ = id => document.getElementById(id);
 let since = 0, status = "idle", frame = -1, info = null, episode = null, queue = Promise.resolve(), browser = false;
@@ -280,6 +303,18 @@ function render() {
 
 const ready = () => $("send").classList.toggle("ready", !!$("text").value.trim() || status === "recording");
 
+let typing = null;          // the agent typing a URL into the address bar (cursor.py): shown letter by letter
+function typeUrl(t) {
+  typing = t; $("urlwrap").classList.add("typing");
+  const per = Math.max(12, (t.ms - 150) / Math.max(1, t.url.length)); let i = 0;
+  (function next() {
+    if (typing !== t) return;
+    $("url").value = t.url.slice(0, ++i);
+    if (i < t.url.length) return setTimeout(next, per);
+    setTimeout(() => { if (typing === t) { typing = null; $("urlwrap").classList.remove("typing"); } }, 900);
+  })();
+}
+
 async function poll() {
   try {
     const s = await (await fetch("/api/events?since=" + since)).json();
@@ -289,7 +324,8 @@ async function poll() {
       if ((s.status === "human" || s.status === "recording") && status !== s.status) $("view").focus();
       status = s.status; episode = s.episode; browser = s.browser; render(); parts();
     }
-    if (document.activeElement !== $("url")) $("url").value = s.url || "";
+    if (s.typing && (!typing || typing.n !== s.typing.n)) typeUrl(s.typing);
+    else if (!typing && document.activeElement !== $("url")) $("url").value = s.url || "";
     if (s.screen_error && status === "agent") $("status").textContent = s.screen_error;
     if (s.frame !== frame) { frame = s.frame; $("screen").src = "/api/frame?n=" + frame; }
   } catch (err) { $("status").textContent = "Console not reachable"; }
@@ -390,6 +426,14 @@ $("view").addEventListener("keydown", e => {
 $("view").addEventListener("paste", e => { if (!canAct()) return; e.preventDefault();
   send({type: "text", text: e.clipboardData.getData("text")}); });
 
+$("keybar").addEventListener("submit", async e => {
+  e.preventDefault();
+  const key = $("key").value.trim();
+  if (!key) return $("key").focus();
+  try { await post("key", {key, save: $("savekey").checked}); $("key").value = ""; $("keybar").hidden = true; }
+  catch (err) { $("key").select(); }
+});
+
 (async () => {
   info = await (await fetch("/api/info")).json();
   const world = info.mock ? "mock world" : info.backend === "realweb" ? "real web" : "MiniWeb";
@@ -402,6 +446,7 @@ $("view").addEventListener("paste", e => { if (!canAct()) return; e.preventDefau
   $("exlabel").textContent = info.backend === "realweb" ? "Example tasks" : "Annotated tasks · graded by their verifier";
   $("filter").hidden = info.tasks.length <= 8;
   $("startname").textContent = startName();
+  $("keybar").hidden = !info.needs_key;
   fillTasks(); render(); parts(); poll();
 })();
 </script>

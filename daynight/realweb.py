@@ -32,6 +32,7 @@ from daynight.schema import Episode, Intervention, Outcome, Step
 from daynight.world import Backend, until_interrupt
 
 VIEWPORT = {"width": 1280, "height": 800}
+VISIBLE = {"enabled": True, "pace": 0.7, "move": 0.55, "human_like": True}
 
 
 def start_url(text):
@@ -115,10 +116,13 @@ class RealWebBackend(Backend):
             except Exception:
                 pass
 
+    def needs_key(self):
+        return not (api_key() or self.rw.get("base_url"))
+
     def warnings(self):
-        if not (api_key() or self.rw.get("base_url")):
-            return ["OPENAI_API_KEY is empty: the browser works, but the agent cannot run. Put the key in .env "
-                    "(OPENAI_API_KEY=...) and restart the console."]
+        if self.needs_key():
+            return ["OPENAI_API_KEY is empty: the browser works, but the agent cannot run. Paste the key in the bar "
+                    "above the browser on the right."]
         return []
 
     def servers(self):
@@ -150,7 +154,7 @@ class RealWebBackend(Backend):
         base_url = self.rw.get("base_url")
         key = api_key() or ("EMPTY" if base_url else "")
         if not key:
-            raise RuntimeError("OPENAI_API_KEY is empty: put it in .env (OPENAI_API_KEY=...) and restart the console")
+            raise RuntimeError("OPENAI_API_KEY is empty: paste it in the key bar above the browser, then run the task again")
         hcfg, t0 = self.cfg["human"], time.time()
         eid = f"d{day}_{task['task_id']}"
         ep_dir = Path(ep_dir)
@@ -168,9 +172,20 @@ class RealWebBackend(Backend):
                 await bs.start()
             if human is not None:
                 await human.attach(bs, None)
+            vis = {**VISIBLE, **(self.rw.get("visible") or {})}
+            cursor = None
+            if vis["enabled"]:
+                from daynight.cursor import Cursor
+                cursor = Cursor(bs, self.screen, pace=vis["pace"], move=vis["move"]).install()
+            extra = {}
+            if vis["enabled"] and vis["human_like"]:
+                from browser_use import Tools
+                from daynight.cursor import HUMAN_LIKE
+                extra = {"tools": Tools(exclude_actions=["search"]), "extend_system_message": HUMAN_LIKE,
+                         "max_actions_per_step": 1}
             agent_obj = Agent(task=task["instruction"] + f"\n\nStart at {task['start_hint']}.",
                               llm=ChatOpenAI(model=model, api_key=key, base_url=base_url), browser_session=bs,
-                              initial_actions=[{"navigate": {"url": task["start_hint"], "new_tab": False}}])
+                              initial_actions=[{"navigate": {"url": task["start_hint"], "new_tab": False}}], **extra)
 
             def history():
                 h = getattr(agent_obj, "history", None) or agent_obj.state.history

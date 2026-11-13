@@ -55,6 +55,10 @@ DEFAULTS = {
         "max_steps": 30,
         "chrome": None,               # Chromium binary; None = the one browser-use finds (playwright's)
         "examples": [],               # [{task, url}]: tasks to pick in the console
+        # visible mode (cursor.py): a cursor glides to each element and says what it will do, the address bar
+        # types each URL, one action per step, and the agent works through the page (search box, links)
+        # instead of jumping to URLs, so the person sees where it goes wrong and can take over in time
+        "visible": {"enabled": True, "pace": 0.7, "move": 0.55, "human_like": True},
     },
     "console": {                      # the day console (console.py): a person prompts the agent and takes over
         "host": "127.0.0.1",          # on a lab machine, reach it through an ssh tunnel

@@ -29,6 +29,7 @@ import concurrent.futures
 import copy
 import html
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -202,7 +203,8 @@ class Hub:
             n = scr.n if scr else len(self.events) + (len(self.human.inputs) if self.human else 0)
             return {"events": self.events[since:], "status": self.status, "episode": self.episode, "frame": n,
                     "url": scr.url if scr else (self.episode or {}).get("url", ""),
-                    "screen_error": scr.error if scr else None, "browser": self.screen is not None}
+                    "screen_error": scr.error if scr else None, "browser": self.screen is not None,
+                    "typing": getattr(scr, "typing", None) if scr else None}
 
     # ── called from HTTP threads ──
     def call(self, name, data):
@@ -264,6 +266,34 @@ class Hub:
 
     def a_done(self, d):
         self._human().on_done(d)
+
+    def a_key(self, d):
+        """The real web's API key, pasted in the console: used from the next task on, no restart. `save` also writes
+        it to the repo's .env (gitignored). The key is never logged or sent back."""
+        key = (d.get("key") or "").strip()
+        if not key or any(c.isspace() for c in key) or len(key) < 20:
+            raise ValueError("that does not look like an API key")
+        name = d.get("name") or "OPENAI_API_KEY"
+        if name != "OPENAI_API_KEY":
+            raise ValueError(f"unknown key {name}")
+        os.environ[name] = key
+        if d.get("save"):
+            env = C.ROOT / ".env"
+            lines = env.read_text().splitlines() if env.exists() else []
+            out, done = [], False
+            for line in lines:
+                if line.strip().removeprefix("export ").startswith(name + "="):
+                    out.append(f"{name}={key}"); done = True
+                else:
+                    out.append(line)
+            if not done:
+                out.append(f"{name}={key}")
+            env.write_text("\n".join(out) + "\n")
+            os.chmod(env, 0o600)
+        self.info["needs_key"] = False
+        self.emit("system", "API key set" + (" and saved to .env" if d.get("save") else " for this session")
+                  + ". Type a task.")
+        return {"ok": True, "saved": bool(d.get("save"))}
 
     def a_end(self, d):
         if self.status not in ("idle",):
@@ -444,7 +474,7 @@ async def session(cfg, saved_cfg, day, backend, agent, ready=None):
     web = cfg["backend"] == "realweb"
     info = {"name": cfg["name"], "backend": cfg["backend"], "mock": C.is_mock(cfg), "day": day,
             "agent": cfg["realweb"]["model"] if web else agent["executor"],
-            "start": {"kind": "url", "default": cfg["realweb"]["start_url"]} if web else {"kind": "site"}, "out": str(C.out_dir(cfg)), "error_types": list(ERROR_TYPES),
+            "start": {"kind": "url", "default": cfg["realweb"]["start_url"]} if web else {"kind": "site"}, "needs_key": bool(getattr(backend, "needs_key", lambda: False)()), "out": str(C.out_dir(cfg)), "error_types": list(ERROR_TYPES),
             "sites": backend.sites(),
             "tasks": [{"id": t["task_id"], "site": t["site"], "instruction": t["instruction"][:240],
                        "macros": t["macros"]} for t in backend.catalog()]}

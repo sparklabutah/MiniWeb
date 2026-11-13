@@ -30,6 +30,7 @@ class Screen:
         self.bs, self.base, self.fps = bs, base, fps
         self.save_dir, self.save_every, self.who = Path(save_dir) if save_dir else None, save_every, who
         self.jpeg, self.n, self.url, self.error = None, 0, "", None
+        self.typing = None                # {url, n, ms}: the agent is typing this URL (cursor.py), the console shows it
         self._task, self._t0, self._saved = None, time.time(), 0.0
 
     async def _cdp(self):
